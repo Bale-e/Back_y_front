@@ -1,0 +1,5 @@
+<div class="zoom-controls">
+  <button class="zoom-btn" (click)="onZoomIn()" title="Acercar">+</button>
+  <button class="zoom-btn" (click)="onZoomOut()" title="Alejar" [disabled]="!zoomOutEnabled">-</button>
+  <button class="zoom-btn reset-btn" (click)="onReset()" title="Centrar Cámara">🎯</button>
+</div>

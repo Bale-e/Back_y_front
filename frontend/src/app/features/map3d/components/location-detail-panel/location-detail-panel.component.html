@@ -1,0 +1,23 @@
+<div class="detail-overlay" *ngIf="isOpen" (click)="onClose()"></div>
+
+<div class="detail-panel" [class.open]="isOpen" *ngIf="locationInfo">
+  <div class="detail-panel__header">
+    <h3 class="detail-panel__title">{{ locationInfo.nombre }}</h3>
+    <button class="detail-panel__close-btn" (click)="onClose()" aria-label="Cerrar detalles">✕</button>
+  </div>
+
+  <div class="detail-panel__body">
+    <p class="detail-panel__desc">{{ locationInfo.desc }}</p>
+    
+    <div class="detail-panel__meta" *ngIf="locationInfo.edificio || locationInfo.piso">
+      <span class="badge" *ngIf="locationInfo.edificio">Edificio {{ locationInfo.edificio }}</span>
+      <span class="badge" *ngIf="locationInfo.piso">{{ locationInfo.piso }}</span>
+    </div>
+  </div>
+
+  <div class="detail-panel__footer">
+    <button class="btn-navigate" (click)="onNavigate()">
+      <span class="icon">🧭</span> Cómo llegar
+    </button>
+  </div>
+</div>

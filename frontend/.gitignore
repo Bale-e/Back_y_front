@@ -1,0 +1,51 @@
+# --- Archivos de compilación y salida ---
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# --- Dependencias ---
+node_modules/
+jspm_packages/
+bower_components/
+
+# --- Caché de Angular ---
+.angular/*
+
+# --- Archivos de IDEs/Editores ---
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+
+# --- Logs y depuración ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# --- Otros ---
+.env
+dist/
+
+# --- Credenciales y claves privadas ---
+ServiceAccountKey.json
+*ServiceAccount*.json
+server/ServiceAccountKey.json
+*.pem
+*.key
+*.p12
+
+# --- Variables de entorno del servidor ---
+server/.env
+
+# --- Archivos temporales de scripts ---
+temp*.js
+tmp*.js

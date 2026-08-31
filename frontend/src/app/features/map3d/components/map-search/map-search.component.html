@@ -1,0 +1,30 @@
+<div class="view-banner">
+  <div class="search-wrapper">
+    <div class="search-input-container">
+      <input
+        class="search-input"
+        type="text"
+        placeholder="Buscar destino..."
+        [(ngModel)]="searchQuery"
+        (input)="onSearchChange()"
+        (blur)="onBlur()"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="clear-btn" *ngIf="searchQuery" (click)="clearSearch()" type="button" aria-label="Limpiar búsqueda">✕</button>
+    </div>
+
+    <div class="search-status" *ngIf="statusText">{{ statusText }}</div>
+
+    <div class="search-suggestions" *ngIf="isSuggestionsOpen">
+      <div
+        class="suggestion-item"
+        *ngFor="let item of filteredDestinations"
+        (mousedown)="selectDestination(item)"
+      >
+        <span class="suggestion-icon">📍</span>
+        <span class="suggestion-text">{{ item }}</span>
+      </div>
+    </div>
+  </div>
+</div>

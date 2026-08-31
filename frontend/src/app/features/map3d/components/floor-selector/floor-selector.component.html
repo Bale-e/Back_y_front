@@ -1,0 +1,25 @@
+<div class="floor-action">
+  <button class="floor-action__button" type="button" (click)="toggleDialog()" aria-label="Seleccionar piso u edificio">
+    <span class="floor-action__ring"></span>
+    <span class="floor-action__icon">{{ floorActionIcon }}</span>
+  </button>
+
+  <div class="floor-action__dialog" [class.visible]="isDialogVisible">
+    <ng-container *ngIf="currentBuilding !== 'S'; else selectBuildingTpl">
+      <p class="dialog-title">¿A qué piso quieres ir?</p>
+      <div class="floor-action__dialog-buttons">
+        <button type="button" (click)="selectFloor('first')">Primer piso</button>
+        <button type="button" (click)="selectFloor('second')">Segundo piso</button>
+        <button type="button" (click)="selectFloor('third')">Tercer piso</button>
+      </div>
+    </ng-container>
+    <ng-template #selectBuildingTpl>
+      <p class="dialog-title">Seleccionar Edificio</p>
+      <div class="floor-action__dialog-buttons">
+        <button type="button" (click)="selectBuilding('A')">Edificio A</button>
+        <button type="button" (click)="selectBuilding('B')">Edificio B</button>
+      </div>
+    </ng-template>
+    <button class="floor-action__dialog-close" type="button" (click)="closeDialog()">Cancelar</button>
+  </div>
+</div>

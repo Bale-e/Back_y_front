@@ -1,0 +1,54 @@
+<!--
+  Plantilla del componente `Map3dContainerComponent`.
+-->
+<div class="map-body">
+  <div class="view-3d">
+    <!-- Componente de búsqueda superior -->
+    <app-map-search
+      [destinations]="destinations"
+      [statusText]="destinationCoordinatesText"
+      (destinationSelected)="onDestinationSelected($event)"
+      (searchCleared)="onSearchCleared()"
+    ></app-map-search>
+
+    <!-- Canvas para la escena BabylonJS -->
+    <div #renderCanvas class="render-canvas"></div>
+
+    <!-- Marcadores de transición proyectados en pantalla -->
+    <ng-container *ngFor="let marker of screenMarkers">
+      <div
+        *ngIf="marker.visible"
+        class="screen-marker-badge marker-building"
+        [ngClass]="getFloorColorClass()"
+        [style.left.px]="marker.x"
+        [style.top.px]="marker.y"
+        (mousedown)="$event.stopPropagation(); onMarkerClicked(marker)"
+        (click)="$event.stopPropagation(); onMarkerClicked(marker)"
+      >
+        <span>{{ marker.label }}</span>
+      </div>
+    </ng-container>
+
+    <!-- Selector flotante de piso y edificio -->
+    <app-floor-selector
+      [currentBuilding]="currentBuilding"
+      (floorSelected)="onFloorSelected($event)"
+      (buildingSelected)="onBuildingSelected($event)"
+    ></app-floor-selector>
+
+    <!-- Controles flotantes de Zoom y Cámara -->
+    <app-map-controls
+      (zoomIn)="onZoomIn()"
+      (zoomOut)="onZoomOut()"
+      (resetCamera)="onResetCamera()"
+    ></app-map-controls>
+
+    <!-- Panel lateral de detalle de locación -->
+    <app-location-detail-panel
+      [locationInfo]="selectedLocationInfo"
+      [isOpen]="isDetailPanelOpen"
+      (close)="closeDetailPanel()"
+      (navigateTo)="onDestinationSelected($event)"
+    ></app-location-detail-panel>
+  </div>
+</div>

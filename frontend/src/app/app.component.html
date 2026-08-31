@@ -1,0 +1,45 @@
+<div class="app-root">
+  <app-map3d></app-map3d>
+
+  <div class="drawer-overlay" [class.open]="drawerOpen" *ngIf="drawerOpen" (click)="closeDrawer()"></div>
+  <aside class="side-drawer open" *ngIf="drawerOpen" role="dialog" aria-modal="true" aria-label="Menú lateral">
+    <div class="side-drawer__inner">
+      <div class="side-drawer__header">
+        <h3>Menú</h3>
+        <button class="side-drawer__close" type="button" aria-label="Cerrar menú" (click)="closeDrawer()">×</button>
+      </div>
+
+      <div class="side-drawer__body">
+        <div class="drawer-columns">
+          <section class="drawer-column">
+            <div class="drawer-column__title">Servicios</div>
+            <div class="drawer-list services-list">
+              <button
+                *ngFor="let service of servicesMenu"
+                class="drawer-item"
+                type="button"
+                [class.selected]="selectedOption === service"
+                (click)="onServiceClick(service)">
+                {{ service }}
+              </button>
+            </div>
+          </section>
+
+          <section class="drawer-column">
+            <div class="drawer-column__title">Ubicaciones</div>
+            <div class="drawer-list locations-list">
+              <button
+                *ngFor="let location of locationsMenu"
+                class="drawer-item"
+                type="button"
+                [class.selected]="selectedOption === location"
+                (click)="onLocationClick(location)">
+                {{ location }}
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
