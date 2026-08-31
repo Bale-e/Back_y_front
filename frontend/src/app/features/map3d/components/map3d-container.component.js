@@ -83,7 +83,11 @@ let Map3dContainerComponent = (() => {
         buildingBFirstFloorModel = 'Edificio B - Piso 1.obj';
         buildingBSecondFloorModel = 'Edificio B - Piso 2.obj';
         buildingBThirdFloorModel = 'Edificio B - Piso 3.obj';
-        sedeModel = 'MODELO_INACAP_FIXED.obj';
+        sedeModel = 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj';
+        legacySedeModel = 'MODELO_INACAP_FIXED.obj';
+        isSedeModel(modelName) {
+            return !!modelName && (modelName === this.sedeModel || modelName === this.legacySedeModel);
+        }
         constructor(babylonSceneService, mapNavService, cd) {
             this.babylonSceneService = babylonSceneService;
             this.mapNavService = mapNavService;
@@ -541,7 +545,7 @@ let Map3dContainerComponent = (() => {
             this.scene.clearColor = new BABYLON.Color4(0.08, 0.08, 0.1, 1);
             // Resetear orthoSize al inicializar escena
             this.orthoSize = this.defaultOrthoSize;
-            const isSede = this.currentFloor === this.sedeModel || this.currentBuilding === 'S';
+            const isSede = this.isSedeModel(this.currentFloor) || this.currentBuilding === 'S';
             const initialAlpha = (isSede || this.isTopDownView) ? -Math.PI / 2 : -Math.PI / 3;
             const initialBeta = isSede ? 1.25 : (this.isTopDownView ? 0.12 : Math.PI / 5);
             // iniciar un 30% más cerca para una vista inicial más próxima
@@ -793,7 +797,7 @@ let Map3dContainerComponent = (() => {
                 return;
             const modelName = this.currentFloor;
             const isBuildingB = [this.buildingBFirstFloorModel, this.buildingBSecondFloorModel, this.buildingBThirdFloorModel].includes(modelName);
-            const isSede = modelName === this.sedeModel;
+            const isSede = this.isSedeModel(modelName);
             const modelRoot = isSede
                 ? '/assets/3d-models/sede/'
                 : isBuildingB

@@ -160,6 +160,19 @@ describe('Map3dContainerComponent viewport wheel handling', () => {
   });
 });
 
+describe('Map3dContainerComponent sede model selection', () => {
+  it('should use the current Sede asset name while remaining compatible with the legacy one', () => {
+    const component = Map3dContainerComponent.createForTest(
+      {} as Firebase,
+      { run: (fn: () => unknown) => fn() } as NgZone,
+      { detectChanges: () => undefined } as ChangeDetectorRef
+    );
+
+    expect((component as any).sedeModel).toBe('INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj');
+    expect((component as any).sedeModel === 'MODELO_INACAP_FIXED.obj').toBeFalse();
+  });
+});
+
 describe('Map3dContainerComponent building A transition marker', () => {
   it('should return the expected marker data for each building B floor', () => {
     const component = Map3dContainerComponent.createForTest(

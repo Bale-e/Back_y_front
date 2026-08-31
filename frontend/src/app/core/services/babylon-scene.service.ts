@@ -133,7 +133,10 @@ export class BabylonSceneService implements OnDestroy {
   private handleAutoRotation(): void {
     if (!this.camera || !this.isAutoRotateEnabled) return;
 
-    const isSede = this.currentBuilding === 'S' || this.currentFloorModel === 'MODELO_INACAP_FIXED.obj';
+    const isSede =
+      this.currentBuilding === 'S' ||
+      this.currentFloorModel === 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj' ||
+      this.currentFloorModel === 'MODELO_INACAP_FIXED.obj';
     if (!isSede) return;
 
     const hasInertia =
@@ -213,7 +216,10 @@ export class BabylonSceneService implements OnDestroy {
     this.clearGuideArrows();
     this.clearDestinationMarker();
 
-    const isSede = buildingId === 'S' || modelName === 'MODELO_INACAP_FIXED.obj';
+    const isSede =
+      buildingId === 'S' ||
+      modelName === 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj' ||
+      modelName === 'MODELO_INACAP_FIXED.obj';
     const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
 
     const rootUrl = isSede

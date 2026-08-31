@@ -111,7 +111,9 @@ let BabylonSceneService = (() => {
         handleAutoRotation() {
             if (!this.camera || !this.isAutoRotateEnabled)
                 return;
-            const isSede = this.currentBuilding === 'S' || this.currentFloorModel === 'MODELO_INACAP_FIXED.obj';
+            const isSede = this.currentBuilding === 'S' ||
+                this.currentFloorModel === 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj' ||
+                this.currentFloorModel === 'MODELO_INACAP_FIXED.obj';
             if (!isSede)
                 return;
             const hasInertia = Math.abs(this.camera.inertialAlphaOffset) > 0.0001 ||
@@ -178,7 +180,9 @@ let BabylonSceneService = (() => {
             });
             this.clearGuideArrows();
             this.clearDestinationMarker();
-            const isSede = buildingId === 'S' || modelName === 'MODELO_INACAP_FIXED.obj';
+            const isSede = buildingId === 'S' ||
+                modelName === 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj' ||
+                modelName === 'MODELO_INACAP_FIXED.obj';
             const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
             const rootUrl = isSede
                 ? '/assets/3d-models/sede/'

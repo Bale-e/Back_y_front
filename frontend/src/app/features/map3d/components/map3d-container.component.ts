@@ -78,7 +78,12 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   private readonly buildingBSecondFloorModel = 'Edificio B - Piso 2.obj';
   private readonly buildingBThirdFloorModel = 'Edificio B - Piso 3.obj';
 
-  private readonly sedeModel = 'MODELO_INACAP_FIXED.obj';
+  private readonly sedeModel = 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj';
+  private readonly legacySedeModel = 'MODELO_INACAP_FIXED.obj';
+
+  private isSedeModel(modelName: string | null | undefined): boolean {
+    return !!modelName && (modelName === this.sedeModel || modelName === this.legacySedeModel);
+  }
 
   constructor(
     babylonSceneService: BabylonSceneService,
@@ -295,7 +300,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
       const isSede =
         this.currentBuilding === 'S' ||
-        this.currentFloor === this.sedeModel ||
+        this.isSedeModel(this.currentFloor) ||
         normalizedMeshName.includes('sede') ||
         normalizedMeshName.includes('untitled') ||
         normalizedMeshName.includes('fixed');
@@ -674,7 +679,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     // Resetear orthoSize al inicializar escena
     this.orthoSize = this.defaultOrthoSize;
 
-    const isSede = this.currentFloor === this.sedeModel || this.currentBuilding === 'S';
+    const isSede = this.isSedeModel(this.currentFloor) || this.currentBuilding === 'S';
 
     const initialAlpha = (isSede || this.isTopDownView) ? -Math.PI / 2 : -Math.PI / 3;
     const initialBeta = isSede ? 1.25 : (this.isTopDownView ? 0.12 : Math.PI / 5);
@@ -929,7 +934,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
     const modelName = this.currentFloor;
     const isBuildingB = [this.buildingBFirstFloorModel, this.buildingBSecondFloorModel, this.buildingBThirdFloorModel].includes(modelName);
-    const isSede = modelName === this.sedeModel;
+    const isSede = this.isSedeModel(modelName);
     const modelRoot = isSede
       ? '/assets/3d-models/sede/'
       : isBuildingB
