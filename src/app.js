@@ -1,6 +1,8 @@
 require('dotenv').config();
 require('./shared/infrastructure/firebase/firebaseAdmin'); // inicializa Firebase Admin antes que nada
 
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const { createCorsMiddleware } = require('./modules/api/infrastructure/middlewares/corsConfig');
 const { notFoundHandler, errorHandler } = require('./modules/api/infrastructure/middlewares/errorHandler');
@@ -57,6 +59,36 @@ app.get('/rutas', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── Monorepo: Servicio Estático del Frontend Angular Compilado ─
+const frontendDistPath = path.join(__dirname, '../frontend/dist/inamap-angular/browser');
+const legacyDistPath = path.join(__dirname, '../frontend/dist/inamap-angular');
+
+const distPathToUse = fs.existsSync(frontendDistPath)
+  ? frontendDistPath
+  : fs.existsSync(legacyDistPath)
+  ? legacyDistPath
+  : null;
+
+if (distPathToUse) {
+  app.use(express.static(distPathToUse));
+  app.use((req, res, next) => {
+    // Si es una petición GET no API, devolver el index.html de la SPA
+    if (
+      req.method === 'GET' &&
+      !req.path.startsWith('/edificios') &&
+      !req.path.startsWith('/locaciones') &&
+      !req.path.startsWith('/navegacion') &&
+      !req.path.startsWith('/ruta') &&
+      !req.path.startsWith('/navigation-paths') &&
+      !req.path.startsWith('/rutas') &&
+      !req.path.startsWith('/health')
+    ) {
+      return res.sendFile(path.join(distPathToUse, 'index.html'));
+    }
+    next();
+  });
+}
 
 // ── 404 y manejo global de errores ───────────────────────────
 app.use(notFoundHandler);

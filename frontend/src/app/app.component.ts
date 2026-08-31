@@ -1,9 +1,9 @@
 /**
  * Componente raíz de la aplicación.
- * Descripción: inicia servicios esenciales y monta la vista principal que contiene el mapa 3D/2D.
+ * Descripción: inicia servicios esenciales y monta la vista principal que contiene el mapa 3D.
  */
 import { Component, OnDestroy, OnInit, Renderer2 } from '@angular/core';
-import { Firebase } from './services/firebase';
+import { EspaciosApiService } from './services/espacios-api.service';
 
 @Component({
   selector: 'app-root',
@@ -18,10 +18,13 @@ export class AppComponent implements OnInit, OnDestroy {
   private hamburgerListener?: () => void;
   private selectionTimeout?: ReturnType<typeof setTimeout>;
 
-  constructor(private firebaseService: Firebase, private renderer: Renderer2) {}
+  constructor(
+    private espaciosApiService: EspaciosApiService,
+    private renderer: Renderer2
+  ) {}
 
   async ngOnInit() {
-    await this.firebaseService.getEdificios();
+    await this.espaciosApiService.getEdificios().catch(() => []);
 
     const hamburgerBtn = document.getElementById('hamburgerMenuBtn');
     if (hamburgerBtn) {
@@ -51,12 +54,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onServiceClick(service: string): void {
     this.setSelectedOption(service);
-    // TODO: implementar lógica específica para servicios.
   }
 
   onLocationClick(location: string): void {
     this.setSelectedOption(location);
-    // TODO: implementar lógica específica para ubicaciones.
   }
 
   private setSelectedOption(option: string): void {
