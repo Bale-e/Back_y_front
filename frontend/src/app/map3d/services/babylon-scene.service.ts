@@ -683,10 +683,12 @@ export class BabylonSceneService implements OnDestroy {
     const boundingInfo = targetMesh.getBoundingInfo();
     const targetPosition = boundingInfo.boundingBox.centerWorld.clone();
 
-    // Ángulo fijo tipo "vista desde dentro" para todos los cuerpos
+        // Ángulo fijo tipo "vista desde dentro" para todos los cuerpos
     const targetAlpha = flipAngle ? baseAlpha + Math.PI : baseAlpha;
     const targetBeta = Math.PI / 2 - 0.6; // casi horizontal, mirando hacia el frente
 
+    console.log('FOCUS MESH DEBUG ->', { meshName, targetRadius, flipAngle, baseAlpha, targetAlpha, targetBeta });
+    
     const startTarget = this.camera.target.clone();
     const startRadius = this.camera.radius;
     const startAlpha = this.camera.alpha;

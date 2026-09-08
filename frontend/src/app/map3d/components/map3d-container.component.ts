@@ -307,10 +307,67 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         return;
       }
 
+      const isBuildingBSecondFloorBody9 = this.currentBuilding === 'B'
+        && this.currentFloor === this.buildingBSecondFloorModel
+        && normalizedMeshName === 'cuerpo9';
+
+      if (isBuildingBSecondFloorBody9) {
+        this.floorSelectorComponent?.openDialog();
+        this.closeDetailPanel();
+        if (this.infoBox) this.infoBox.style.display = 'none';
+        return;
+      }
+
+      const isExcludedBuildingBSecondFloorBody = this.currentBuilding === 'B'
+        && this.currentFloor === this.buildingBSecondFloorModel
+        && ['cuerpo8', 'cuerpo0'].includes(normalizedMeshName);
+
+      if (isExcludedBuildingBSecondFloorBody) {
+        this.closeDetailPanel();
+        if (this.infoBox) this.infoBox.style.display = 'none';
+        return;
+      }
+
+      const isExcludedThirdFloorBody = (this.currentFloor === this.thirdFloorModel
+        || this.currentFloor === this.buildingBThirdFloorModel)
+        && ['cuerpo48', 'cuerpo47', 'cuerpo27'].includes(normalizedMeshName);
+
+      if (isExcludedThirdFloorBody) {
+        this.closeDetailPanel();
+        if (this.infoBox) this.infoBox.style.display = 'none';
+        return;
+      }
+
+      const isExcludedBuildingBThirdFloorBody = this.currentBuilding === 'B'
+        && this.currentFloor === this.buildingBThirdFloorModel
+        && ['cuerpo9', 'cuerpo0'].includes(normalizedMeshName);
+
+      if (isExcludedBuildingBThirdFloorBody) {
+        this.closeDetailPanel();
+        if (this.infoBox) this.infoBox.style.display = 'none';
+        return;
+      }
+
       // Si este mesh es un disparador del selector de piso (ej. escaleras),
       // abrir el selector de piso y no mostrar el panel de detalle de ubicación.
       if (this.isFloorSelectionTrigger(meshName)) {
         this.floorSelectorComponent?.openDialog();
+        this.closeDetailPanel();
+        if (this.infoBox) this.infoBox.style.display = 'none';
+        return;
+      }
+
+      const isExcludedFirstFloorSurface = this.currentBuilding === 'A'
+        && this.currentFloor === this.firstFloorModel
+        && ['cuerpo43', 'cuerpo44', 'cuerpo45'].includes(normalizedMeshName);
+      const isExcludedBuildingBFirstFloorSurface = this.currentBuilding === 'B'
+        && this.currentFloor === this.buildingBFirstFloorModel
+        && ['cuerpo98', 'cuerpo75', 'cuerpo69', 'cuerpo72', 'cuerpo74', 'cuerpo73'].includes(normalizedMeshName);
+      const isExcludedSecondFloorBody = (this.currentFloor === this.secondFloorModel
+        || this.currentFloor === this.buildingBSecondFloorModel)
+        && ['cuerpo40', 'cuerpo41', 'cuerpo32', 'cuerpo31'].includes(normalizedMeshName);
+
+      if (isExcludedFirstFloorSurface || isExcludedBuildingBFirstFloorSurface || isExcludedSecondFloorBody) {
         this.closeDetailPanel();
         if (this.infoBox) this.infoBox.style.display = 'none';
         return;
@@ -350,13 +407,14 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     const isSecondFloor = this.currentFloor === this.secondFloorModel || this.currentFloor === this.buildingBSecondFloorModel;
     const isThirdFloor = this.currentFloor === this.thirdFloorModel || this.currentFloor === this.buildingBThirdFloorModel;
 
-    const shouldFocus = (
+        const shouldFocus = (
       (this.currentBuilding === 'A' && isFirstFloor && firstFloorBodies.includes(normalizedMeshName)) ||
       (this.currentBuilding === 'B' && this.currentFloor === this.buildingBFirstFloorModel && buildingBFirstFloorBodies.includes(normalizedMeshName)) ||
-      (isSecondFloor && secondFloorBodies.includes(normalizedMeshName)) ||
-      (this.currentBuilding === 'B' && this.currentFloor === this.buildingBThirdFloorModel && /^cuerpo/i.test(normalizedMeshName)) ||
-      (isThirdFloor && thirdFloorBodies.includes(normalizedMeshName))
+      (isSecondFloor && /^cuerpo/i.test(normalizedMeshName)) ||
+      (isThirdFloor && /^cuerpo/i.test(normalizedMeshName))
     );
+
+        console.log('SHOULD FOCUS DEBUG ->', { meshName, normalizedMeshName, shouldFocus, currentBuilding: this.currentBuilding, currentFloor: this.currentFloor });
 
     if (!shouldFocus) {
       return;
@@ -369,18 +427,37 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     const flippedBodiesThirdFloor = ['cuerpo40', 'cuerpo72', 'cuerpo4', 'cuerpo3', 'cuerpo67', 'cuerpo68',
     'cuerpo57', 'cuerpo59'];
 
-    const shouldFlip =
-    (isFirstFloor && flippedBodiesFirstFloor.includes(normalizedMeshName)) ||
-    (isSecondFloor && flippedBodiesSecondFloor.includes(normalizedMeshName)) ||
-    (this.currentBuilding === 'B' && this.currentFloor === this.buildingBThirdFloorModel && /^cuerpo/i.test(normalizedMeshName)) ||
-    (isThirdFloor && flippedBodiesThirdFloor.includes(normalizedMeshName));
+                                let shouldFlip = false;
+    if (isFirstFloor) {
+      shouldFlip = flippedBodiesFirstFloor.includes(normalizedMeshName);
+                        } else if (isThirdFloor && this.currentBuilding === 'B') {
+      const buildingBThirdFloorFlipped = ['cuerpo7', 'cuerpo4', 'cuerpo1', 'cuerpo5'];
+      shouldFlip = buildingBThirdFloorFlipped.includes(normalizedMeshName);
+    } else if (isSecondFloor || isThirdFloor) {
+      const side = this.babylonSceneService.getMeshFacingSide(meshName, 'z');
+      const invertForBuildingB = this.currentBuilding === 'B';
+      shouldFlip = invertForBuildingB ? side === -1 : side === 1;
+    }
 
-    const baseAlphaSecondFloor = Math.PI / 2;
-    const baseAlphaThirdFloor = Math.PI / 2;
-    const currentBaseAlpha = isSecondFloor ? baseAlphaSecondFloor : (isThirdFloor ? baseAlphaThirdFloor : Math.PI / 2);
+        const baseAlphaSecondFloor = Math.PI / 2;
+    const baseAlphaThirdFloorA = Math.PI / 2;
+    const baseAlphaThirdFloorB = 0;
+    const currentBaseAlpha = isSecondFloor
+      ? baseAlphaSecondFloor
+      : (isThirdFloor
+        ? (this.currentBuilding === 'B' ? baseAlphaThirdFloorB : baseAlphaThirdFloorA)
+        : Math.PI / 2);
 
-    this.babylonSceneService.focusOnMesh(meshName, 9, 1800, shouldFlip, currentBaseAlpha);
+            const isBuildingBFirstFloorTarget = this.currentBuilding === 'B' && this.currentFloor === this.buildingBFirstFloorModel;
+    const zoomRadius = isBuildingBFirstFloorTarget ? 15 : 15;
+
+        if (isFirstFloor) {
+      this.babylonSceneService.focusOnMesh(meshName, zoomRadius, 1800, shouldFlip);
+    } else {
+      this.babylonSceneService.focusOnMesh(meshName, zoomRadius, 1800, shouldFlip, currentBaseAlpha);
+    }
   }
+
   private animateCameraFocus(targetVector: BABYLON.Vector3, targetOrthoSize: number, durationMs = 700): void {
     if (!this.camera) return;
 
@@ -511,7 +588,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   public isFloorSelectionTrigger(meshName: string | null | undefined): boolean {
-    const normalizedMeshName = meshName?.replace(/\s+/g, '').toLowerCase();
+    const normalizedMeshName = meshName?.replace(/[^a-z0-9]/gi, '').toLowerCase();
     if (!normalizedMeshName) {
       return false;
     }
@@ -1081,15 +1158,46 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
             if (this.infoBox) this.infoBox.style.display = 'none';
             return;
           }
-          const excludedFirstFloorDetailBodies = ['cuerpo14', 'cuerpo21', 'cuerpo19', 'cuerpo25', 'cuerpo45'];
-          const excludedSecondFloorDetailBodies = ['cuerpo23', 'cuerpo8', 'cuerpo25', 'cuerpo30', 'cuerpo41'];
+
+          if (this.currentBuilding === 'B'
+              && this.currentFloor === this.buildingBSecondFloorModel
+              && normalizedMeshName === 'cuerpo9') {
+            this.floorSelectorComponent?.openDialog();
+            this.closeDetailPanel();
+            if (this.infoBox) this.infoBox.style.display = 'none';
+            return;
+          }
+
+          if ((this.currentFloor === this.thirdFloorModel || this.currentFloor === this.buildingBThirdFloorModel)
+              && ['cuerpo48', 'cuerpo47', 'cuerpo27'].includes(normalizedMeshName)) {
+            this.closeFloorDialog();
+            this.closeDetailPanel();
+            if (this.infoBox) this.infoBox.style.display = 'none';
+            return;
+          }
+
+          if (this.currentBuilding === 'B'
+              && this.currentFloor === this.buildingBThirdFloorModel
+              && ['cuerpo9', 'cuerpo0'].includes(normalizedMeshName)) {
+            this.closeFloorDialog();
+            this.closeDetailPanel();
+            if (this.infoBox) this.infoBox.style.display = 'none';
+            return;
+          }
+
+          const excludedFirstFloorDetailBodies = ['cuerpo14', 'cuerpo21', 'cuerpo19', 'cuerpo25', 'cuerpo43', 'cuerpo44', 'cuerpo45'];
+          const excludedBuildingBFirstFloorSurfaceBodies = ['cuerpo98', 'cuerpo75', 'cuerpo69', 'cuerpo72', 'cuerpo74', 'cuerpo73'];
+          const excludedSecondFloorDetailBodies = ['cuerpo23', 'cuerpo8', 'cuerpo25', 'cuerpo30', 'cuerpo31', 'cuerpo32', 'cuerpo40', 'cuerpo41'];
           const excludedBuildingBFirstFloorDetailBodies = ['cuerpo0', 'cuerpo97'];
           const excludedBuildingBSecondFloorDetailBodies = ['cuerpo0'];
           const excludedBuildingBThirdFloorDetailBodies = ['cuerpo0'];
           const isFirstFloorBodyDetailTrigger = (this.currentFloor === this.firstFloorModel || this.currentFloor === this.buildingBFirstFloorModel)
             && /^cuerpo/i.test(normalizedMeshName)
             && !excludedFirstFloorDetailBodies.includes(normalizedMeshName)
-            && !(this.currentFloor === this.buildingBFirstFloorModel && excludedBuildingBFirstFloorDetailBodies.includes(normalizedMeshName));
+            && !(this.currentFloor === this.buildingBFirstFloorModel && (
+              excludedBuildingBFirstFloorDetailBodies.includes(normalizedMeshName)
+              || excludedBuildingBFirstFloorSurfaceBodies.includes(normalizedMeshName)
+            ));
           const isSecondFloorBodyDetailTrigger = (this.currentFloor === this.secondFloorModel || this.currentFloor === this.buildingBSecondFloorModel)
             && /^cuerpo/i.test(normalizedMeshName)
             && !excludedSecondFloorDetailBodies.includes(normalizedMeshName)
@@ -1113,7 +1221,9 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
           } else {
             const isSuppressedLeftPanel =
               (this.currentFloor === this.firstFloorModel || this.currentFloor === this.buildingBFirstFloorModel)
-              && excludedFirstFloorDetailBodies.includes(normalizedMeshName);
+              && (excludedFirstFloorDetailBodies.includes(normalizedMeshName)
+                || (this.currentFloor === this.buildingBFirstFloorModel
+                  && excludedBuildingBFirstFloorSurfaceBodies.includes(normalizedMeshName)));
 
             if (isSuppressedLeftPanel) {
               this.closeFloorDialog();
