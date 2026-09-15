@@ -457,9 +457,12 @@ export class BabylonSceneService implements OnDestroy {
       }
     }
 
-    // Marcador Edificio A (desde Edificio B)
-    if (this.currentBuilding === 'B' && !this.currentFloorModel.includes('Piso 3')) {
-      const proj = projectWorldPointOnGround(-5.336930000984566, -1.9430948868138938);
+        // Marcador Edificio A (desde Edificio B)
+    if (this.currentBuilding === 'B') {
+      const isBuildingBThirdFloor = this.currentFloorModel === 'Edificio B - Piso 3.obj';
+      const proj = isBuildingBThirdFloor
+        ? projectWorldPointOnGround(-0.1150672957515404, -8.696399910085567)
+        : projectWorldPointOnGround(-5.336930000984566, -1.9430948868138938);
       markers.push({
         id: 'marker-building-a',
         label: '← Volver al Edificio A',

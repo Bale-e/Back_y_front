@@ -698,13 +698,6 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       };
     }
 
-    if (this.currentFloor === this.buildingBSecondFloorModel) {
-      return {
-        label: 'Ir al Edificio A - Piso 2',
-        position: { x: -4.43, y: 0.01, z: -3.25 }
-      };
-    }
-
     if (this.currentFloor === this.buildingBFirstFloorModel) {
       return {
         label: 'Ir al mapa principal',
