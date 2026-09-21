@@ -310,9 +310,13 @@ export class MapNavigationService {
 
   private getPisoFromLoc(loc: any): string {
     if (!loc) return 'Piso 1';
-    const raw = loc.Piso ?? loc.piso ?? loc.floor ?? loc.Floor ?? loc._coleccionPiso;
+    const raw = loc.Piso ?? loc['Piso '] ?? loc.piso ?? loc['piso '] ?? loc.floor ?? loc.Floor ?? loc._coleccionPiso ?? loc._coleccion;
     if (!raw) return 'Piso 1';
     const str = raw.toString().trim();
+    if (/3/i.test(str)) return 'Piso 3';
+    if (/2/i.test(str)) return 'Piso 2';
+    if (/-1|sub/i.test(str)) return 'Piso -1';
+    if (/1/i.test(str)) return 'Piso 1';
     if (/^\d+$/.test(str)) return `Piso ${str}`;
     if (/^piso\s*\d+/i.test(str)) {
       const num = str.replace(/[^0-9-]/g, '');
@@ -342,9 +346,14 @@ export class MapNavigationService {
     const cuerpoNum = loc.Cuerpo ?? loc.cuerpo;
     const cuerpoId = cuerpoNum != null ? `cuerpo${cuerpoNum}` : undefined;
 
-    // 1. Obtener posición del mesh si existe
+    // 1. Obtener posición del mesh SOLO si el piso de la escena coincide con el de la locación
+    const currentFloor = this.currentFloorSubject.value.toLowerCase();
+    const isSameFloor = (piso === 'Piso 1' && (currentFloor.includes('piso1') || currentFloor.includes('1.obj')))
+      || (piso === 'Piso 2' && (currentFloor.includes('piso2') || currentFloor.includes('2.obj')))
+      || (piso === 'Piso 3' && (currentFloor.includes('piso3') || currentFloor.includes('3.obj')));
+
     let meshPos: BABYLON.Vector3 | null = null;
-    if (meshPositionGetter) {
+    if (meshPositionGetter && isSameFloor) {
       meshPos = meshPositionGetter(destinationName, cuerpoId);
     }
 
@@ -360,9 +369,11 @@ export class MapNavigationService {
       routePoints = backendRoute.coordinates.map((c) => new BABYLON.Vector3(c[0], c[1], c[2]));
     }
 
-    // Fallback de coordenadas de la locación si fuera necesario
+    // Fallback de coordenadas de la locación
     const docCoord = this.extractVec3(loc);
-    const destination = meshPos ?? (routePoints.length > 0 ? routePoints[routePoints.length - 1] : null) ?? (docCoord ? new BABYLON.Vector3(docCoord.x, Math.max(docCoord.y, 0.05), docCoord.z) : null);
+    const destination = (routePoints.length > 0 ? routePoints[routePoints.length - 1] : null)
+      ?? (docCoord ? new BABYLON.Vector3(docCoord.x, Math.max(docCoord.y, 0.05), docCoord.z) : null)
+      ?? meshPos;
 
     if (!destination) {
       console.warn(`[MapNav] Sin coordenadas disponibles para: ${destinationName}`);

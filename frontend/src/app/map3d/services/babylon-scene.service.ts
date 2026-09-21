@@ -488,6 +488,12 @@ export class BabylonSceneService implements OnDestroy {
   private insertElbowPoint(worldPoints: BABYLON.Vector3[]): BABYLON.Vector3[] {
     if (worldPoints.length < 2) return worldPoints;
 
+    // Si la ruta ya tiene 3 o más puntos, el backend ya calculó el punto de inflexión
+    // perpendicular exacto (giro de 90° frente a la sala), por lo que la ruta ya es óptima.
+    if (worldPoints.length >= 3) {
+      return worldPoints;
+    }
+
     const THRESHOLD = 0.15; // distancia mínima para considerar un giro real
 
     const last = worldPoints[worldPoints.length - 1];        // destino final
@@ -536,18 +542,16 @@ export class BabylonSceneService implements OnDestroy {
 
     const color = new BABYLON.Color3(0.95, 0.08, 0.08);
 
-    // Los puntos ya vienen en coordenadas mundo (transformados desde el espacio local del OBJ
-    // usando localToWorld() antes de llamar a este método). Se dibujan segmento a segmento.
-    // Se iguala la Y de todos los waypoints intermedios a un valor sobre el suelo para
-    // que la línea no atraviese el modelo.
-    const floorY = Math.max(points[points.length - 1].y, 0.5);
-    const leveledPoints: BABYLON.Vector3[] = points.map((p, i) =>
-      i === points.length - 1
-        ? p.clone()                                            // destino: respetar su Y real
-        : new BABYLON.Vector3(p.x, floorY, p.z)              // waypoints intermedios: nivelados
+    // Los puntos ya vienen en coordenadas mundo de Babylon.
+    // Nivelamos la altura Y de todos los puntos al suelo del pasillo (con un pequeño offset de 0.08m)
+    // para que la ruta se trace completamente plana en el plano horizontal y el giro en 90°
+    // sea nítido y claro sin inclinaciones verticales.
+    const corridorY = points[0].y;
+    const leveledPoints: BABYLON.Vector3[] = points.map((p) =>
+      new BABYLON.Vector3(p.x, corridorY + 0.08, p.z)
     );
 
-    // Insertar punto de codo en L antes del destino para evitar diagonales que cruzan paredes
+    // Insertar punto de codo en L solo si son 2 puntos (ruta directa sin waypoints intermedios)
     const worldPoints = this.insertElbowPoint(leveledPoints);
 
     const totalSegments = worldPoints.length - 1;

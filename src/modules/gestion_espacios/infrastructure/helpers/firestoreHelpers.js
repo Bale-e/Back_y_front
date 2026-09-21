@@ -12,8 +12,8 @@ const COLECCIONES_LOCACIONES = [
 // ── Busca un campo sin importar mayúscula/minúscula ──────────
 function getFieldCI(obj, fieldName) {
   if (!obj) return undefined;
-  const regex = new RegExp(`^${fieldName}$`, 'i');
-  const key = Object.keys(obj).find((k) => regex.test(k));
+  const cleanTarget = fieldName.trim().toLowerCase();
+  const key = Object.keys(obj).find((k) => k.trim().toLowerCase() === cleanTarget);
   return key !== undefined ? obj[key] : undefined;
 }
 

@@ -486,6 +486,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     requestAnimationFrame(animateStep);
   }
 
+
   private switchFloorByPisoName(pisoStr: string, edificio?: BuildingId): void {
     const targetBuilding = edificio || this.currentBuilding;
     if (targetBuilding !== this.currentBuilding) {
@@ -493,14 +494,15 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     }
 
     const pisoLower = pisoStr.toLowerCase().replace(/\s+/g, '');
-    if (pisoLower.includes('2') || pisoLower.includes('piso2')) {
-      this.onFloorSelected('second');
-    } else if (pisoLower.includes('3') || pisoLower.includes('piso3')) {
+    if (/3/i.test(pisoLower)) {
       this.onFloorSelected('third');
-    } else if (pisoLower.includes('1') || pisoLower.includes('piso1')) {
+    } else if (/2/i.test(pisoLower)) {
+      this.onFloorSelected('second');
+    } else if (/1/i.test(pisoLower)) {
       this.onFloorSelected('first');
     }
   }
+
   async onDestinationSelected(destinationName: string): Promise<void> {
     this.selectedDestination = destinationName;
     const result = await this.mapNavService.calculateRoute(
@@ -512,23 +514,28 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         this.switchFloorByPisoName(result.piso, result.edificio);
       }
       this.destinationCoordinatesText = result.statusText;
+
+      const loc = await this.mapNavService.findLocationByName(destinationName);
+      if (loc) {
+        this.selectedLocationInfo = {
+          nombre: loc.Nombre || loc.nombre || destinationName,
+          desc: `${loc.Tipo || loc.tipo || 'Espacio académico'} — Edificio ${result.edificio}, ${result.piso}.`,
+          edificio: result.edificio,
+          piso: result.piso,
+        };
+        this.mapNavService.setSelectedLocation(this.selectedLocationInfo);
+      }
+
       this.babylonSceneService.setDestinationMarker(result.coord);
 
-      // Los routePoints de buildRoute contienen coordenadas en el espacio local del modelo OBJ
-      // (exactamente como están almacenadas en Firestore). Se deben transformar a espacio mundo
-      // usando localToWorld() para que las flechas se dibujen dentro del pasillo correcto.
-      //
-      // Excepción: el último punto puede haber sido obtenido con getMeshWorldPosition() y ya
-      // estará en espacio mundo. En ese caso usamos result.coord directamente (que ES el
-      // meshPos / destino final ya transformado).
+      // Los routePoints provienen de la API de navegación backend y ya están en coordenadas mundo
+      // correspondientes a la posición real del edificio, pasillos y salas.
       const rawPoints = result.routePoints;
       const worldPoints = rawPoints.map((pt, i) => {
-        if (i === rawPoints.length - 1) {
-          // El punto final es el destino — result.coord ya está en espacio mundo
+        if (i === rawPoints.length - 1 && result.coord) {
           return result.coord.clone();
         }
-        // Puntos intermedios (Accesos, Giros de navigation-paths) → transformar local→mundo
-        return this.babylonSceneService.localToWorld(pt);
+        return pt.clone();
       });
 
       this.babylonSceneService.drawAnimatedRoute(worldPoints);
