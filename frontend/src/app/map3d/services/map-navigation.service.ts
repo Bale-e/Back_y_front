@@ -29,7 +29,14 @@ export class MapNavigationService {
     'Cuerpo28': { nombre: 'Sala de Tutorías 3', desc: 'Espacio adicional de tutorías con capacidad para grupos pequeños.' },
     'Cuerpo27': { nombre: 'Sala de Tutorías 4', desc: 'Sala de apoyo académico y reuniones estudiantiles.' },
     'Cuerpo20': { nombre: 'Sala A106', desc: 'Espacio académico del Edificio A, piso 1.' },
-    'cuerpo20': { nombre: 'Sala A106', desc: 'Espacio académico del Edificio A, piso 1.' }
+    'cuerpo20': { nombre: 'Sala A106', desc: 'Espacio académico del Edificio A, piso 1.' },
+    'c101': { nombre: 'Sala C101', desc: 'Espacio académico (Convenio Legrand) del Edificio C, piso 1.' },
+    'c102': { nombre: 'Sala C102', desc: 'Espacio académico (Electricidad y Electrónica) del Edificio C, piso 1.' },
+    'c103': { nombre: 'Sala C103', desc: 'Espacio académico (Aplicaciones Computacionales) del Edificio C, piso 1.' },
+    'c104': { nombre: 'Sala C104', desc: 'Espacio académico (Instrumentación y Control) del Edificio C, piso 1.' },
+    'c105': { nombre: 'Sala C105', desc: 'Espacio académico (Aplicaciones Computacionales) del Edificio C, piso 1.' },
+    'c106': { nombre: 'Sala C106', desc: 'Espacio académico (Electricidad y Electrónica) del Edificio C, piso 1.' },
+    'c107': { nombre: 'Sala C107', desc: 'Espacio académico (Aplicaciones Computacionales) del Edificio C, piso 1.' }
   };
 
   private getFloorSpecificInfo(meshName: string): SelectedLocationInfo | null {
@@ -154,6 +161,23 @@ export class MapNavigationService {
     if (infoDataEntry) {
       return infoDataEntry;
     }
+
+    // Identificación de salas del Edificio C (Mesh18 C102_1 Model -> c102, etc.)
+    const cRoomMatch = normalizedMeshName.match(/c(10[1-7])/i);
+    if (cRoomMatch) {
+      const roomNum = cRoomMatch[1];
+      const roomCode = `c${roomNum}`;
+      if (this.infoDataMap[roomCode]) {
+        return this.infoDataMap[roomCode];
+      }
+      return {
+        nombre: `Sala C${roomNum}`,
+        desc: `Espacio académico del Edificio C, Piso 1.`,
+        edificio: 'C',
+        piso: 'Piso 1'
+      };
+    }
+
     const cleanName = meshName.replace(/\s+/g, '');
     const match = cleanName.match(/^cuerpo(\d+)/i);
     if (match) {
@@ -342,7 +366,7 @@ export class MapNavigationService {
 
     const piso = this.getPisoFromLoc(loc);
     const edificioField = loc._edificioNombre || loc.Edificio || loc.edificio || 'A';
-    const edificio: BuildingId = /b/i.test(edificioField) ? 'B' : /s|sede/i.test(edificioField) ? 'S' : 'A';
+    const edificio: BuildingId = /c/i.test(edificioField) ? 'C' : /b/i.test(edificioField) ? 'B' : /s|sede/i.test(edificioField) ? 'S' : 'A';
     const cuerpoNum = loc.Cuerpo ?? loc.cuerpo;
     const cuerpoId = cuerpoNum != null ? `cuerpo${cuerpoNum}` : undefined;
 
