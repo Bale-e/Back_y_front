@@ -2,6 +2,7 @@ import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import * as BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
 import { dibujarFlechaGuia } from './guide-arrow.service';
+import { BuildingId } from '../../core/models/navegacion.model';
 
 export interface ScreenMarker {
   id: string;
@@ -9,7 +10,7 @@ export interface ScreenMarker {
   x: number;
   y: number;
   visible: boolean;
-  type: 'building-b' | 'building-a' | 'sede';
+  type: 'building-b' | 'building-a' | 'building-c' | 'sede';
   data?: any;
 }
 
@@ -24,7 +25,7 @@ export class BabylonSceneService implements OnDestroy {
   private destinationMarker: BABYLON.TransformNode | BABYLON.Mesh | null = null;
   private guideArrowMeshes: BABYLON.AbstractMesh[] = [];
 
-  private currentBuilding: 'A' | 'B' | 'S' = 'A';
+  private currentBuilding: BuildingId = 'A';
   private currentFloorModel = 'Edifico A - Piso 1.obj';
 
   private onMarkersUpdatedCb?: (markers: ScreenMarker[]) => void;
@@ -185,10 +186,10 @@ export class BabylonSceneService implements OnDestroy {
     skybox.material = skyboxMaterial;
   }
 
-  public async loadModel(modelName: string, building: 'A' | 'B' | 'S' | boolean = 'A'): Promise<void> {
+  public async loadModel(modelName: string, building: BuildingId | boolean = 'A'): Promise<void> {
     if (!this.scene) return;
 
-    const buildingId: 'A' | 'B' | 'S' = typeof building === 'boolean' ? (building ? 'B' : 'A') : building;
+    const buildingId: BuildingId = typeof building === 'boolean' ? (building ? 'B' : 'A') : building;
 
     // Si es el mismo modelo ya cargado, conservar la vista de cámara actual al terminar
     const isSameModel = modelName === this.currentFloorModel && buildingId === this.currentBuilding && this.modelRoot !== null;
@@ -223,12 +224,15 @@ export class BabylonSceneService implements OnDestroy {
       modelName === 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj' ||
       modelName === 'MODELO_INACAP_FIXED.obj';
     const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
+    const isBuildingC = buildingId === 'C' || modelName.includes('Edificio C');
 
     const rootUrl = isSede
       ? '/assets/3d-models/sede/'
       : isBuildingB
         ? '/assets/3d-models/Edificio B/'
-        : '/assets/3d-models/Edificio A/';
+        : isBuildingC
+          ? '/assets/3d-models/Edificio C/'
+          : '/assets/3d-models/Edificio A/';
 
     try {
       const result = await BABYLON.SceneLoader.ImportMeshAsync(
@@ -251,7 +255,9 @@ export class BabylonSceneService implements OnDestroy {
 
       allNodes.rotation = isSede
         ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
-        : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
+        : isBuildingC
+          ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
+          : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
 
       if (isBuildingB) {
         allNodes.scaling = new BABYLON.Vector3(1.2, 1.2, 1.2);
@@ -470,6 +476,19 @@ export class BabylonSceneService implements OnDestroy {
         y: proj.y,
         visible: proj.visible,
         type: 'building-a'
+      });
+    }
+
+    // Marcador Sede (desde Edificio C)
+    if (this.currentBuilding === 'C') {
+      const proj = projectWorldPointOnGround(0, -7);
+      markers.push({
+        id: 'marker-sede',
+        label: '→ Ir al mapa principal',
+        x: proj.x,
+        y: proj.y,
+        visible: proj.visible,
+        type: 'sede'
       });
     }
 

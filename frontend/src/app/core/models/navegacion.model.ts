@@ -1,4 +1,4 @@
-export type BuildingId = 'A' | 'B' | 'S';
+export type BuildingId = 'A' | 'B' | 'C' | 'S';
 
 export interface SelectedLocationInfo {
   nombre: string;

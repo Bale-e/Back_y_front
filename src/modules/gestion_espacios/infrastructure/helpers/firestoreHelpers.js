@@ -4,6 +4,7 @@ const { withCache } = require('../../../../shared/infrastructure/cache/MemoryCac
 // ── Colecciones de locaciones dentro de cada edificio ────────
 const COLECCIONES_LOCACIONES = [
   'Locaciones',
+  'Locaciones piso 1',
   'Locaciones piso -1',
   'Locaciones piso 2',
   'Locaciones piso 3',

@@ -78,6 +78,8 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   private readonly buildingBSecondFloorModel = 'Edificio B - Piso 2.obj';
   private readonly buildingBThirdFloorModel = 'Edificio B - Piso 3.obj';
 
+  private readonly buildingCFirstFloorModel = 'Edificio C - Piso 1.obj';
+
   private readonly sedeModel = 'INSTITUTO EN 3D.obj';
   private readonly legacySedeModel = 'MODELO_INACAP_FIXED.obj';
   private readonly oldSedeModel = 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj';
@@ -238,11 +240,13 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
     this.cd.detectChanges();
   }
 
- onMarkerClicked(marker: ScreenMarker): void {
+  onMarkerClicked(marker: ScreenMarker): void {
     if (marker.type === 'building-b') {
       this.goToBuildingBSameFloor();
     } else if (marker.type === 'building-a') {
       this.goToBuildingASameFloor();
+    } else if (marker.type === 'building-c') {
+      this.goToBuildingCFirstFloor();
     } else if (marker.type === 'sede') {
       this.onBuildingSelected('S');
     }
@@ -301,6 +305,18 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         normalizedMeshName.includes('fixed');
 
       if (isSede) {
+        if (normalizedMeshName.includes('mesh71') || normalizedMeshName.includes('c1')) {
+          this.goToBuildingCFirstFloor();
+          return;
+        }
+        if (normalizedMeshName.includes('mesh73') || normalizedMeshName.includes('b1')) {
+          this.goToBuildingBFirstFloor();
+          return;
+        }
+        if (normalizedMeshName.includes('mesh74') || normalizedMeshName.includes('a1')) {
+          this.goToBuildingAFirstFloor();
+          return;
+        }
         // No abrir tarjetas de salas ni cuadros emergentes para el mapa de la Sede
         this.closeDetailPanel();
         if (this.infoBox) this.infoBox.style.display = 'none';
@@ -563,17 +579,19 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   onFloorSelected(floorKey: string): void {
-    const targetFloor = this.currentBuilding === 'B'
-      ? floorKey === 'first'
-        ? this.buildingBFirstFloorModel
-        : floorKey === 'second'
-          ? this.buildingBSecondFloorModel
-          : this.buildingBThirdFloorModel
-      : floorKey === 'first'
-        ? this.firstFloorModel
-        : floorKey === 'second'
-          ? this.secondFloorModel
-          : this.thirdFloorModel;
+    const targetFloor = this.currentBuilding === 'C'
+      ? this.buildingCFirstFloorModel
+      : this.currentBuilding === 'B'
+        ? floorKey === 'first'
+          ? this.buildingBFirstFloorModel
+          : floorKey === 'second'
+            ? this.buildingBSecondFloorModel
+            : this.buildingBThirdFloorModel
+        : floorKey === 'first'
+          ? this.firstFloorModel
+          : floorKey === 'second'
+            ? this.secondFloorModel
+            : this.thirdFloorModel;
 
     this.currentFloor = targetFloor;
     this.mapNavService.setFloor(targetFloor);
@@ -665,6 +683,13 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.mapNavService.setFloor(this.thirdFloorModel);
   }
 
+  private goToBuildingCFirstFloor(): void {
+    this.currentBuilding = 'C';
+    this.currentFloor = this.buildingCFirstFloorModel;
+    this.mapNavService.setBuilding('C');
+    this.mapNavService.setFloor(this.buildingCFirstFloorModel);
+  }
+
   private goToSede(): void {
     this.currentBuilding = 'S';
     this.currentFloor = this.sedeModel;
@@ -672,12 +697,16 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.mapNavService.setFloor(this.sedeModel);
   }
 
-  public selectBuilding(building: 'A' | 'B'): void {
+  public selectBuilding(building: BuildingId): void {
     this.floorDialogVisible = false;
     if (building === 'A') {
       this.goToBuildingAFirstFloor();
-    } else {
+    } else if (building === 'B') {
       this.goToBuildingBFirstFloor();
+    } else if (building === 'C') {
+      this.goToBuildingCFirstFloor();
+    } else {
+      this.goToSede();
     }
   }
 
@@ -1006,15 +1035,18 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
     const modelName = this.currentFloor;
     const isBuildingB = [this.buildingBFirstFloorModel, this.buildingBSecondFloorModel, this.buildingBThirdFloorModel].includes(modelName);
+    const isBuildingC = [this.buildingCFirstFloorModel].includes(modelName) || modelName.includes('Edificio C');
     const isSede = this.isSedeModel(modelName);
     const modelRoot = isSede
       ? '/assets/3d-models/sede/'
       : isBuildingB
         ? '/assets/3d-models/Edificio B/'
-        : '/assets/3d-models/Edificio A/';
+        : isBuildingC
+          ? '/assets/3d-models/Edificio C/'
+          : '/assets/3d-models/Edificio A/';
 
     // Actualizar el edificio actual
-    this.currentBuilding = isSede ? 'S' : (isBuildingB ? 'B' : 'A');
+    this.currentBuilding = isSede ? 'S' : (isBuildingB ? 'B' : (isBuildingC ? 'C' : 'A'));
 
     try {
       const result = await BABYLON.SceneLoader.ImportMeshAsync(
@@ -1030,8 +1062,8 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       const allNodes = new BABYLON.TransformNode('modelRoot', this.scene);
       // guardar referencia para centrar la cámara mientras el modelo rote
       this.modelRoot = allNodes;
-      // Rotar el objeto para que el lado derecho quede al frente (90° en Y para Sede)
-      allNodes.rotation = isSede
+      // Rotar el objeto para que el lado derecho quede al frente (90° en Y para Sede y Edificio C)
+      allNodes.rotation = (isSede || isBuildingC)
         ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
         : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
 
@@ -1335,6 +1367,8 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   onBuildingSelected(building: BuildingId): void {
     if (building === 'B') {
       this.goToBuildingBFirstFloor();
+    } else if (building === 'C') {
+      this.goToBuildingCFirstFloor();
     } else if (building === 'A') {
       this.goToBuildingAFirstFloor();
     } else {
