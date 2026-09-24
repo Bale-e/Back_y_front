@@ -32,12 +32,44 @@ export class MapNavigationService {
     'cuerpo20': { nombre: 'Sala A106', desc: 'Espacio académico del Edificio A, piso 1.' }
   };
 
+  // ──────────────────────────────────────────────────────────────
+  // FIX: la resolución de "Edificio B, piso 3" (y B-cuerpo7-piso2) se
+  // evalúa ANTES de depender del diccionario genérico `overrides`.
+  // Antes, si el mesh clickeado (ej. cuerpo4, cuerpo5, cuerpo6, cuerpo8)
+  // no existía en `overrides`, la función retornaba null de inmediato
+  // y nunca llegaba a revisar `bThirdFloorOverrides`, que sí tenía el
+  // nombre correcto de la sala. Por eso esos cuerpos mostraban el
+  // fallback genérico "Cuerpo N" en vez del nombre de la sala.
+  // ──────────────────────────────────────────────────────────────
   private getFloorSpecificInfo(meshName: string): SelectedLocationInfo | null {
     const normalizedMeshName = (meshName || '').replace(/\s+/g, '').toLowerCase();
     const floorText = this.currentFloorSubject.value.toLowerCase();
     const isSecondFloor = floorText.includes('piso2') || floorText.includes('2');
     const isThirdFloor = floorText.includes('piso3') || floorText.includes('3');
 
+    // ── Edificio B, piso 3: se revisa primero, independiente del diccionario genérico ──
+    if (this.currentBuildingSubject.value === 'B' && isThirdFloor) {
+      const bThirdFloorOverrides: Record<string, SelectedLocationInfo> = {
+        cuerpo1: { nombre: 'Sala B304', desc: 'Espacio académico del Edificio B, piso 3.' },
+        cuerpo2: { nombre: 'Sala B303', desc: 'Espacio académico del Edificio B, piso 3.' },
+        cuerpo3: { nombre: 'Sala B305', desc: 'Espacio académico del Edificio B, piso 3.' },
+        cuerpo4: { nombre: 'Sala B306', desc: 'Espacio académico del Edificio B, piso 3.' },
+        cuerpo5: { nombre: 'Sala B302', desc: 'Espacio académico del Edificio B, piso 3.' },
+        cuerpo6: { nombre: 'Sala B307', desc: 'Espacio académico del Edificio B, piso 3.' },
+        cuerpo7: { nombre: 'Sala B308', desc: 'Espacio académico del Edificio B, piso 3.' },
+        cuerpo8: { nombre: 'Sala B301', desc: 'Espacio académico del Edificio B, piso 3.' }
+      };
+      const bOverride = bThirdFloorOverrides[normalizedMeshName];
+      if (bOverride) {
+        return bOverride;
+      }
+    }
+
+    if (this.currentBuildingSubject.value === 'B' && normalizedMeshName === 'cuerpo7' && isSecondFloor) {
+      return { nombre: 'Sala B308', desc: 'Espacio académico del Edificio B, piso 2.' };
+    }
+
+    // ── Diccionario genérico (Edificio A y demás casos no cubiertos arriba) ──
     const overrides: Record<string, { firstFloor?: SelectedLocationInfo; secondFloor?: SelectedLocationInfo; thirdFloor?: SelectedLocationInfo }> = {
       cuerpo20: {
         firstFloor: { nombre: 'Sala A106', desc: 'Espacio académico del Edificio A, piso 1.' },
@@ -93,27 +125,6 @@ export class MapNavigationService {
     const override = overrides[normalizedMeshName];
     if (!override) {
       return null;
-    }
-
-    if (this.currentBuildingSubject.value === 'B' && isThirdFloor) {
-      const bThirdFloorOverrides: Record<string, SelectedLocationInfo> = {
-        cuerpo1: { nombre: 'Sala B304', desc: 'Espacio académico del Edificio B, piso 3.' },
-        cuerpo2: { nombre: 'Sala B303', desc: 'Espacio académico del Edificio B, piso 3.' },
-        cuerpo3: { nombre: 'Sala B305', desc: 'Espacio académico del Edificio B, piso 3.' },
-        cuerpo4: { nombre: 'Sala B306', desc: 'Espacio académico del Edificio B, piso 3.' },
-        cuerpo5: { nombre: 'Sala B302', desc: 'Espacio académico del Edificio B, piso 3.' },
-        cuerpo6: { nombre: 'Sala B307', desc: 'Espacio académico del Edificio B, piso 3.' },
-        cuerpo7: { nombre: 'Sala B308', desc: 'Espacio académico del Edificio B, piso 3.' },
-        cuerpo8: { nombre: 'Sala B301', desc: 'Espacio académico del Edificio B, piso 3.' }
-      };
-      const bOverride = bThirdFloorOverrides[normalizedMeshName];
-      if (bOverride) {
-        return bOverride;
-      }
-    }
-
-    if (this.currentBuildingSubject.value === 'B' && normalizedMeshName === 'cuerpo7' && isSecondFloor) {
-      return { nombre: 'Sala B308', desc: 'Espacio académico del Edificio B, piso 2.' };
     }
 
     if (isThirdFloor) {
