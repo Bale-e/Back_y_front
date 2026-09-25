@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { API_BASE_URL } from '../core/config/api.config';
+import { API_BASE_URL, AUTH_HEADERS } from '../core/config/api.config';
 import { Edificio } from '../core/models/edificio.model';
 import { Locacion } from '../core/models/locacion.model';
 
@@ -15,7 +15,7 @@ export class EspaciosApiService {
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey);
     }
-    const res = await fetch(`${API_BASE_URL}/edificios`);
+    const res = await fetch(`${API_BASE_URL}/edificios`, { headers: AUTH_HEADERS });
     if (!res.ok) throw new Error('Error al obtener edificios desde la API');
     const data: Edificio[] = await res.json();
     this.cache.set(cacheKey, data);
@@ -23,7 +23,7 @@ export class EspaciosApiService {
   }
 
   async getEdificioPorId(id: string): Promise<Edificio | null> {
-    const res = await fetch(`${API_BASE_URL}/edificios/${encodeURIComponent(id)}`);
+    const res = await fetch(`${API_BASE_URL}/edificios/${encodeURIComponent(id)}`, { headers: AUTH_HEADERS });
     if (!res.ok) {
       if (res.status === 404) return null;
       throw new Error('Error al obtener edificio por ID');
@@ -32,7 +32,7 @@ export class EspaciosApiService {
   }
 
   async getEdificioPorNombre(nombre: string): Promise<Edificio | null> {
-    const res = await fetch(`${API_BASE_URL}/edificios/nombre/${encodeURIComponent(nombre)}`);
+    const res = await fetch(`${API_BASE_URL}/edificios/nombre/${encodeURIComponent(nombre)}`, { headers: AUTH_HEADERS });
     if (!res.ok) {
       if (res.status === 404) return null;
       throw new Error('Error al buscar edificio por nombre');
@@ -46,7 +46,7 @@ export class EspaciosApiService {
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey);
     }
-    const res = await fetch(`${API_BASE_URL}/edificios/${encodeURIComponent(edificioId)}/locaciones`);
+    const res = await fetch(`${API_BASE_URL}/edificios/${encodeURIComponent(edificioId)}/locaciones`, { headers: AUTH_HEADERS });
     if (!res.ok) return [];
     const data: Locacion[] = await res.json();
     this.cache.set(cacheKey, data);
@@ -82,25 +82,25 @@ export class EspaciosApiService {
 
   // ── BÚSQUEDAS GLOBALES ──────────────────────────────────────
   async getLocacionPorNombre(nombre: string): Promise<Locacion | null> {
-    const res = await fetch(`${API_BASE_URL}/locaciones/${encodeURIComponent(nombre)}`);
+    const res = await fetch(`${API_BASE_URL}/locaciones/${encodeURIComponent(nombre)}`, { headers: AUTH_HEADERS });
     if (!res.ok) return null;
     return res.json();
   }
 
   async getLocacionesPorPiso(piso: string): Promise<Locacion[]> {
-    const res = await fetch(`${API_BASE_URL}/locaciones/piso/${encodeURIComponent(piso)}`);
+    const res = await fetch(`${API_BASE_URL}/locaciones/piso/${encodeURIComponent(piso)}`, { headers: AUTH_HEADERS });
     if (!res.ok) return [];
     return res.json();
   }
 
   async getLocacionesPorTipo(tipo: string): Promise<Locacion[]> {
-    const res = await fetch(`${API_BASE_URL}/locaciones/tipo/${encodeURIComponent(tipo)}`);
+    const res = await fetch(`${API_BASE_URL}/locaciones/tipo/${encodeURIComponent(tipo)}`, { headers: AUTH_HEADERS });
     if (!res.ok) return [];
     return res.json();
   }
 
   async getLocacionesPorCuerpo(cuerpo: number | string): Promise<Locacion | null> {
-    const res = await fetch(`${API_BASE_URL}/locaciones/cuerpo/${encodeURIComponent(cuerpo)}`);
+    const res = await fetch(`${API_BASE_URL}/locaciones/cuerpo/${encodeURIComponent(cuerpo)}`, { headers: AUTH_HEADERS });
     if (!res.ok) return null;
     return res.json();
   }

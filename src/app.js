@@ -6,6 +6,7 @@ const fs = require('fs');
 const express = require('express');
 const { createCorsMiddleware } = require('./modules/api/infrastructure/middlewares/corsConfig');
 const { notFoundHandler, errorHandler } = require('./modules/api/infrastructure/middlewares/errorHandler');
+const { authMiddleware } = require('./modules/api/infrastructure/middlewares/authMiddleware');
 
 const navegacionRoutes = require('./modules/api/infrastructure/routes/navegacion.routes');
 const edificiosRoutes = require('./modules/api/infrastructure/routes/edificios.routes');
@@ -18,20 +19,20 @@ const app = express();
 app.use(createCorsMiddleware());
 app.use(express.json());
 
-// ── Healthcheck ─────────────────────────────────────────────
+// ── Healthcheck (Público) ───────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// ── Rutas de la Arquitectura Hexagonal ───────────────────────
-app.use('/navegacion', navegacionRoutes);
-app.use('/edificios', edificiosRoutes);
-app.use('/locaciones', locacionesRoutes);
+// ── Rutas de la Arquitectura Hexagonal (Protegidas con Token) ─
+app.use('/navegacion', authMiddleware, navegacionRoutes);
+app.use('/edificios', authMiddleware, edificiosRoutes);
+app.use('/locaciones', authMiddleware, locacionesRoutes);
 
 // ── Rutas de Compatibilidad Directa con el Frontend Angular ──
 // /ruta/:destino
-app.get('/ruta/:destino', NavegacionController.obtenerRutaHaciaDestino);
+app.get('/ruta/:destino', authMiddleware, NavegacionController.obtenerRutaHaciaDestino);
 
 // /navigation-paths
-app.get('/navigation-paths', async (req, res) => {
+app.get('/navigation-paths', authMiddleware, async (req, res) => {
   try {
     const paths = await navigationRepository.obtenerTodosLosPaths();
     res.json(paths);
@@ -40,7 +41,7 @@ app.get('/navigation-paths', async (req, res) => {
   }
 });
 
-app.get('/navigation-paths/piso/:piso', async (req, res) => {
+app.get('/navigation-paths/piso/:piso', authMiddleware, async (req, res) => {
   try {
     const path = await navigationRepository.obtenerPathPorPiso(req.params.piso);
     if (!path) return res.status(404).json({ error: 'No hay navigation-path para ese piso' });
@@ -51,7 +52,7 @@ app.get('/navigation-paths/piso/:piso', async (req, res) => {
 });
 
 // /rutas (antigua colección)
-app.get('/rutas', async (req, res) => {
+app.get('/rutas', authMiddleware, async (req, res) => {
   try {
     const rutas = await navigationRepository.obtenerRutasAntiguas();
     res.json(rutas);

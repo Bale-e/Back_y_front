@@ -13,7 +13,9 @@ async function runTests() {
   async function testEndpoint(name, path) {
     try {
       const start = Date.now();
-      const res = await fetch(`${baseUrl}${path}`);
+      const res = await fetch(`${baseUrl}${path}`, {
+        headers: { 'Authorization': 'Bearer inago_sec_7f9c2d1b8e4a053f6e8d2b1a9c4e7f0b5d3a6c8e1f4b2a9d7c0e5f8b1a3d6e9f' }
+      });
       const duration = Date.now() - start;
       const data = await res.json();
       const statusOk = res.ok ? '✓ OK' : `✗ STATUS ${res.status}`;
