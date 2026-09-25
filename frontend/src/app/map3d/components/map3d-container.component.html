@@ -6,7 +6,6 @@
     <!-- Componente de búsqueda superior -->
     <app-map-search
       [destinations]="destinations"
-      [statusText]="destinationCoordinatesText"
       (destinationSelected)="onDestinationSelected($event)"
       (searchCleared)="onSearchCleared()"
     ></app-map-search>
@@ -28,6 +27,24 @@
         <span>{{ marker.label }}</span>
       </div>
     </ng-container>
+
+    <!-- Panel de tarjetas de navegación apiladas a la izquierda -->
+    <div class="nav-steps-panel" *ngIf="navStepsVisible && navSteps.length > 0">
+      <div class="nav-steps-header">
+        <span class="nav-steps-title">🗺️ Indicaciones</span>
+      </div>
+      <div
+        *ngFor="let step of navSteps; let i = index"
+        class="nav-step-card"
+        [class.is-active]="step.active"
+        [class.is-done]="step.done"
+        [class.is-last]="i === navSteps.length - 1"
+      >
+        <span class="nav-step-icon">{{ step.icon }}</span>
+        <span class="nav-step-text">{{ step.text }}</span>
+        <span class="nav-step-check" *ngIf="step.done">✓</span>
+      </div>
+    </div>
 
     <!-- Selector flotante de piso y edificio -->
     <app-floor-selector

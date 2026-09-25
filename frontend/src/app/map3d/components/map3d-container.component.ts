@@ -47,6 +47,10 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   private firebaseService: any = null;
 
   screenMarkers: ScreenMarker[] = [];
+  /** Pasos de navegación para las tarjetas apiladas a la izquierda */
+  navSteps: { icon: string; text: string; done: boolean; active: boolean }[] = [];
+  activeStepIndex = -1;
+  navStepsVisible = false;
   currentFloor = 'Edifico A - Piso 1.obj';
   /**
    * Último piso efectivamente cargado, actualizado SÓLO por la suscripción a currentFloor$.
@@ -578,6 +582,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
   async onDestinationSelected(destinationName: string): Promise<void> {
     this.selectedDestination = destinationName;
+    this.clearNavSteps();
     const result = await this.mapNavService.calculateRoute(
       destinationName,
       (locName, cuerpoId) => this.babylonSceneService.getMeshWorldPosition(locName, cuerpoId)
@@ -588,6 +593,10 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       return;
     }
 
+    // Cerrar el panel de detalle de locación al iniciar la ruta,
+    // para dejar libre el espacio de las indicaciones a la izquierda.
+    this.closeDetailPanel();
+
     if (result.isMultiFloor && result.leg1Points && result.leg2Points) {
       // ══════════════════════════════════════════════════════════════════════
       // NAVEGACIÓN MULTI-PISO SECUENCIAL
@@ -596,17 +605,20 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       try {
         this.babylonSceneService.clearDestinationMarker();
 
-        // 1. Paso 1: Dirigirse a la escalera en el piso actual
-        this.destinationCoordinatesText = `Paso 1: Dirígete a la ${result.chosenStairName} para ir a ${result.piso}...`;
+        // Tramo 1: Dirigirse a la escalera
+        this.destinationCoordinatesText = `Dirígete a la ${result.chosenStairName}...`;
+        const cb1 = this.buildNavSteps(
+          result.leg1Points,
+          destinationName,
+          `Paso 1: ir a ${result.piso} por ${result.chosenStairName}`
+        );
         this.cd.detectChanges();
+        await this.babylonSceneService.drawAnimatedRoute(result.leg1Points, true, cb1);
 
-        await this.babylonSceneService.drawAnimatedRoute(result.leg1Points, true);
-
-        // Pausa breve al llegar al descanso de la escalera
         await new Promise((r) => setTimeout(r, 350));
 
-        // 2. Paso 2: Transición fluida 3D de pisos
-        this.destinationCoordinatesText = `${result.direction === 'up' ? 'Subiendo' : 'Bajando'} a ${result.piso} por ${result.chosenStairName}...`;
+        // Transición de piso
+        this.destinationCoordinatesText = `${result.direction === 'up' ? 'Subiendo' : 'Bajando'} a ${result.piso}...`;
         this.cd.detectChanges();
 
         const targetFloorModel = this.resolveFloorModel(result.edificio, result.piso);
@@ -621,12 +633,17 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
           result.direction || 'up'
         );
 
-        // 3. Paso 3: En el nuevo piso, continuar desde la escalera hacia el pasillo y la sala
-        this.destinationCoordinatesText = `Paso 2: En ${result.piso}, continúa desde ${result.chosenStairName} hacia ${destinationName}`;
+        // Tramo 2: Desde escalera hasta la sala en el piso destino
+        this.destinationCoordinatesText = `Paso 2: Continúa hacia ${destinationName}`;
+        const cb2 = this.buildNavSteps(
+          result.leg2Points,
+          destinationName,
+          `Paso 2: en ${result.piso}`
+        );
         this.cd.detectChanges();
 
         this.babylonSceneService.setDestinationMarker(result.coord);
-        await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true);
+        await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true, cb2);
 
         this.destinationCoordinatesText = result.statusText;
       } finally {
@@ -637,8 +654,6 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       // RUTA EN EL MISMO PISO (O DIFERENTE EDIFICIO)
       // ══════════════════════════════════════════════════════════════════════
       if (result.piso) {
-        // Solo cambiar de piso/edificio si el destino está en un piso distinto al actual.
-        // Evita recargar el modelo 3D cuando la ruta apunta al mismo piso donde ya está el usuario.
         const targetFloorModel = this.resolveFloorModel(result.edificio, result.piso);
         const alreadyOnCorrectFloor =
           this.currentBuilding === result.edificio &&
@@ -651,8 +666,6 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       this.destinationCoordinatesText = result.statusText;
       this.babylonSceneService.setDestinationMarker(result.coord);
 
-      // Los routePoints provienen de la API de navegación backend y ya están en coordenadas mundo
-      // correspondientes a la posición real del edificio, pasillos y salas.
       const rawPoints = result.routePoints;
       const worldPoints = rawPoints.map((pt, i) => {
         if (i === rawPoints.length - 1 && result.coord) {
@@ -661,7 +674,8 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         return pt.clone();
       });
 
-      this.babylonSceneService.drawAnimatedRoute(worldPoints, true);
+      const cb = this.buildNavSteps(worldPoints, destinationName);
+      this.babylonSceneService.drawAnimatedRoute(worldPoints, true, cb);
     }
 
     const loc = await this.mapNavService.findLocationByName(destinationName);
@@ -678,9 +692,133 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.cd.detectChanges();
   }
 
+  /**
+   * Genera la instrucción textual de navegación para un segmento dado.
+   * Usa la geometría del segmento (eje dominante) y la del segmento anterior para detectar giros.
+   */
+  public getStepInstruction(
+    segmentIndex: number,
+    totalSegments: number,
+    from: any,
+    to: any,
+    prevFrom?: any,
+    prevTo?: any
+  ): string {
+    const isLast = segmentIndex + 1 >= totalSegments;
+
+    if (isLast) {
+      return 'Has llegado a tu destino 🎯';
+    }
+
+    if (segmentIndex === 0) {
+      return 'Sal por la entrada principal';
+    }
+
+    // Detectar eje dominante del segmento actual
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+
+    // Detectar cambio de dirección respecto al segmento anterior
+    if (prevFrom && prevTo) {
+      const prevDx = prevTo.x - prevFrom.x;
+      const prevDz = prevTo.z - prevFrom.z;
+
+      const prevAxisIsX = Math.abs(prevDx) >= Math.abs(prevDz);
+      const currAxisIsX = Math.abs(dx) >= Math.abs(dz);
+
+      // Hubo un cambio de eje dominante → hay giro
+      if (prevAxisIsX !== currAxisIsX) {
+        // Determinar si es izquierda o derecha usando producto cruzado 2D
+        // cross = prevDx * dz - prevDz * dx  (componente Y del cross product)
+        const cross = prevDx * dz - prevDz * dx;
+        if (cross > 0) {
+          return 'Gira a la izquierda';
+        } else {
+          return 'Gira a la derecha';
+        }
+      }
+    }
+
+    return 'Avanza por el pasillo';
+  }
+
+  /**
+   * Genera el array completo de tarjetas de navegación a partir de los puntos de ruta,
+   * y devuelve un callback para activar cada tarjeta a medida que avanza la animación.
+   */
+  private buildNavSteps(
+    routePoints: any[],
+    destinationName: string,
+    phaseLabel?: string
+  ): (segmentIndex: number, totalSegments: number, midpoint: any, isLast: boolean) => void {
+    const totalSegments = routePoints.length - 1;
+
+    // Generar todas las tarjetas de una vez
+    const steps = routePoints.slice(0, -1).map((from, i) => {
+      const to = routePoints[i + 1];
+      const prevFrom = i > 0 ? routePoints[i - 1] : undefined;
+      const prevTo   = i > 0 ? routePoints[i]     : undefined;
+      const text = this.getStepInstruction(i, totalSegments, from, to, prevFrom, prevTo);
+      const icon = i === 0 ? '🚶' : (i + 1 >= totalSegments) ? '🎯' : text.includes('Gira') ? '↩️' : '➡️';
+      return { icon, text, done: false, active: false };
+    });
+
+    // Si hay etiqueta de fase (multi-piso), añadir tarjeta de fase al inicio
+    const phaseStep = phaseLabel ? [{ icon: '🏢', text: phaseLabel, done: false, active: false }] : [];
+    this.navSteps = [...phaseStep, ...steps];
+    this.navStepsVisible = true;
+
+    const phaseOffset = phaseLabel ? 1 : 0;
+    const maxIdx = this.navSteps.length - 1;
+
+    // Activar el primer paso real inmediatamente (antes de que llegue el primer callback)
+    const firstRealIdx = phaseOffset;
+    if (this.navSteps[firstRealIdx]) {
+      this.navSteps[firstRealIdx] = { ...this.navSteps[firstRealIdx], active: true };
+    }
+    this.activeStepIndex = firstRealIdx;
+    this.cd.detectChanges();
+
+    return (_segmentIndex: number, _totalSegments: number, _midpoint: any, isLast: boolean) => {
+      // Clampear el índice real al rango del array de pasos.
+      // Esto protege contra el punto de codo extra que insertElbowPoint puede agregar.
+      const rawIdx = _segmentIndex + phaseOffset;
+      const realIdx = Math.min(rawIdx, maxIdx);
+
+      // Marcar todos los pasos anteriores como completados
+      for (let k = phaseOffset; k < realIdx; k++) {
+        if (this.navSteps[k] && !this.navSteps[k].done) {
+          this.navSteps[k] = { ...this.navSteps[k], done: true, active: false };
+        }
+      }
+      // Activar el paso actual (si aún no está done)
+      if (this.navSteps[realIdx] && !this.navSteps[realIdx].done) {
+        this.navSteps[realIdx] = { ...this.navSteps[realIdx], active: true };
+      }
+      this.activeStepIndex = realIdx;
+      this.cd.detectChanges();
+
+      if (isLast) {
+        // Al terminar, marcar todos los pasos como completados
+        setTimeout(() => {
+          this.navSteps = this.navSteps.map(s => ({ ...s, done: true, active: false }));
+          this.cd.detectChanges();
+        }, 1400);
+      }
+    };
+  }
+
+  /** Limpia el panel de tarjetas de navegación */
+  private clearNavSteps(): void {
+    this.navSteps = [];
+    this.navStepsVisible = false;
+    this.activeStepIndex = -1;
+  }
+
   onSearchCleared(): void {
     this.selectedDestination = null;
     this.destinationCoordinatesText = '';
+    this.clearNavSteps();
     this.babylonSceneService.clearGuideArrows();
     this.babylonSceneService.clearDestinationMarker();
   }

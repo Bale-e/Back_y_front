@@ -716,7 +716,16 @@ export class BabylonSceneService implements OnDestroy {
     return result;
   }
 
-  public drawAnimatedRoute(points: BABYLON.Vector3[], clearExisting = true): Promise<void> {
+  public drawAnimatedRoute(
+    points: BABYLON.Vector3[],
+    clearExisting = true,
+    onSegmentDrawn?: (
+      segmentIndex: number,
+      totalSegments: number,
+      midpoint: BABYLON.Vector3,
+      isLast: boolean
+    ) => void
+  ): Promise<void> {
     return new Promise<void>((resolve) => {
       if (!this.scene || points.length < 2) {
         resolve();
@@ -748,11 +757,23 @@ export class BabylonSceneService implements OnDestroy {
         const worldFrom = worldPoints[i];
         const worldTo = worldPoints[i + 1];
 
+        // Notificar al callback ANTES de dibujar la flecha,
+        // así la tarjeta se activa justo cuando el segmento comienza a aparecer.
+        if (onSegmentDrawn) {
+          const midpoint = new BABYLON.Vector3(
+            (worldFrom.x + worldTo.x) / 2,
+            (worldFrom.y + worldTo.y) / 2,
+            (worldFrom.z + worldTo.z) / 2
+          );
+          const isLast = (i + 1 >= totalSegments);
+          onSegmentDrawn(i, totalSegments, midpoint, isLast);
+        }
+
         const meshes = dibujarFlechaGuia(this.scene, worldFrom, worldTo, color);
         this.guideArrowMeshes.push(...meshes);
 
         if (i + 1 < totalSegments) {
-          setTimeout(() => drawSegment(i + 1), 320);
+          setTimeout(() => drawSegment(i + 1), 1100);
         } else {
           resolve();
         }
@@ -760,6 +781,43 @@ export class BabylonSceneService implements OnDestroy {
 
       drawSegment(0);
     });
+  }
+
+  /**
+   * Proyecta un punto 3D en espacio mundo a coordenadas de pantalla (píxeles).
+   * Utiliza la misma matriz de transformación que updateScreenMarkers.
+   * Devuelve null si la escena, cámara o engine no están inicializados.
+   */
+  public projectWorldPointToScreen(
+    worldPoint: BABYLON.Vector3
+  ): { x: number; y: number; visible: boolean } | null {
+    if (!this.scene || !this.camera || !this.engine) return null;
+
+    const viewMatrix = this.camera.getViewMatrix();
+    const projectionMatrix = this.camera.getProjectionMatrix();
+    const transformMatrix = viewMatrix.multiply(projectionMatrix);
+    const viewport = new BABYLON.Viewport(
+      0, 0,
+      this.engine.getRenderWidth(),
+      this.engine.getRenderHeight()
+    );
+
+    const screenCoords = BABYLON.Vector3.Project(
+      worldPoint,
+      BABYLON.Matrix.Identity(),
+      transformMatrix,
+      viewport
+    );
+
+    const isVisible =
+      screenCoords.z > 0 &&
+      screenCoords.z < 1 &&
+      screenCoords.x > 0 &&
+      screenCoords.x < this.engine.getRenderWidth() &&
+      screenCoords.y > 0 &&
+      screenCoords.y < this.engine.getRenderHeight();
+
+    return { x: screenCoords.x, y: screenCoords.y, visible: isVisible };
   }
 
   /**

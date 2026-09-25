@@ -1,23 +1,26 @@
-<div class="detail-overlay" *ngIf="isOpen" (click)="onClose()"></div>
-
-<div class="detail-panel" [class.open]="isOpen" *ngIf="locationInfo">
-  <div class="detail-panel__header">
-    <h3 class="detail-panel__title">{{ locationInfo.nombre }}</h3>
-    <button class="detail-panel__close-btn" (click)="onClose()" aria-label="Cerrar detalles">✕</button>
-  </div>
-
-  <div class="detail-panel__body">
-    <p class="detail-panel__desc">{{ locationInfo.desc }}</p>
-    
-    <div class="detail-panel__meta" *ngIf="locationInfo.edificio || locationInfo.piso">
-      <span class="badge" *ngIf="locationInfo.edificio">Edificio {{ locationInfo.edificio }}</span>
-      <span class="badge" *ngIf="locationInfo.piso">{{ locationInfo.piso }}</span>
+<div
+  class="loc-card"
+  [class.open]="isOpen"
+  *ngIf="locationInfo"
+>
+  <!-- Cabecera -->
+  <div class="loc-card__header">
+    <div class="loc-card__icon">📍</div>
+    <div class="loc-card__titles">
+      <h3 class="loc-card__name">{{ locationInfo.nombre }}</h3>
+      <div class="loc-card__badges">
+        <span class="badge" *ngIf="locationInfo.edificio">Edificio {{ locationInfo.edificio }}</span>
+        <span class="badge" *ngIf="locationInfo.piso">{{ locationInfo.piso }}</span>
+      </div>
     </div>
+    <button class="loc-card__close" (click)="onClose()" aria-label="Cerrar">✕</button>
   </div>
 
-  <div class="detail-panel__footer">
-    <button class="btn-navigate" (click)="onNavigate()">
-      <span class="icon">🧭</span> Cómo llegar
-    </button>
-  </div>
+  <!-- Descripción -->
+  <p class="loc-card__desc">{{ locationInfo.desc }}</p>
+
+  <!-- Acción principal -->
+  <button class="loc-card__nav-btn" (click)="onNavigate()">
+    <span>🧭</span> Cómo llegar
+  </button>
 </div>
