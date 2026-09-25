@@ -24,6 +24,7 @@ export class BabylonSceneService implements OnDestroy {
   private modelRoot: BABYLON.TransformNode | null = null;
   private destinationMarker: BABYLON.TransformNode | BABYLON.Mesh | null = null;
   private guideArrowMeshes: BABYLON.AbstractMesh[] = [];
+  private currentRouteAnimId = 0;
 
   private currentBuilding: BuildingId = 'A';
   private currentFloorModel = 'Edifico A - Piso 1.obj';
@@ -191,14 +192,11 @@ export class BabylonSceneService implements OnDestroy {
 
     const buildingId: BuildingId = typeof building === 'boolean' ? (building ? 'B' : 'A') : building;
 
-    // Si es el mismo modelo ya cargado, conservar la vista de cámara actual al terminar
+    // Si es el mismo modelo ya cargado, no recargar: conservar escena y cámara intactas.
     const isSameModel = modelName === this.currentFloorModel && buildingId === this.currentBuilding && this.modelRoot !== null;
-    const savedCamera = isSameModel && this.camera ? {
-      alpha:  this.camera.alpha,
-      beta:   this.camera.beta,
-      radius: this.camera.radius,
-      target: this.camera.target.clone()
-    } : null;
+    if (isSameModel) {
+      return;
+    }
 
     this.currentFloorModel = modelName;
     this.currentBuilding = buildingId;
@@ -218,11 +216,58 @@ export class BabylonSceneService implements OnDestroy {
     this.clearGuideArrows();
     this.clearDestinationMarker();
 
-    const isSede =
-      buildingId === 'S' ||
+    const newRoot = await this.buildModelRoot(modelName, buildingId);
+    if (!newRoot) return;
+
+    // Limpiar por si otra llamada asíncrona dejó un modelRoot durante la espera
+    if (this.modelRoot) {
+      this.modelRoot.dispose(false, true);
+    }
+    this.modelRoot = newRoot;
+
+    if (this.camera && this.modelRoot) {
+      this.camera.setTarget(BABYLON.Vector3.Zero());
+      const isSede      = this.isSedeModelName(modelName, buildingId);
+      const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
+      if (isSede) {
+        this.camera.radius = 77;
+        this.camera.alpha  = -Math.PI / 2;
+        this.camera.beta   = 1.25;
+        this.baseRadius    = 77;
+        this.zoomTime      = 0;
+      } else if (isBuildingB) {
+        this.camera.radius = 36.4;
+        this.camera.alpha  = Math.PI / 4;
+        this.camera.beta   = Math.PI / 3;
+        this.baseRadius    = 36.4;
+      } else {
+        this.camera.radius = 36.4;
+        this.camera.alpha  = Math.PI / 4;
+        this.camera.beta   = Math.PI / 3;
+        this.baseRadius    = 36.4;
+      }
+    }
+  }
+
+  /**
+   * Determina si un nombre de modelo corresponde al modelo de la Sede.
+   */
+  private isSedeModelName(modelName: string, buildingId: BuildingId): boolean {
+    return buildingId === 'S' ||
       modelName === 'INSTITUTO EN 3D.obj' ||
       modelName === 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj' ||
       modelName === 'MODELO_INACAP_FIXED.obj';
+  }
+
+  /**
+   * Carga el archivo OBJ, crea el TransformNode raíz, asigna materiales y ajusta escala/posición.
+   * Devuelve el nodo raíz listo para ser posicionado en escena, o null si falla.
+   * No toca this.modelRoot ni limpia la escena: es responsabilidad del llamador.
+   */
+  private async buildModelRoot(modelName: string, buildingId: BuildingId): Promise<BABYLON.TransformNode | null> {
+    if (!this.scene) return null;
+
+    const isSede      = this.isSedeModelName(modelName, buildingId);
     const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
     const isBuildingC = buildingId === 'C' || modelName.includes('Edificio C');
 
@@ -234,116 +279,232 @@ export class BabylonSceneService implements OnDestroy {
           ? '/assets/3d-models/Edificio C/'
           : '/assets/3d-models/Edificio A/';
 
+    let result: BABYLON.ISceneLoaderAsyncResult;
     try {
-      const result = await BABYLON.SceneLoader.ImportMeshAsync(
+      result = await BABYLON.SceneLoader.ImportMeshAsync(
         '',
         encodeURI(rootUrl),
         encodeURI(modelName),
         this.scene
       );
-
-      if (result.meshes.length === 0) return;
-
-      // Volver a limpiar por si otra llamada asíncrona dejó un modelRoot
-      if (this.modelRoot) {
-        this.modelRoot.dispose(false, true);
-        this.modelRoot = null;
-      }
-
-      const allNodes = new BABYLON.TransformNode('modelRoot', this.scene);
-      this.modelRoot = allNodes;
-
-      allNodes.rotation = isSede
-        ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
-        : isBuildingC
-          ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
-          : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
-
-      if (isBuildingB) {
-        allNodes.scaling = new BABYLON.Vector3(1.2, 1.2, 1.2);
-      }
-
-      result.meshes.forEach((mesh, index) => {
-        mesh.isVisible = true;
-        mesh.parent = allNodes;
-        mesh.isPickable = true;
-        mesh.checkCollisions = true;
-
-        if (!mesh.material) {
-          const defaultMat = new BABYLON.StandardMaterial(`defaultMat_${index}`, this.scene!);
-          defaultMat.diffuseColor = new BABYLON.Color3(0.85, 0.85, 0.9);
-          mesh.material = defaultMat;
-        }
-
-        const material: any = mesh.material;
-        if (material) {
-          material.emissiveColor = new BABYLON.Color3(0, 0, 0);
-          if ('specularColor' in material) {
-            material.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
-          }
-          if ('ambientColor' in material) {
-            material.ambientColor = new BABYLON.Color3(0.04, 0.04, 0.04);
-          }
-          if ('metallic' in material) {
-            material.metallic = 0;
-          }
-          if ('roughness' in material) {
-            material.roughness = Math.min(1, Math.max(material.roughness ?? 1, 0.85));
-          }
-          if ('specularPower' in material) {
-            material.specularPower = 8;
-          }
-        }
-      });
-
-      const bounds = allNodes.getHierarchyBoundingVectors(true);
-      const size = BABYLON.Vector3.Distance(bounds.min, bounds.max);
-      const targetSize = isSede ? 210 : 25;
-
-      if (size > 0) {
-        const scale = targetSize / size;
-        allNodes.scaling = new BABYLON.Vector3(scale, scale, scale);
-
-        const scaledBounds = allNodes.getHierarchyBoundingVectors(true);
-        const centerX = (scaledBounds.min.x + scaledBounds.max.x) / 2;
-        const centerZ = (scaledBounds.min.z + scaledBounds.max.z) / 2;
-        allNodes.position.x = -centerX;
-        allNodes.position.y = -scaledBounds.min.y;
-        allNodes.position.z = -centerZ;
-      }
-
-      if (this.camera && this.modelRoot) {
-        // Center the camera on the origin, since the model has been translated to be centered.
-        this.camera.setTarget(BABYLON.Vector3.Zero());
-        if (isSede) {
-          this.camera.radius = 77;
-          this.camera.alpha = -Math.PI / 2;
-          this.camera.beta = 1.25;
-          this.baseRadius = 77;
-          this.zoomTime = 0;
-        } else if (isBuildingB) {
-          this.camera.radius = 36.4;
-          this.camera.alpha = Math.PI / 4;
-          this.camera.beta = Math.PI / 3;
-          this.baseRadius = 36.4;
-        } else {
-          this.camera.radius = 36.4;
-          this.camera.alpha = Math.PI / 4;
-          this.camera.beta = Math.PI / 3;
-          this.baseRadius = 36.4;
-        }
-
-        // Si se recargó el mismo piso (ej. al seleccionar un destino), restaurar la vista anterior
-        if (savedCamera) {
-          this.camera.alpha  = savedCamera.alpha;
-          this.camera.beta   = savedCamera.beta;
-          this.camera.radius = savedCamera.radius;
-          this.camera.setTarget(savedCamera.target);
-          this.baseRadius = savedCamera.radius;
-        }
-      }
     } catch (err) {
       console.error(`Error al cargar modelo 3D (${rootUrl}${modelName}):`, err);
+      return null;
+    }
+
+    if (!result || result.meshes.length === 0) return null;
+
+    const allNodes = new BABYLON.TransformNode('modelRoot', this.scene);
+
+    allNodes.rotation = isSede
+      ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
+      : isBuildingC
+        ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
+        : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
+
+    if (isBuildingB) {
+      allNodes.scaling = new BABYLON.Vector3(1.2, 1.2, 1.2);
+    }
+
+    result.meshes.forEach((mesh, index) => {
+      mesh.isVisible = true;
+      mesh.parent = allNodes;
+      mesh.isPickable = true;
+      mesh.checkCollisions = true;
+
+      if (!mesh.material) {
+        const defaultMat = new BABYLON.StandardMaterial(`defaultMat_${index}`, this.scene!);
+        defaultMat.diffuseColor = new BABYLON.Color3(0.85, 0.85, 0.9);
+        mesh.material = defaultMat;
+      }
+
+      const material: any = mesh.material;
+      if (material) {
+        material.emissiveColor = new BABYLON.Color3(0, 0, 0);
+        if ('specularColor' in material) material.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+        if ('ambientColor'  in material) material.ambientColor  = new BABYLON.Color3(0.04, 0.04, 0.04);
+        if ('metallic'      in material) material.metallic      = 0;
+        if ('roughness'     in material) material.roughness     = Math.min(1, Math.max(material.roughness ?? 1, 0.85));
+        if ('specularPower' in material) material.specularPower = 8;
+      }
+    });
+
+    // Ajustar escala y centrar
+    const bounds     = allNodes.getHierarchyBoundingVectors(true);
+    const size       = BABYLON.Vector3.Distance(bounds.min, bounds.max);
+    const targetSize = isSede ? 210 : 25;
+
+    if (size > 0) {
+      const scale = targetSize / size;
+      allNodes.scaling = new BABYLON.Vector3(scale, scale, scale);
+
+      const scaledBounds = allNodes.getHierarchyBoundingVectors(true);
+      const centerX = (scaledBounds.min.x + scaledBounds.max.x) / 2;
+      const centerZ = (scaledBounds.min.z + scaledBounds.max.z) / 2;
+      allNodes.position.x = -centerX;
+      allNodes.position.y = -scaledBounds.min.y;
+      allNodes.position.z = -centerZ;
+    }
+
+    return allNodes;
+  }
+
+  /**
+   * Cambia de modelo con animación fluida y continua de deslizamiento vertical que da
+   * la sensación orgánica de subir o bajar un piso, desvaneciendo suavemente el piso
+   * saliente mientras el nuevo se posiciona armónicamente.
+   *
+   * @param modelName   Nombre del archivo .obj del nuevo piso.
+   * @param building    Edificio destino.
+   * @param direction   'up'   → nuevo piso entra desde arriba, el actual sale hacia abajo.
+   *                    'down' → nuevo piso entra desde abajo, el actual sale hacia arriba.
+   */
+  public async loadModelWithTransition(
+    modelName: string,
+    building: BuildingId | boolean = 'A',
+    direction: 'up' | 'down' = 'up'
+  ): Promise<void> {
+    if (!this.scene) return;
+
+    const buildingId: BuildingId = typeof building === 'boolean' ? (building ? 'B' : 'A') : building;
+
+    const isSameModel = modelName === this.currentFloorModel && buildingId === this.currentBuilding && this.modelRoot !== null;
+    if (isSameModel) return;
+
+    this.currentFloorModel = modelName;
+    this.currentBuilding   = buildingId;
+
+    this.clearDestinationMarker();
+
+    // El modelo saliente se conserva vivo durante la animación
+    const outgoingRoot = this.modelRoot;
+    this.modelRoot = null;
+
+    // Cargar el nuevo modelo (centrado, materiales aplicados)
+    const incomingRoot = await this.buildModelRoot(modelName, buildingId);
+    if (!incomingRoot) {
+      outgoingRoot?.dispose(false, true);
+      this.clearGuideArrows();
+      return;
+    }
+
+    if (this.modelRoot && this.modelRoot !== incomingRoot) {
+      this.modelRoot.dispose(false, true);
+    }
+    this.modelRoot = incomingRoot;
+
+    // ── Preparar animación en 3 etapas con proximidad clara ───────────────────
+    const OFFSET = 26;
+    const GAP    = 4.2;
+
+    const incomingBaseY = incomingRoot.position.y;
+    const outgoingBaseY = outgoingRoot ? outgoingRoot.position.y : 0;
+
+    // Subir → nuevo piso entra desde arriba (+OFFSET) hacia meetY (+GAP sobre el actual). Saliente sale hacia abajo (-OFFSET).
+    // Bajar → nuevo piso entra desde abajo (-OFFSET) hacia meetY (-GAP bajo el actual). Saliente sale hacia arriba (+OFFSET).
+    const incomingStartY = direction === 'up' ? incomingBaseY + OFFSET : incomingBaseY - OFFSET;
+    const meetY          = direction === 'up' ? outgoingBaseY + GAP   : outgoingBaseY - GAP;
+    const outgoingExitY  = direction === 'up' ? outgoingBaseY - OFFSET : outgoingBaseY + OFFSET;
+
+    const incomingMeshes = incomingRoot.getChildMeshes(false);
+    const outgoingMeshes = outgoingRoot ? outgoingRoot.getChildMeshes(false) : [];
+    const arrowMeshes    = this.guideArrowMeshes.slice();
+
+    incomingMeshes.forEach(m => { m.visibility = 0; });
+    incomingRoot.position.y = incomingStartY;
+
+    // ── Animación en 3 etapas (~2200ms total) ──────────────────────────────────
+    // Etapa 1 (0 -> P1): El nuevo piso se acerca desde arriba/abajo hasta posicionarse muy cerca (meetY).
+    // Etapa 2 (P1 -> P2): Pausa de proximidad clara donde ambos pisos están alineados sin tocarse.
+    // Etapa 3 (P2 -> 1.0): El piso anterior se aleja y desvanece, mientras el nuevo se asienta en el centro.
+    const DURATION_MS = 2200;
+    const P1 = 0.44; // fin de etapa 1 (~968ms)
+    const P2 = 0.64; // fin de etapa 2 (~1408ms, pausa de proximidad de ~440ms)
+
+    const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+    const easeInOutQuad = (t: number): number =>
+      t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    const startTime = performance.now();
+
+    await new Promise<void>(resolve => {
+      const step = () => {
+        const elapsed = performance.now() - startTime;
+        const raw     = Math.min(elapsed / DURATION_MS, 1);
+
+        let incomingY: number;
+        let outgoingY: number;
+        let incomingAlpha: number;
+        let outgoingAlpha: number;
+
+        if (raw <= P1) {
+          // ── Etapa 1: Acercamiento suave del nuevo piso hacia meetY ──────────
+          const t = easeOutCubic(raw / P1);
+          incomingY     = incomingStartY + (meetY - incomingStartY) * t;
+          outgoingY     = outgoingBaseY;
+          incomingAlpha = Math.min(1, t * 1.25);
+          outgoingAlpha = 1;
+        } else if (raw <= P2) {
+          // ── Etapa 2: Proximidad. Ambos pisos visibles y muy cercanos ─────────
+          incomingY     = meetY;
+          outgoingY     = outgoingBaseY;
+          incomingAlpha = 1;
+          outgoingAlpha = 1;
+        } else {
+          // ── Etapa 3: Alejamiento del piso anterior y asentamiento final ───────
+          const localProgress = (raw - P2) / (1 - P2);
+          const tExit         = easeInOutQuad(localProgress);
+
+          incomingY     = meetY + (incomingBaseY - meetY) * localProgress;
+          outgoingY     = outgoingBaseY + (outgoingExitY - outgoingBaseY) * tExit;
+          incomingAlpha = 1;
+          outgoingAlpha = Math.max(0, 1 - localProgress);
+        }
+
+        if (incomingRoot && !incomingRoot.isDisposed()) {
+          incomingRoot.position.y = incomingY;
+        }
+        if (outgoingRoot && !outgoingRoot.isDisposed()) {
+          outgoingRoot.position.y = outgoingY;
+        }
+
+        incomingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = incomingAlpha; });
+        outgoingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = outgoingAlpha; });
+        arrowMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = outgoingAlpha; });
+
+        if (raw < 1) {
+          requestAnimationFrame(step);
+        } else {
+          // Finalizar transición en el estado exacto
+          if (incomingRoot && !incomingRoot.isDisposed()) {
+            incomingRoot.position.y = incomingBaseY;
+            incomingRoot.getChildMeshes(false).forEach(m => { m.visibility = 1; });
+          }
+          this.clearGuideArrows();
+          outgoingRoot?.dispose(false, true);
+          resolve();
+        }
+      };
+      requestAnimationFrame(step);
+    });
+
+    // Recentrar cámara al modelo activo
+    if (this.camera && this.modelRoot) {
+      this.camera.setTarget(BABYLON.Vector3.Zero());
+      const isSede      = this.isSedeModelName(modelName, buildingId);
+      const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
+      if (isSede) {
+        this.camera.radius = 77;
+        this.camera.alpha  = -Math.PI / 2;
+        this.camera.beta   = 1.25;
+        this.baseRadius    = 77;
+        this.zoomTime      = 0;
+      } else {
+        this.camera.radius = 36.4;
+        this.camera.alpha  = Math.PI / 4;
+        this.camera.beta   = Math.PI / 3;
+        this.baseRadius    = 36.4;
+      }
     }
   }
 
@@ -555,40 +716,50 @@ export class BabylonSceneService implements OnDestroy {
     return result;
   }
 
-  public drawAnimatedRoute(points: BABYLON.Vector3[]): void {
-    if (!this.scene || points.length < 2) return;
-    this.clearGuideArrows();
-
-    const color = new BABYLON.Color3(0.95, 0.08, 0.08);
-
-    // Los puntos ya vienen en coordenadas mundo de Babylon.
-    // Nivelamos la altura Y de todos los puntos al suelo del pasillo (con un pequeño offset de 0.08m)
-    // para que la ruta se trace completamente plana en el plano horizontal y el giro en 90°
-    // sea nítido y claro sin inclinaciones verticales.
-    const corridorY = points[0].y;
-    const leveledPoints: BABYLON.Vector3[] = points.map((p) =>
-      new BABYLON.Vector3(p.x, corridorY + 0.08, p.z)
-    );
-
-    // Insertar punto de codo en L solo si son 2 puntos (ruta directa sin waypoints intermedios)
-    const worldPoints = this.insertElbowPoint(leveledPoints);
-
-    const totalSegments = worldPoints.length - 1;
-
-    const drawSegment = (i: number) => {
-      if (!this.scene) return;
-      const worldFrom = worldPoints[i];
-      const worldTo = worldPoints[i + 1];
-
-      const meshes = dibujarFlechaGuia(this.scene, worldFrom, worldTo, color);
-      this.guideArrowMeshes.push(...meshes);
-
-      if (i + 1 < totalSegments) {
-        setTimeout(() => drawSegment(i + 1), 400);
+  public drawAnimatedRoute(points: BABYLON.Vector3[], clearExisting = true): Promise<void> {
+    return new Promise<void>((resolve) => {
+      if (!this.scene || points.length < 2) {
+        resolve();
+        return;
       }
-    };
+      if (clearExisting) {
+        this.clearGuideArrows();
+      }
 
-    drawSegment(0);
+      const animId = ++this.currentRouteAnimId;
+      const color = new BABYLON.Color3(0.95, 0.08, 0.08);
+
+      // Los puntos ya vienen en coordenadas mundo de Babylon.
+      // Nivelamos la altura Y de todos los puntos al suelo del pasillo (con un pequeño offset de 0.08m)
+      const corridorY = points[0].y;
+      const leveledPoints: BABYLON.Vector3[] = points.map((p) =>
+        new BABYLON.Vector3(p.x, corridorY + 0.08, p.z)
+      );
+
+      // Insertar punto de codo en L solo si son 2 puntos (ruta directa sin waypoints intermedios)
+      const worldPoints = this.insertElbowPoint(leveledPoints);
+      const totalSegments = worldPoints.length - 1;
+
+      const drawSegment = (i: number) => {
+        if (!this.scene || this.currentRouteAnimId !== animId) {
+          resolve();
+          return;
+        }
+        const worldFrom = worldPoints[i];
+        const worldTo = worldPoints[i + 1];
+
+        const meshes = dibujarFlechaGuia(this.scene, worldFrom, worldTo, color);
+        this.guideArrowMeshes.push(...meshes);
+
+        if (i + 1 < totalSegments) {
+          setTimeout(() => drawSegment(i + 1), 320);
+        } else {
+          resolve();
+        }
+      };
+
+      drawSegment(0);
+    });
   }
 
   /**

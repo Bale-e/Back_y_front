@@ -58,6 +58,7 @@ class FirestoreLocacionRepository extends ILocacionRepository {
   }
 
   async buscarGlobalPorNombre(nombre) {
+    if (!nombre || typeof nombre !== 'string') return null;
     const todas = await this.obtenerTodasLasLocaciones();
     const nombreBuscado = nombre.trim().toLowerCase();
     const encontrada = todas.find((loc) => {
