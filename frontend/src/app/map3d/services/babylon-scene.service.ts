@@ -642,10 +642,10 @@ export class BabylonSceneService implements OnDestroy {
 
     // Marcador Sede (desde Edificio C)
     if (this.currentBuilding === 'C') {
-      const proj = projectWorldPointOnGround(0, -7);
+      const proj = projectWorldPointOnGround(4.407557547931399, 9.68820615481936);
       markers.push({
         id: 'marker-sede',
-        label: '→ Ir al mapa principal',
+        label: '→ al mapa principal',
         x: proj.x,
         y: proj.y,
         visible: proj.visible,

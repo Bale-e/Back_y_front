@@ -445,28 +445,33 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     }
   }
 
-  private focusOnMeshIfNeeded(meshName: string): void {
+    private focusOnMeshIfNeeded(meshName: string): void {
     // Normalización agresiva: quita todo lo que no sea letra o número
     // (esto maneja casos como "Cuerpo10 (3)" -> "cuerpo10")
+    const meshNumberMatch = (meshName || '').match(/Mesh(\d+)/i);
     const baseNameMatch = (meshName || '').match(/^[a-zA-Z]+\d+/);
-    const normalizedMeshName = baseNameMatch
-      ? baseNameMatch[0].toLowerCase()
-      : (meshName || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const normalizedMeshName = meshNumberMatch
+      ? `cuerpo${meshNumberMatch[1]}`
+      : baseNameMatch
+        ? baseNameMatch[0].toLowerCase()
+        : (meshName || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
 
     const firstFloorBodies = ['cuerpo1', 'cuerpo2', 'cuerpo3', 'cuerpo4', 'cuerpo5', 'cuerpo6', 'cuerpo7', 'cuerpo9', 'cuerpo10', 'cuerpo11', 'cuerpo12', 'cuerpo13', 'cuerpo15', 'cuerpo16', 'cuerpo17', 'cuerpo18', 'cuerpo20', 'cuerpo24', 'cuerpo26', 'cuerpo27', 'cuerpo28', 'cuerpo29', 'cuerpo30'];
     const buildingBFirstFloorBodies = ['cuerpo79', 'cuerpo77', 'cuerpo76', 'cuerpo78'];
     const secondFloorBodies = ['cuerpo22', 'cuerpo21', 'cuerpo20', 'cuerpo6', 'cuerpo13', 'cuerpo15', 'cuerpo17', 'cuerpo19', 'cuerpo12', 'cuerpo10', 'cuerpo7', 'cuerpo9', 'cuerpo14', 'cuerpo16', 'cuerpo11', 'cuerpo5', 'cuerpo18', 'cuerpo3', 'cuerpo29', 'cuerpo2', 'cuerpo4', 'cuerpo1'];
     const thirdFloorBodies = ['cuerpo13', 'cuerpo2', 'cuerpo70', 'cuerpo68', 'cuerpo11', 'cuerpo1', 'cuerpo12', 'cuerpo23', 'cuerpo55', 'cuerpo5', 'cuerpo7', 'cuerpo21', 'cuerpo14', 'cuerpo3', 'cuerpo75', 'cuerpo79', 'cuerpo15', 'cuerpo4', 'cuerpo8', 'cuerpo40', 'cuerpo18', 'cuerpo46', 'cuerpo9', 'cuerpo20', 'cuerpo22', 'cuerpo10'];
+    const buildingCBodies = ['cuerpo16', 'cuerpo9', 'cuerpo7', 'cuerpo6', 'cuerpo5', 'cuerpo15', 'cuerpo17', 'cuerpo4', 'cuerpo10', 'cuerpo11', 'cuerpo13', 'cuerpo14'];
 
     const isFirstFloor = this.currentFloor === this.firstFloorModel || this.currentFloor === this.buildingBFirstFloorModel;
     const isSecondFloor = this.currentFloor === this.secondFloorModel || this.currentFloor === this.buildingBSecondFloorModel;
     const isThirdFloor = this.currentFloor === this.thirdFloorModel || this.currentFloor === this.buildingBThirdFloorModel;
 
-        const shouldFocus = (
+            const shouldFocus = (
       (this.currentBuilding === 'A' && isFirstFloor && firstFloorBodies.includes(normalizedMeshName)) ||
       (this.currentBuilding === 'B' && this.currentFloor === this.buildingBFirstFloorModel && buildingBFirstFloorBodies.includes(normalizedMeshName)) ||
       (isSecondFloor && /^cuerpo/i.test(normalizedMeshName)) ||
-      (isThirdFloor && /^cuerpo/i.test(normalizedMeshName))
+      (isThirdFloor && /^cuerpo/i.test(normalizedMeshName)) ||
+      (this.currentBuilding === 'C' && buildingCBodies.includes(normalizedMeshName))
     );
 
         console.log('SHOULD FOCUS DEBUG ->', { meshName, normalizedMeshName, shouldFocus, currentBuilding: this.currentBuilding, currentFloor: this.currentFloor });
@@ -482,8 +487,11 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     const flippedBodiesThirdFloor = ['cuerpo40', 'cuerpo72', 'cuerpo4', 'cuerpo3', 'cuerpo67', 'cuerpo68',
     'cuerpo57', 'cuerpo59'];
 
-                                let shouldFlip = false;
-    if (isFirstFloor) {
+    let shouldFlip = false;
+    if (this.currentBuilding === 'C') {
+      const buildingCFlipped = ['cuerpo10', 'cuerpo11'];
+      shouldFlip = buildingCFlipped.includes(normalizedMeshName);
+    } else if (isFirstFloor) {
       shouldFlip = flippedBodiesFirstFloor.includes(normalizedMeshName);
                         } else if (isThirdFloor && this.currentBuilding === 'B') {
       const buildingBThirdFloorFlipped = ['cuerpo7', 'cuerpo4', 'cuerpo1', 'cuerpo5'];
@@ -494,14 +502,18 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       shouldFlip = invertForBuildingB ? side === -1 : side === 1;
     }
 
-        const baseAlphaSecondFloor = Math.PI / 2;
+    const baseAlphaSecondFloor = Math.PI / 2;
     const baseAlphaThirdFloorA = Math.PI / 2;
     const baseAlphaThirdFloorB = 0;
-    const currentBaseAlpha = isSecondFloor
-      ? baseAlphaSecondFloor
-      : (isThirdFloor
-        ? (this.currentBuilding === 'B' ? baseAlphaThirdFloorB : baseAlphaThirdFloorA)
-        : Math.PI / 2);
+    const baseAlphaBuildingC = Math.PI;
+    const buildingCReversedBodies = ['cuerpo13', 'cuerpo14'];
+    const currentBaseAlpha = this.currentBuilding === 'C'
+      ? (buildingCReversedBodies.includes(normalizedMeshName) ? 1.5 : baseAlphaBuildingC)
+      : (isSecondFloor
+        ? baseAlphaSecondFloor
+        : (isThirdFloor
+          ? (this.currentBuilding === 'B' ? baseAlphaThirdFloorB : baseAlphaThirdFloorA)
+          : Math.PI / 2));
 
             const isBuildingBFirstFloorTarget = this.currentBuilding === 'B' && this.currentFloor === this.buildingBFirstFloorModel;
     const zoomRadius = isBuildingBFirstFloorTarget ? 15 : 15;
