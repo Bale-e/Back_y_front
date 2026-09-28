@@ -62,8 +62,8 @@ app.get('/rutas', authMiddleware, async (req, res) => {
 });
 
 // ── Monorepo: Servicio Estático del Frontend Angular Compilado ─
-const frontendDistPath = path.join(__dirname, '../frontend/dist/inamap-angular/browser');
-const legacyDistPath = path.join(__dirname, '../frontend/dist/inamap-angular');
+const frontendDistPath = path.join(__dirname, '../../frontend/dist/inamap-angular/browser');
+const legacyDistPath = path.join(__dirname, '../../frontend/dist/inamap-angular');
 
 const distPathToUse = fs.existsSync(frontendDistPath)
   ? frontendDistPath
