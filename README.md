@@ -10,17 +10,18 @@
 2. [Stack tecnológico](#stack-tecnológico)
 3. [Estructura del monorepo](#estructura-del-monorepo)
 4. [Arquitectura hexagonal (Backend)](#arquitectura-hexagonal-backend)
-5. [Módulos del backend](#módulos-del-backend)
-6. [API REST — Endpoints](#api-rest--endpoints)
-7. [Seguridad — Autenticación por token](#seguridad--autenticación-por-token)
-8. [Frontend Angular](#frontend-angular)
-9. [Modelos 3D incluidos](#modelos-3d-incluidos)
-10. [Variables de entorno](#variables-de-entorno)
-11. [Guía de instalación y ejecución](#guía-de-instalación-y-ejecución)
-12. [Despliegue con Docker](#despliegue-con-docker)
-13. [Algoritmos y lógica clave](#algoritmos-y-lógica-clave)
-14. [Beneficios de la arquitectura](#beneficios-de-la-arquitectura)
-15. [Estado actual y roadmap](#estado-actual-y-roadmap)
+5. [Vertical Slicing](#vertical-slicing)
+6. [Módulos del backend](#módulos-del-backend)
+7. [API REST — Endpoints](#api-rest--endpoints)
+8. [Seguridad — Autenticación por token](#seguridad--autenticación-por-token)
+9. [Frontend Angular](#frontend-angular)
+10. [Modelos 3D incluidos](#modelos-3d-incluidos)
+11. [Variables de entorno](#variables-de-entorno)
+12. [Guía de instalación y ejecución](#guía-de-instalación-y-ejecución)
+13. [Despliegue con Docker](#despliegue-con-docker)
+14. [Algoritmos y lógica clave](#algoritmos-y-lógica-clave)
+15. [Beneficios de la arquitectura](#beneficios-de-la-arquitectura)
+16. [Estado actual y roadmap](#estado-actual-y-roadmap)
 
 ---
 
@@ -294,6 +295,163 @@ Adaptadores de entrada HTTP.
 - **Rutas**: definen los endpoints REST
 - **Middlewares**: CORS, autenticación por token, manejo de errores
 - **View Models**: estructuran la respuesta para el cliente
+
+---
+
+## Vertical Slicing
+
+Además de la arquitectura hexagonal por capas horizontales (dominio → aplicación → infraestructura), el backend está organizado en **tres slices verticales**: cada uno agrupa todo lo necesario para una funcionalidad completa, desde la ruta HTTP hasta la base de datos, sin que un slice tenga que tocar el código interno de otro.
+
+### ¿Qué es un vertical slice?
+
+Un **slice vertical** corta el sistema de arriba abajo: en lugar de tener una capa de "todos los controladores" y una capa de "todos los repositorios", cada funcionalidad lleva consigo su propio controlador, caso de uso, entidades y repositorio. Esto hace que cada slice sea independiente y modificable sin afectar a los demás.
+
+```
+          HTTP Request
+               │
+   ┌───────────┼───────────┐
+   │           │           │
+   ▼           ▼           ▼
+┌──────┐  ┌──────────┐  ┌─────────────┐
+│ SLICE│  │  SLICE   │  │   SLICE     │
+│  1   │  │    2     │  │     3       │
+│Edifi-│  │Navegación│  │Visualiza-   │
+│cios y│  │y Rutas   │  │ción del Mapa│
+│Loca- │  │          │  │             │
+│ciones│  │          │  │             │
+└──────┘  └──────────┘  └─────────────┘
+   │           │               │
+   └─────── Shared ────────────┘
+     (errores, value objects,
+      Firebase, caché)
+```
+
+---
+
+### Slice 1 — Gestión de Espacios (`gestion_espacios`)
+
+Responde a la pregunta: **¿qué espacios existen en el campus?**
+
+| Capa | Archivo(s) |
+|---|---|
+| **Rutas HTTP** | `edificios.routes.js`, `locaciones.routes.js` |
+| **Controladores** | `EdificiosController.js`, `LocacionesController.js` |
+| **Casos de uso** | `ListarEdificiosUseCase` — `execute()`, `executeById()`, `executeByNombre()` |
+| | `BuscarLocacionUseCase` — `executePorEdificio()`, `executePorPiso()`, `executePorTipo()`, `executeGlobal()`, `executeGlobalPorCuerpo()` |
+| | `ObtenerEdificioUseCase` |
+| **DTOs** | `EdificioResponse.dto.js`, `LocacionResponse.dto.js` |
+| **Entidades** | `Edificio`, `Locacion`, `Piso` |
+| **Puertos** | `IEdificioRepository`, `ILocacionRepository` |
+| **Repositorios** | `FirestoreEdificioRepository`, `FirestoreLocacionRepository` |
+| **Mappers** | `EdificioDocumentMapper`, `LocacionDocumentMapper` |
+| **Frontend** | `EspaciosApiService`, modelos `Edificio`, `Locacion`, `Floor` |
+
+**Endpoints que sirve:**
+```
+GET /edificios
+GET /edificios/nombre/:nombre
+GET /edificios/:id
+GET /edificios/:id/locaciones
+GET /edificios/:id/locaciones/piso/:piso
+GET /edificios/:id/locaciones/tipo/:tipo
+GET /edificios/:id/locaciones/nombre/:nombre
+GET /locaciones/piso/:piso
+GET /locaciones/tipo/:tipo
+GET /locaciones/cuerpo/:cuerpo
+GET /locaciones/:nombre
+```
+
+---
+
+### Slice 2 — Sistema de Navegación (`sistema_navegacion`)
+
+Responde a la pregunta: **¿cómo llego de un punto A a un punto B?**
+
+| Capa | Archivo(s) |
+|---|---|
+| **Rutas HTTP** | `navegacion.routes.js` |
+| **Controlador** | `NavegacionController.js` — `calcularRuta()`, `obtenerRutaHaciaDestino()` |
+| **Caso de uso** | `CalcularRutaUseCase` — `execute()`, `executeRutaHaciaDestino()` |
+| **DTOs** | `CalcularRutaRequest.dto.js`, `RutaCalculadaResponse.dto.js` |
+| **Puerto de aplicación** | `ICalcularRutaUseCase` |
+| **Entidades** | `Graph`, `Node`, `Edge`, `Route` |
+| **Puerto de dominio** | `INavigationRepository` |
+| **Servicio de dominio** | `AStarAlgorithm` — heurística euclidiana 3D |
+| **Repositorio** | `FirestoreNavigationRepository` — lee `navigation-paths` |
+| **Mapper** | `NavigationPathDocumentMapper` — Firestore doc → grafo |
+| **Frontend** | `NavegacionApiService`, `MapNavigationService.calculateRoute()` |
+
+**Endpoints que sirve:**
+```
+GET /navegacion/ruta?destino=...&origen=...&piso=...&edificio=...
+GET /navegacion/ruta/:destino
+GET /ruta/:destino           (retrocompatibilidad)
+GET /navigation-paths
+GET /navigation-paths/piso/:piso
+GET /rutas
+```
+
+---
+
+### Slice 3 — Visualización del Mapa (`visualizacion_mapa`)
+
+Responde a la pregunta: **¿cómo se muestra la ruta al usuario en el mapa 3D?**
+
+Este slice no tiene endpoints propios: es invocado **internamente por el Slice 2** para enriquecer la respuesta con datos visuales antes de enviarla al frontend.
+
+| Capa | Archivo(s) |
+|---|---|
+| **Invocación** | `NavegacionController.calcularRuta()` llama a este slice tras calcular la ruta |
+| **Caso de uso** | `GenerarVisualizacionRutaUseCase.execute(coordinates, options)` |
+| **DTO** | `VisualizacionRuta.dto.js` — waypoints, segmentos, orientaciones de flechas |
+| **Entidades** | `ArrowOrientation`, `PathSegment`, `Waypoint` |
+| **Servicios de dominio** | `ArrowDirectionCalculator` — calcula el ángulo de cada flecha |
+| | `PolylineSmoother` — suaviza la polilínea de la ruta |
+| **Transformer** | `MapCoordinateTransformer` — adapta coordenadas al sistema del mapa |
+| **Frontend** | `BabylonSceneService.drawAnimatedRoute()`, `GuideArrowService` |
+
+---
+
+### Shared — Código transversal
+
+No es un slice de funcionalidad sino una capa de **utilidades compartidas** que los tres slices consumen sin duplicar código:
+
+| Pieza | Usada por |
+|---|---|
+| `Point3D`, `Angle`, `Vector2D` | Slices 2 y 3 (geometría de rutas y flechas) |
+| `DomainError`, `NotFoundError`, `ValidationError` | Los tres slices |
+| `MemoryCacheAdapter` | Repositorios de los slices 1 y 2 |
+| `firebaseAdmin.js` | Repositorios de los tres slices |
+
+---
+
+### Flujo completo de una petición de ruta
+
+```
+Frontend
+  │  GET /navegacion/ruta?destino=Sala A201
+  ▼
+authMiddleware (valida Bearer Token)
+  │
+  ▼
+NavegacionController          ← Slice 2 (entrada HTTP)
+  │
+  ├─► CalcularRutaUseCase     ← Slice 2 (lógica)
+  │     ├── FirestoreNavigationRepository  (lee navigation-paths)
+  │     ├── FirestoreLocacionRepository    (fallback si no hay path)
+  │     └── AStarAlgorithm / findTurnPointOnPath
+  │
+  └─► GenerarVisualizacionRutaUseCase  ← Slice 3 (enriquece la respuesta)
+        ├── ArrowDirectionCalculator
+        ├── PolylineSmoother
+        └── MapCoordinateTransformer
+  │
+  ▼
+Respuesta JSON: { coordinates, distance, visualizacion }
+  │
+  ▼
+Frontend: MapNavigationService → BabylonSceneService.drawAnimatedRoute()
+```
 
 ---
 
