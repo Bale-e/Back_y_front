@@ -300,31 +300,36 @@ Adaptadores de entrada HTTP.
 
 ## Vertical Slicing
 
-Además de la arquitectura hexagonal por capas horizontales (dominio → aplicación → infraestructura), el backend está organizado en **tres slices verticales**: cada uno agrupa todo lo necesario para una funcionalidad completa, desde la ruta HTTP hasta la base de datos, sin que un slice tenga que tocar el código interno de otro.
+Además de la arquitectura hexagonal por capas horizontales (dominio → aplicación → infraestructura), el backend está organizado en **cuatro slices verticales**: cada uno agrupa todo lo necesario para una funcionalidad completa, desde la ruta HTTP hasta la base de datos, sin que un slice tenga que tocar el código interno de otro.
 
 ### ¿Qué es un vertical slice?
 
 Un **slice vertical** corta el sistema de arriba abajo: en lugar de tener una capa de "todos los controladores" y una capa de "todos los repositorios", cada funcionalidad lleva consigo su propio controlador, caso de uso, entidades y repositorio. Esto hace que cada slice sea independiente y modificable sin afectar a los demás.
 
 ```
-          HTTP Request
-               │
-   ┌───────────┼───────────┐
-   │           │           │
-   ▼           ▼           ▼
-┌──────┐  ┌──────────┐  ┌─────────────┐
-│ SLICE│  │  SLICE   │  │   SLICE     │
-│  1   │  │    2     │  │     3       │
-│Edifi-│  │Navegación│  │Visualiza-   │
-│cios y│  │y Rutas   │  │ción del Mapa│
-│Loca- │  │          │  │             │
-│ciones│  │          │  │             │
-└──────┘  └──────────┘  └─────────────┘
-   │           │               │
-   └─────── Shared ────────────┘
-     (errores, value objects,
-      Firebase, caché)
+               HTTP Request
+                    │
+   ┌────────────────┼──────────────────┐
+   │                │                  │
+   ▼                ▼                  ▼
+┌──────────┐  ┌──────────┐  ┌─────────────────┐
+│  SLICE   │  │  SLICE   │  │     SLICE       │
+│    1     │  │    2     │  │       3         │
+│ Gestión  │  │Navegación│  │  Visualización  │
+│  de      │  │ y Rutas  │  │   del Mapa      │
+│ Espacios │  │          │  │                 │
+└──────────┘  └──────────┘  └─────────────────┘
+      │             │               │
+      └─────────── API ─────────────┘
+         (rutas, controladores,
+         middlewares, view-models)
+      │             │               │
+      └──────── Shared ─────────────┘
+        (errores, value objects,
+         Firebase, caché)
 ```
+
+> **Nota sobre el slice API:** a diferencia de los otros tres, el slice `api` **no tiene capa de dominio ni de aplicación**, porque no contiene lógica de negocio. Solo tiene dos capas: `infrastructure/` (controladores, rutas, middlewares) y `presentation/` (view-models). Actúa como el punto de entrada HTTP que delega en los casos de uso de los otros slices.
 
 ---
 
@@ -425,29 +430,74 @@ No es un slice de funcionalidad sino una capa de **utilidades compartidas** que 
 
 ---
 
+### Slice API — Adaptador HTTP (`api`)
+
+Responde a la pregunta: **¿cómo entra una petición HTTP al sistema y cómo sale la respuesta?**
+
+Este slice **no tiene lógica de negocio propia**. Actúa como intermediario entre el mundo exterior (HTTP) y los casos de uso de los otros tres slices. A diferencia del resto, solo tiene dos capas:
+
+#### Capa `infrastructure/`
+
+| Subcarpeta | Archivo | Responsabilidad |
+|---|---|---|
+| `routes/` | `edificios.routes.js` | Define las URLs del slice de espacios y las asocia a controladores |
+| | `locaciones.routes.js` | URLs de búsqueda global de locaciones |
+| | `navegacion.routes.js` | URLs de cálculo de rutas |
+| `controllers/` | `EdificiosController.js` | Extrae parámetros del `req`, invoca `ListarEdificiosUseCase` o `BuscarLocacionUseCase`, envía `res` |
+| | `LocacionesController.js` | Igual para búsquedas globales de locaciones |
+| | `NavegacionController.js` | Igual para navegación; encadena además `GenerarVisualizacionRutaUseCase` |
+| `middlewares/` | `authMiddleware.js` | Extrae y valida el Bearer Token contra `API_TOKEN` del `.env`. Devuelve 401 si falla |
+| | `corsConfig.js` | Lee `CORS_ORIGIN` del `.env` y configura qué orígenes pueden hacer peticiones |
+| | `errorHandler.js` | Captura errores no manejados; mapea `DomainError` → 4xx, genéricos → 500 |
+| | `validateRequest.js` | Valida la forma de los parámetros de entrada antes de llegar al controlador |
+
+#### Capa `presentation/`
+
+| Archivo | Responsabilidad |
+|---|---|
+| `view-models/ApiResponse.js` | Estructura estándar de respuesta: `{ data, error, status }` |
+
+**Flujo interno del slice API para cada petición:**
+
+```
+Petición HTTP
+      ↓
+   routes         ← ¿qué URL existe y qué controlador la atiende?
+   middlewares    ← ¿el origen está permitido? ¿el token es válido? ¿los parámetros son correctos?
+   controllers    ← delega en el caso de uso del slice correspondiente
+   view-models    ← formatea el resultado antes de enviarlo
+      ↓
+Respuesta HTTP
+```
+
+---
+
 ### Flujo completo de una petición de ruta
 
 ```
 Frontend
   │  GET /navegacion/ruta?destino=Sala A201
   ▼
-authMiddleware (valida Bearer Token)
+[Slice API — infrastructure]
+  corsConfig      → origen http://localhost:4200 permitido ✓
+  authMiddleware  → Bearer Token válido ✓
+  validateRequest → parámetros correctos ✓
+  NavegacionController.calcularRuta()
   │
-  ▼
-NavegacionController          ← Slice 2 (entrada HTTP)
+  ├─► [Slice 2 — sistema_navegacion]
+  │     CalcularRutaUseCase
+  │       ├── FirestoreNavigationRepository  (lee navigation-paths de Firestore)
+  │       ├── FirestoreLocacionRepository    (fallback si no hay path)
+  │       └── findTurnPointOnPath()          (punto de inflexión exacto a 90°)
   │
-  ├─► CalcularRutaUseCase     ← Slice 2 (lógica)
-  │     ├── FirestoreNavigationRepository  (lee navigation-paths)
-  │     ├── FirestoreLocacionRepository    (fallback si no hay path)
-  │     └── AStarAlgorithm / findTurnPointOnPath
-  │
-  └─► GenerarVisualizacionRutaUseCase  ← Slice 3 (enriquece la respuesta)
-        ├── ArrowDirectionCalculator
-        ├── PolylineSmoother
-        └── MapCoordinateTransformer
-  │
-  ▼
-Respuesta JSON: { coordinates, distance, visualizacion }
+  └─► [Slice 3 — visualizacion_mapa]
+        GenerarVisualizacionRutaUseCase
+          ├── ArrowDirectionCalculator  (ángulo de cada flecha)
+          ├── PolylineSmoother          (polilínea suavizada)
+          └── MapCoordinateTransformer  (coordenadas al sistema BabylonJS)
+
+[Slice API — presentation]
+  ApiResponse → res.json({ coordinates, distance, visualizacion })
   │
   ▼
 Frontend: MapNavigationService → BabylonSceneService.drawAnimatedRoute()
@@ -463,15 +513,16 @@ Gestiona el inventario de espacios físicos del campus.
 
 **Responsabilidades:**
 - Listar todos los edificios registrados en Firestore
-- Obtener un edificio por su ID
+- Obtener un edificio por su ID o nombre
 - Listar locaciones filtrando por edificio, piso o tipo
-- Búsqueda global de locaciones por nombre o tipo
+- Búsqueda global de locaciones por nombre, tipo o número de cuerpo
 - Normalización de datos provenientes de Firestore (campos con variantes de mayúsculas/minúsculas gestionados con `getFieldCI`)
+- Caché de todas las locaciones bajo la clave `locaciones:todas_globales` para evitar lecturas repetidas a Firestore
 
 **Entidades clave:**
 - `Edificio`: `{ id, nombre, descripcion, pisos[], coordenadas, raw }`
-- `Locacion`: nombre, tipo, piso, cuerpo, coordenadas3D
-- `Piso`: número de piso
+- `Locacion`: `{ id, nombre, tipo, piso, cuerpo, coordenadas, edificioId, edificioNombre, raw }`
+- `Piso`: número de piso como concepto del dominio
 
 ---
 
@@ -487,9 +538,8 @@ Construye el grafo de navegación desde Firestore y resuelve rutas óptimas.
 
 **Algoritmo de rutas (`CalcularRutaUseCase`):**
 
-El uso case implementa la siguiente lógica:
 1. Busca el destino en los `navigation-paths` (Conexiones y Accesos)
-2. Si no lo encuentra, busca en la colección de Locaciones de Firestore
+2. Si no lo encuentra, busca en la colección de Locaciones de Firestore (fallback)
 3. Determina el piso/edificio objetivo y filtra el navigation-path correspondiente
 4. Calcula el `turnPoint`: proyección perpendicular del destino sobre el pasillo — garantiza el giro exacto en 90°
 5. Construye la ruta: `[inicio] → [giros del pasillo previos al turnPoint] → [turnPoint] → [destino]`
@@ -504,13 +554,33 @@ El uso case implementa la siguiente lógica:
 
 ### `visualizacion_mapa` — Preparación visual de rutas
 
-Transforma las coordenadas brutas de la ruta en datos listos para renderizar.
+Transforma las coordenadas brutas de la ruta en datos listos para renderizar. No tiene endpoints propios: es invocado internamente por `NavegacionController` tras recibir la ruta calculada.
 
 **Responsabilidades:**
+- Clasificar cada punto de la ruta como `start`, `intermediate` o `end` → genera `Waypoint[]`
 - Calcular la orientación de cada flecha guía (`ArrowDirectionCalculator`)
 - Suavizar la polilínea de la ruta (`PolylineSmoother`)
 - Transformar coordenadas para el sistema de referencia del mapa (`MapCoordinateTransformer`)
-- Generar el DTO de visualización con waypoints, segmentos y orientaciones
+- Generar el DTO de visualización con waypoints, flechas y polilínea suavizada
+
+---
+
+### `api` — Adaptador HTTP
+
+Punto de entrada de todas las peticiones HTTP. No contiene lógica de negocio: delega en los casos de uso de los otros tres módulos.
+
+**Capas que tiene (solo dos, sin dominio ni aplicación):**
+
+- **`infrastructure/`**: controladores, rutas y middlewares
+  - `EdificiosController`, `LocacionesController`, `NavegacionController`
+  - `edificios.routes.js`, `locaciones.routes.js`, `navegacion.routes.js`
+  - `authMiddleware` — valida el Bearer Token
+  - `corsConfig` — configura los orígenes permitidos
+  - `errorHandler` — convierte errores en respuestas HTTP apropiadas
+  - `validateRequest` — valida parámetros de entrada antes de llegar al controlador
+
+- **`presentation/`**: estructura la respuesta
+  - `ApiResponse` — formato estándar `{ data, error, status }`
 
 ---
 
@@ -518,16 +588,16 @@ Transforma las coordenadas brutas de la ruta en datos listos para renderizar.
 
 Piezas reutilizables por todos los módulos:
 
-| Pieza | Descripción |
-|---|---|
-| `DomainError` | Clase base para errores del dominio |
-| `NotFoundError` | Recurso no encontrado (mapea a HTTP 404) |
-| `ValidationError` | Error de validación de datos de entrada |
-| `Point3D` | Punto tridimensional con `distanceTo()` |
-| `Angle` | Ángulo en radianes con utilidades de conversión |
-| `Vector2D` | Vector 2D para operaciones geométricas planas |
-| `MemoryCacheAdapter` | Caché en memoria con TTL configurable |
-| `firebaseAdmin.js` | Inicialización única de Firebase Admin SDK |
+| Pieza | Capa | Descripción |
+|---|---|---|
+| `Point3D` | Dominio | Punto 3D **inmutable** (`Object.freeze`) con `distanceTo()` y fábrica `Point3D.create()` |
+| `Angle` | Dominio | Ángulo en radianes con utilidades de conversión |
+| `Vector2D` | Dominio | Vector 2D para operaciones geométricas planas |
+| `DomainError` | Dominio | Clase base de errores del dominio |
+| `NotFoundError` | Dominio | Recurso no encontrado (mapea a HTTP 404) |
+| `ValidationError` | Dominio | Error de validación de datos de entrada (mapea a HTTP 400) |
+| `MemoryCacheAdapter` | Infraestructura | Caché en memoria con TTL. API: `get()`, `set()`, `withCache(key, fn)` |
+| `firebaseAdmin.js` | Infraestructura | Inicialización única del Firebase Admin SDK; exporta `{ admin, db }` |
 
 ---
 
