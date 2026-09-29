@@ -61,13 +61,8 @@ La comunicación entre ambas capas se realiza mediante peticiones HTTP autentica
 
 ```text
 Back_y_front/                          ← Raíz del monorepo
-├── package.json                       ← Scripts de orquestación del monorepo
-├── server.js                          ← Punto de entrada del backend (legacy, redirige a backEnd/)
-├── .env                               ← Variables de entorno (NO subir a Git)
 ├── .gitignore
-├── scratch/
-│   ├── debug_paths.js                 ← Script de depuración de rutas de navegación
-│   └── test_hexagonal_endpoints.js    ← Tests manuales de los endpoints hexagonales
+├── README.md
 │
 ├── backEnd/                           ← Aplicación backend (Node.js + Express)
 │   ├── package.json                   ← Dependencias y scripts del backend
@@ -628,44 +623,38 @@ cd ../frontend
 npm install
 ```
 
-### Desarrollo (ejecutar backend y frontend por separado)
+### Desarrollo (backend y frontend por separado)
 
-**Backend:**
+**Backend** (terminal 1):
 ```bash
 cd backEnd
-npm run dev
-# → Servidor disponible en http://localhost:3000
-# → Recarga automática con nodemon al modificar archivos
+npm run dev     # desarrollo con nodemon → http://localhost:3000
+# o
+npm start       # producción
 ```
 
-**Frontend:**
+**Frontend** (terminal 2):
 ```bash
 cd frontend
-npm start
-# → Angular DevServer disponible en http://localhost:4200
-# → Hot-reload activo durante el desarrollo
+npm start       # Angular DevServer → http://localhost:4200
 ```
 
-### Comandos desde la raíz del monorepo
+### Comandos disponibles
+
+**Backend (`backEnd/`):**
 
 ```bash
-# Iniciar el backend en modo producción
-npm start
+npm start             # inicia con node (producción)
+npm run dev           # inicia con nodemon (desarrollo, recarga automática)
+npm run test:backend  # ejecuta los tests manuales de los endpoints
+```
 
-# Iniciar el backend en modo desarrollo (nodemon)
-npm run dev
+**Frontend (`frontend/`):**
 
-# Iniciar solo el backend
-npm run dev:backend
-
-# Iniciar solo el frontend (Angular DevServer)
-npm run dev:frontend
-
-# Compilar el frontend para producción
-npm run build:frontend
-
-# Ejecutar los tests manuales del backend hexagonal
-npm run test:backend
+```bash
+npm start       # Angular DevServer (http://localhost:4200)
+npm run build   # compila para producción → frontend/dist/
+npm run watch   # compila en modo watch (desarrollo)
 ```
 
 ### Modo monolítico (producción sin Docker)
