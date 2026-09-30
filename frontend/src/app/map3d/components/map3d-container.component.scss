@@ -211,4 +211,105 @@
     opacity: 1;
     transform: translateX(4px) scale(1);
   }
-}
+}
+
+// ── Controles de navegación manual (flechas) ────────────────────────────────
+.nav-step-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(8, 12, 24, 0.92);
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  pointer-events: all; // Override del pointer-events: none del panel padre
+  margin-top: 2px;
+}
+
+.nav-arrow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 122, 0, 0.55);
+  background: rgba(255, 100, 20, 0.12);
+  color: #ff9d42;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease, opacity 0.18s ease;
+  user-select: none;
+  outline: none;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 122, 0, 0.28);
+    border-color: #ff7a00;
+    transform: scale(1.1);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  &:disabled,
+  &.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.3);
+    transform: none;
+  }
+}
+
+.nav-step-counter {
+  flex: 1;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+// Estado especial: transición de piso pendiente
+// El panel y el botón → se resaltan en verde/esmeralda para indicar
+// que pulsar → cambiará de piso.
+.nav-step-controls.pending-floor {
+  border-color: rgba(80, 200, 120, 0.5);
+  background: rgba(8, 26, 14, 0.95);
+}
+
+.nav-floor-label {
+  flex: 1;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6ee7a0;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  animation: floor-label-pulse 1.4s ease-in-out infinite;
+}
+
+.nav-arrow-btn.floor-transition {
+  border-color: rgba(80, 200, 120, 0.75);
+  background: rgba(30, 120, 60, 0.22);
+  color: #6ee7a0;
+
+  &:hover:not(:disabled) {
+    background: rgba(30, 160, 80, 0.35);
+    border-color: #4caf50;
+    color: #a5f3c0;
+  }
+}
+
+@keyframes floor-label-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+

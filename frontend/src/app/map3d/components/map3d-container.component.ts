@@ -51,7 +51,23 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   navSteps: { icon: string; text: string; done: boolean; active: boolean }[] = [];
   activeStepIndex = -1;
   navStepsVisible = false;
+  /** Índice del segmento de ruta actualmente visible (para navegación manual) */
+  currentRouteSegment = 0;
+  /** Callback de segmento activo guardado para usarlo en navNext/navPrev */
+  private activeSegmentCb?: (segmentIndex: number, totalSegments: number, midpoint: any, isLast: boolean) => void;
+  /**
+   * Cuando es true, el botón → ya no avanza un segmento sino que dispara
+   * la transición de piso en rutas multi-piso. Se habilita al llegar al
+   * último paso del tramo 1 para que el usuario confirme manualmente.
+   */
+  navPendingFloorTransition = false;
+  /** Etiqueta que describe la transición pendiente (p. ej. "Subir a Piso 2") */
+  navPendingFloorLabel = '';
+  /** Resolver interno de la promesa que bloquea la transición de piso */
+  private pendingFloorResolve: (() => void) | null = null;
   currentFloor = 'Edifico A - Piso 1.obj';
+
+
   /**
    * Último piso efectivamente cargado, actualizado SÓLO por la suscripción a currentFloor$.
    * A diferencia de currentFloor, no es pre-actualizado por onFloorSelected / goToBuildingX,
@@ -627,7 +643,11 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         this.cd.detectChanges();
         await this.babylonSceneService.drawAnimatedRoute(result.leg1Points, true, cb1);
 
-        await new Promise((r) => setTimeout(r, 350));
+        // Esperar a que el usuario navegue manualmente el tramo 1 y pulse →
+        // para confirmar que desea pasar al siguiente piso.
+        const floorAction = result.direction === 'up' ? 'Subir' : 'Bajar';
+        await this.waitForFloorTransition(`${floorAction} a ${result.piso} →`);
+
 
         // Transición de piso
         this.destinationCoordinatesText = `${result.direction === 'up' ? 'Subiendo' : 'Bajando'} a ${result.piso}...`;
@@ -756,7 +776,8 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
   /**
    * Genera el array completo de tarjetas de navegación a partir de los puntos de ruta,
-   * y devuelve un callback para activar cada tarjeta a medida que avanza la animación.
+   * guarda el callback en activeSegmentCb para poder reutilizarlo en navNext/navPrev,
+   * y retorna el callback que sincroniza la tarjeta activa con el segmento mostrado.
    */
   private buildNavSteps(
     routePoints: any[],
@@ -780,6 +801,9 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.navSteps = [...phaseStep, ...steps];
     this.navStepsVisible = true;
 
+    // Reiniciar el índice de segmento activo para la navegación manual
+    this.currentRouteSegment = 0;
+
     const phaseOffset = phaseLabel ? 1 : 0;
     const maxIdx = this.navSteps.length - 1;
 
@@ -791,41 +815,128 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.activeStepIndex = firstRealIdx;
     this.cd.detectChanges();
 
-    return (_segmentIndex: number, _totalSegments: number, _midpoint: any, isLast: boolean) => {
+    const cb = (_segmentIndex: number, _totalSegments: number, _midpoint: any, isLast: boolean) => {
       // Clampear el índice real al rango del array de pasos.
       // Esto protege contra el punto de codo extra que insertElbowPoint puede agregar.
       const rawIdx = _segmentIndex + phaseOffset;
       const realIdx = Math.min(rawIdx, maxIdx);
 
-      // Marcar todos los pasos anteriores como completados
-      for (let k = phaseOffset; k < realIdx; k++) {
-        if (this.navSteps[k] && !this.navSteps[k].done) {
-          this.navSteps[k] = { ...this.navSteps[k], done: true, active: false };
+      // Resetear estados de todos los pasos
+      this.navSteps = this.navSteps.map((s, idx) => {
+        if (idx < realIdx) {
+          return { ...s, done: true, active: false };
+        } else if (idx === realIdx) {
+          return { ...s, done: false, active: true };
+        } else {
+          return { ...s, done: false, active: false };
         }
-      }
-      // Activar el paso actual (si aún no está done)
-      if (this.navSteps[realIdx] && !this.navSteps[realIdx].done) {
-        this.navSteps[realIdx] = { ...this.navSteps[realIdx], active: true };
-      }
+      });
+
       this.activeStepIndex = realIdx;
-      this.cd.detectChanges();
+      this.currentRouteSegment = _segmentIndex;
 
       if (isLast) {
-        // Al terminar, marcar todos los pasos como completados
-        setTimeout(() => {
-          this.navSteps = this.navSteps.map(s => ({ ...s, done: true, active: false }));
-          this.cd.detectChanges();
-        }, 1400);
+        if (this.pendingFloorResolve) {
+          // Hay una transición de piso esperando: activar el botón verde
+          // en lugar de marcar los pasos como completados.
+          this.navPendingFloorTransition = true;
+        } else {
+          // Ruta normal sin cambio de piso: marcar todos como completados.
+          setTimeout(() => {
+            this.navSteps = this.navSteps.map(s => ({ ...s, done: true, active: false }));
+            this.cd.detectChanges();
+          }, 400);
+        }
       }
+
+      this.cd.detectChanges();
     };
+
+
+    // Guardar el callback para reutilizarlo en navNext/navPrev
+    this.activeSegmentCb = cb;
+
+    return cb;
   }
 
-  /** Limpia el panel de tarjetas de navegación */
+  /** Avanza al siguiente segmento de la ruta (navegación manual).
+   *  Si hay una transición de piso pendiente y el usuario está en el último
+   *  paso, este botón la dispara en lugar de avanzar un segmento más. */
+  public navNext(): void {
+    // Caso especial: transición de piso pendiente → resolverla
+    if (this.navPendingFloorTransition && this.pendingFloorResolve) {
+      const resolve = this.pendingFloorResolve;
+      this.pendingFloorResolve = null;
+      this.navPendingFloorTransition = false;
+      this.navPendingFloorLabel = '';
+      this.cd.detectChanges();
+      resolve();
+      return;
+    }
+
+    const total = this.babylonSceneService.getRouteSegmentCount();
+    if (total === 0 || this.currentRouteSegment >= total - 1) return;
+    const next = this.currentRouteSegment + 1;
+    this.babylonSceneService.showRouteStep(next, total, this.activeSegmentCb);
+  }
+
+  /** Retrocede al segmento anterior de la ruta (navegación manual) */
+  public navPrev(): void {
+    // No se puede retroceder si hay una transición de piso pendiente
+    if (this.navPendingFloorTransition) return;
+    const total = this.babylonSceneService.getRouteSegmentCount();
+    if (total === 0 || this.currentRouteSegment <= 0) return;
+    const prev = this.currentRouteSegment - 1;
+    this.babylonSceneService.showRouteStep(prev, total, this.activeSegmentCb);
+  }
+
+  /** Indica si hay un paso anterior al que retroceder */
+  public get canNavPrev(): boolean {
+    if (this.navPendingFloorTransition) return false;
+    return this.navStepsVisible && this.currentRouteSegment > 0;
+  }
+
+  /** Indica si hay un paso siguiente al que avanzar (o una transición de piso que confirmar) */
+  public get canNavNext(): boolean {
+    if (this.navPendingFloorTransition) return true;
+    const total = this.babylonSceneService.getRouteSegmentCount();
+    return this.navStepsVisible && this.currentRouteSegment < total - 1;
+  }
+
+  /**
+   * Pausa la navegación multi-piso esperando que el usuario pulse → manualmente.
+   * Muestra una etiqueta especial en el botón de avance.
+   * @param label Texto descriptivo de la transición, p. ej. "Subir a Piso 2"
+   */
+  public waitForFloorTransition(label: string): Promise<void> {
+    // Solo guarda la etiqueta y el resolver.
+    // navPendingFloorTransition se activará cuando el callback del último
+    // segmento del tramo 1 detecte isLast=true.
+    this.navPendingFloorLabel = label;
+    this.cd.detectChanges();
+    return new Promise<void>(resolve => {
+      this.pendingFloorResolve = resolve;
+    });
+  }
+
+
+  /** Limpia el panel de tarjetas de navegación y el estado de transición de piso */
   private clearNavSteps(): void {
     this.navSteps = [];
     this.navStepsVisible = false;
     this.activeStepIndex = -1;
+    this.currentRouteSegment = 0;
+    this.activeSegmentCb = undefined;
+    this.navPendingFloorTransition = false;
+    this.navPendingFloorLabel = '';
+    // Si había una transición pendiente, descartarla
+    if (this.pendingFloorResolve) {
+      this.pendingFloorResolve = null;
+    }
   }
+
+
+
 
   onSearchCleared(): void {
     this.selectedDestination = null;

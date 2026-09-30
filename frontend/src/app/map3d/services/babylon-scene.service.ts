@@ -716,6 +716,15 @@ export class BabylonSceneService implements OnDestroy {
     return result;
   }
 
+  /**
+   * Dibuja todos los segmentos de la ruta de una vez (sin animación automática).
+   * Los meshes de cada segmento se almacenan en routeSegmentMeshes para que
+   * showRouteStep() pueda mostrar/ocultar cada uno individualmente.
+   * El primer segmento se muestra visible; los demás comienzan ocultos.
+   * Llama a onSegmentDrawn con i=0 para activar la primera tarjeta de navegación.
+   */
+  private routeSegmentMeshes: BABYLON.AbstractMesh[][] = [];
+
   public drawAnimatedRoute(
     points: BABYLON.Vector3[],
     clearExisting = true,
@@ -733,54 +742,82 @@ export class BabylonSceneService implements OnDestroy {
       }
       if (clearExisting) {
         this.clearGuideArrows();
+        this.routeSegmentMeshes = [];
       }
 
-      const animId = ++this.currentRouteAnimId;
+      ++this.currentRouteAnimId;
       const color = new BABYLON.Color3(0.95, 0.08, 0.08);
 
-      // Los puntos ya vienen en coordenadas mundo de Babylon.
-      // Nivelamos la altura Y de todos los puntos al suelo del pasillo (con un pequeño offset de 0.08m)
+      // Nivelar altura Y al suelo del pasillo
       const corridorY = points[0].y;
       const leveledPoints: BABYLON.Vector3[] = points.map((p) =>
         new BABYLON.Vector3(p.x, corridorY + 0.08, p.z)
       );
 
-      // Insertar punto de codo en L solo si son 2 puntos (ruta directa sin waypoints intermedios)
+      // Insertar punto de codo en L si son solo 2 puntos
       const worldPoints = this.insertElbowPoint(leveledPoints);
       const totalSegments = worldPoints.length - 1;
 
-      const drawSegment = (i: number) => {
-        if (!this.scene || this.currentRouteAnimId !== animId) {
-          resolve();
-          return;
-        }
+      // Dibujar todos los segmentos de una vez, empezando solo el primero visible
+      for (let i = 0; i < totalSegments; i++) {
         const worldFrom = worldPoints[i];
-        const worldTo = worldPoints[i + 1];
-
-        // Notificar al callback ANTES de dibujar la flecha,
-        // así la tarjeta se activa justo cuando el segmento comienza a aparecer.
-        if (onSegmentDrawn) {
-          const midpoint = new BABYLON.Vector3(
-            (worldFrom.x + worldTo.x) / 2,
-            (worldFrom.y + worldTo.y) / 2,
-            (worldFrom.z + worldTo.z) / 2
-          );
-          const isLast = (i + 1 >= totalSegments);
-          onSegmentDrawn(i, totalSegments, midpoint, isLast);
-        }
-
+        const worldTo   = worldPoints[i + 1];
         const meshes = dibujarFlechaGuia(this.scene, worldFrom, worldTo, color);
+        this.routeSegmentMeshes.push(meshes);
         this.guideArrowMeshes.push(...meshes);
 
-        if (i + 1 < totalSegments) {
-          setTimeout(() => drawSegment(i + 1), 1100);
-        } else {
-          resolve();
-        }
-      };
+        // Ocultar todos; luego showRouteStep(0) mostrará el primero
+        meshes.forEach(m => { m.isVisible = false; });
+      }
 
-      drawSegment(0);
+      // Mostrar el primer segmento y notificar callback
+      this.showRouteStep(0, totalSegments, onSegmentDrawn);
+
+      resolve();
     });
+  }
+
+  /**
+   * Muestra únicamente el segmento indicado (por índice) y oculta los demás.
+   * Llama al callback de navegación para sincronizar la tarjeta activa.
+   */
+  public showRouteStep(
+    stepIndex: number,
+    totalSegments?: number,
+    onSegmentDrawn?: (
+      segmentIndex: number,
+      totalSegments: number,
+      midpoint: BABYLON.Vector3,
+      isLast: boolean
+    ) => void
+  ): void {
+    const total = totalSegments ?? this.routeSegmentMeshes.length;
+    const clampedIdx = Math.max(0, Math.min(stepIndex, this.routeSegmentMeshes.length - 1));
+
+    this.routeSegmentMeshes.forEach((meshes, i) => {
+      meshes.forEach(m => { m.isVisible = (i === clampedIdx); });
+    });
+
+    if (onSegmentDrawn && this.routeSegmentMeshes.length > 0) {
+      const meshes = this.routeSegmentMeshes[clampedIdx];
+      if (meshes && meshes.length > 0) {
+        // Calcular midpoint del segmento activo
+        const pos0 = meshes[0].position;
+        const posLast = meshes[meshes.length - 1].position;
+        const midpoint = new BABYLON.Vector3(
+          (pos0.x + posLast.x) / 2,
+          (pos0.y + posLast.y) / 2,
+          (pos0.z + posLast.z) / 2
+        );
+        const isLast = clampedIdx + 1 >= total;
+        onSegmentDrawn(clampedIdx, total, midpoint, isLast);
+      }
+    }
+  }
+
+  /** Retorna el número de segmentos de la ruta actualmente cargada. */
+  public getRouteSegmentCount(): number {
+    return this.routeSegmentMeshes.length;
   }
 
   /**
@@ -834,7 +871,9 @@ export class BabylonSceneService implements OnDestroy {
   public clearGuideArrows(): void {
     this.guideArrowMeshes.forEach(mesh => mesh.dispose());
     this.guideArrowMeshes = [];
+    this.routeSegmentMeshes = [];
   }
+
 
   public setDestinationMarker(position: BABYLON.Vector3): void {
     if (!this.scene) return;

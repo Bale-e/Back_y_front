@@ -44,7 +44,38 @@
         <span class="nav-step-text">{{ step.text }}</span>
         <span class="nav-step-check" *ngIf="step.done">✓</span>
       </div>
+
+      <!-- Controles de navegación manual -->
+      <div class="nav-step-controls" [class.pending-floor]="navPendingFloorTransition" (click)="$event.stopPropagation()">
+        <button
+          class="nav-arrow-btn nav-arrow-prev"
+          [class.disabled]="!canNavPrev"
+          [disabled]="!canNavPrev"
+          (click)="navPrev()"
+          title="Paso anterior"
+          aria-label="Paso anterior"
+        >&#8592;</button>
+
+        <span class="nav-step-counter" *ngIf="!navPendingFloorTransition">
+          {{ currentRouteSegment + 1 }} / {{ navSteps.length }}
+        </span>
+        <span class="nav-floor-label" *ngIf="navPendingFloorTransition">
+          {{ navPendingFloorLabel }}
+        </span>
+
+        <button
+          class="nav-arrow-btn nav-arrow-next"
+          [class.disabled]="!canNavNext"
+          [class.floor-transition]="navPendingFloorTransition"
+          [disabled]="!canNavNext"
+          (click)="navNext()"
+          [title]="navPendingFloorTransition ? navPendingFloorLabel : 'Siguiente paso'"
+          [attr.aria-label]="navPendingFloorTransition ? navPendingFloorLabel : 'Siguiente paso'"
+        >&#8594;</button>
+      </div>
+
     </div>
+
 
     <!-- Selector flotante de piso y edificio -->
     <app-floor-selector
