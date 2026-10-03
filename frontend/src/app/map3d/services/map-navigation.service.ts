@@ -41,40 +41,95 @@ export class MapNavigationService {
 
   private cachedLocations: Locacion[] = [];
 
-  // ──────────────────────────────────────────────────────────────
-  // Extrae la letra de edificio ("A", "B", "S") desde el nombre de
-  // edificio que ya viaja en la respuesta del backend (edificioNombre /
-  // _edificioNombre, ej. "Edificio B"). Ya NO se compara contra el ID
-  // de documento de Firestore (_edificioId), porque ese ID es un hash
-  // aleatorio y compararlo con .includes('a') / .includes('b') daba
-  // falsos positivos.
-  // ──────────────────────────────────────────────────────────────
-  private getLetraEdificio(loc: any): string {
-    const nombreEdificio = (loc?.edificioNombre || loc?._edificioNombre || loc?.Edificio || loc?.edificio || '').toString();
-    const match = nombreEdificio.match(/edificio\s*([a-z])/i);
-    if (match) return match[1].toLowerCase();
-    // fallback: si el propio nombre es una sola letra ("B") o similar
-    const single = nombreEdificio.trim().toLowerCase();
-    return single.length === 1 ? single : '';
+  // ── Utilidades de comparación: insensibles a mayúsculas, tildes y espacios ──
+  private norm(valor: any): string {
+    return (valor ?? '')
+      .toString()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/_+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
-  // Normaliza un string de piso a algo comparable, ej. "Piso 3" -> "piso3"
-  private normalizarPiso(piso: string): string {
-    return (piso || '').toString().toLowerCase().replace(/\s+/g, '');
+  // Lee un campo sin importar cómo esté escrito su nombre ("Piso", "piso ", "PISO"...)
+  private getCI(obj: any, ...nombres: string[]): any {
+    if (!obj) return undefined;
+    const claves = Object.keys(obj);
+    for (const nombre of nombres) {
+      const objetivo = this.norm(nombre);
+      // Se revisan TODAS las claves equivalentes (p. ej. "edificioNombre" y "_edificioNombre")
+      // y se devuelve la primera que tenga valor.
+      for (const clave of claves) {
+        if (this.norm(clave) !== objetivo) continue;
+        const valor = obj[clave];
+        if (valor !== undefined && valor !== null && valor !== '') {
+          return valor;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  // Clave distintiva de un edificio, sirve tanto para el nombre guardado en la
+  // base de datos como para el nombre del modelo 3D cargado:
+  //   "Edificio B - Piso 3.obj" -> "b"   |   "EDIFICIO b " -> "b"
+  //   "Edifico A" -> "a"                 |   "Torre Central" -> "central"
+  // No conoce nombres de edificios: cualquier edificio que exista en la BD sirve.
+  private claveEdificio(texto: any): string {
+    return this.norm(texto)
+      .replace(/\.(obj|glb|gltf|fbx|stl|dae)$/, '')
+      .replace(/\(.*?\)/g, '')
+      .replace(/\b(piso|nivel|planta)\b.*$/, '')
+      .replace(/[\s\-–—:,.]+$/, '')
+      .replace(/^(edificio|edifico|edif|building|bloque|torre)\s+/, '')
+      .trim();
+  }
+
+  // "Piso 3", "piso3", "PISO -1", "Locaciones piso 2", "Edificio B - Piso 3.obj",
+  // "tercer piso", 3  ->  número de piso (null si no se puede determinar)
+  private clavePiso(texto: any): number | null {
+    if (texto === null || texto === undefined || texto === '') return null;
+    const t = this.norm(texto).replace(/\.(obj|glb|gltf|fbx|stl|dae)$/, '');
+
+    const m = t.match(/\b(piso|nivel|planta)\b(.*)$/);
+    const zona = m ? m[2] : t;
+    const numero = zona.match(/(-?\d+)/);
+    if (numero) return parseInt(numero[1], 10);
+
+    const ordinales: Record<string, number> = {
+      primer: 1, primero: 1, primera: 1, segundo: 2, segunda: 2,
+      tercer: 3, tercero: 3, tercera: 3, cuarto: 4, cuarta: 4,
+      quinto: 5, quinta: 5, sexto: 6, septimo: 7, octavo: 8, noveno: 9, decimo: 10
+    };
+    for (const palabra of t.split(/[^a-z]+/)) {
+      if (ordinales[palabra] !== undefined) return ordinales[palabra];
+    }
+    if (/(subsuelo|subterraneo|sotano)/.test(t)) return -1;
+    return null;
+  }
+
+  // Piso de una locación: primero el campo Piso; si no trae número (p. ej. la
+  // colección base "Locaciones"), se asume Piso 1, igual que el resto de este servicio.
+  private pisoDeLocacion(loc: any): number {
+    return this.clavePiso(this.getCI(loc, 'piso', 'floor', 'nivel')) ?? 1;
+  }
+
+  // 8, "8", "Cuerpo 8", "cuerpo8" -> 8
+  private claveCuerpo(valor: any): number | null {
+    if (valor === null || valor === undefined || valor === '') return null;
+    const m = this.norm(valor).match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
   }
 
   // ──────────────────────────────────────────────────────────────
-  // Resuelve el nombre/descr. de una sala a partir del meshName
-  // ("cuerpo4", "cuerpo20 (3)", etc.) consultando ÚNICAMENTE las
-  // locaciones que trae el backend (Firestore), filtradas por el
-  // edificio y piso actualmente visibles en la escena 3D.
-  // No requiere mantener ninguna lista manual: agregar/editar una
-  // sala en Firestore (con su Cuerpo, Piso, Nombre, Edificio) se
-  // refleja automáticamente acá.
+  // Búsqueda estructurada contra los datos de la base de datos:
+  //   1° EDIFICIO -> 2° PISO -> 3° SALA (cuerpo)
+  // El edificio y el piso se leen del modelo 3D cargado, el cuerpo del mesh
+  // clickeado. No hay listas manuales de salas ni edificios escritos a mano.
   // ──────────────────────────────────────────────────────────────
   public async getLocationInfoByMeshNameAsync(meshName: string): Promise<SelectedLocationInfo | null> {
     const normalizedMeshName = (meshName || '').replace(/\s+/g, '').toLowerCase();
-
     const isBackgroundMesh = (normalizedMeshName.includes('untitled') || normalizedMeshName.includes('fixed') || normalizedMeshName.includes('sede') || normalizedMeshName === 'ground' || normalizedMeshName === 'suelo')
       && !/^cuerpo\d+/i.test(normalizedMeshName);
 
@@ -82,64 +137,75 @@ export class MapNavigationService {
       return null;
     }
 
-    const cleanName = meshName.replace(/\s+/g, '');
-    const match = cleanName.match(/^cuerpo(\d+)/i);
+    const match = (meshName || '').replace(/\s+/g, '').match(/^cuerpo(\d+)/i);
     if (!match) {
       return null;
     }
-
     const cuerpoNum = parseInt(match[1], 10);
+
+    const currentBld = this.currentBuildingSubject.value;
+    const modelo = this.currentFloorSubject.value; // ej. "Edificio B - Piso 3.obj"
 
     try {
       if (this.cachedLocations.length === 0) {
         this.cachedLocations = await this.espaciosApiService.getLocacionesDeTodosLosEdificios();
       }
 
-      const currentBld = this.currentBuildingSubject.value;
-      const currentFloorNorm = this.normalizarPiso(this.currentFloorSubject.value);
+      const esSede = currentBld === 'S';
+      const nombreEdificioDe = (loc: any) => this.getCI(loc, '_edificioNombre', 'edificioNombre', 'edificio');
 
-      const found = this.cachedLocations.find((loc: any) => {
-        const locCuerpo = loc.cuerpo ?? loc.Cuerpo;
-        if (locCuerpo == null) return false;
-        if (parseInt(locCuerpo, 10) !== cuerpoNum) return false;
+      // 1° EDIFICIO
+      const claveActual = this.claveEdificio(modelo);
+      const delEdificio = esSede
+        ? this.cachedLocations
+        : this.cachedLocations.filter((loc: any) => this.claveEdificio(nombreEdificioDe(loc)) === claveActual);
 
-        if (currentBld === 'S') return true;
-
-        const letraEdificioLoc = this.getLetraEdificio(loc);
-        const matchBuilding = letraEdificioLoc === currentBld.toLowerCase();
-
-        const locFloorNorm = this.normalizarPiso(loc.piso ?? loc.Piso);
-        const matchFloor = currentFloorNorm.includes(locFloorNorm) || locFloorNorm.includes(currentFloorNorm);
-
-        return matchBuilding && matchFloor;
-      });
-
-      if (found) {
-        const name = (found as any).nombre || (found as any).Nombre || `Cuerpo ${cuerpoNum}`;
-        const tipo = (found as any).tipo || (found as any).Tipo || 'Espacio académico';
-        const floorStr = (found as any).piso || (found as any).Piso || 'Piso 1';
-        const edificioStr = (found as any).edificioNombre || (found as any)._edificioNombre || currentBld;
+      if (!esSede && delEdificio.length === 0) {
         return {
-          nombre: name,
-          desc: `${tipo} — ${edificioStr}, ${floorStr}.`,
-          edificio: edificioStr,
-          piso: floorStr
+          nombre: 'Edificio no registrado',
+          desc: 'No se encontraron locaciones de este edificio en la base de datos.',
+          edificio: currentBld,
+          piso: modelo
         };
       }
+
+      // 2° PISO
+      const pisoActual = this.clavePiso(modelo);
+      const delPiso = (esSede || pisoActual === null)
+        ? delEdificio
+        : delEdificio.filter((loc: any) => this.pisoDeLocacion(loc) === pisoActual);
+
+      // 3° SALA
+      const found: any = delPiso.find((loc: any) => this.claveCuerpo(this.getCI(loc, 'cuerpo')) === cuerpoNum);
+
+      if (found) {
+        const nombre = (this.getCI(found, 'nombre') ?? `Cuerpo ${cuerpoNum}`).toString();
+        const tipo = (this.getCI(found, 'tipo') ?? 'Espacio académico').toString();
+        const edificioTxt = (nombreEdificioDe(found) ?? currentBld).toString();
+        const pisoTxt = `Piso ${this.pisoDeLocacion(found)}`;
+        return {
+          nombre,
+          desc: `${tipo} — Cuerpo ${cuerpoNum}, ${edificioTxt}, ${pisoTxt}.`,
+          edificio: currentBld,
+          piso: pisoTxt
+        };
+      }
+
+      return {
+        nombre: 'Espacio no registrado',
+        desc: `No hay una sala registrada para el Cuerpo ${cuerpoNum} en este edificio y piso.`,
+        edificio: currentBld,
+        piso: modelo
+      };
     } catch (err) {
       console.warn('Error al buscar info por meshName:', err);
+      return {
+        nombre: 'Error al consultar información',
+        desc: 'Ocurrió un problema al consultar la base de datos. Intenta nuevamente.',
+        edificio: currentBld,
+        piso: modelo
+      };
     }
-
-    // Fallback final: no se encontró coincidencia en el backend para
-    // este cuerpo/edificio/piso. Puede significar que la sala aún no
-    // tiene el campo "Cuerpo" cargado en Firestore, o que no coincide
-    // con el edificio/piso actual.
-    return {
-      nombre: `Cuerpo ${match[1]}`,
-      desc: `Espacio de la sede Inacap. Información e indicaciones disponibles para Cuerpo ${match[1]}.`,
-      edificio: this.currentBuildingSubject.value,
-      piso: this.currentFloorSubject.value
-    };
   }
 
   public async findNearestLocationByCoords(point: any, buildingFilter?: string, maxDistance = 80): Promise<SelectedLocationInfo | null> {
@@ -265,35 +331,6 @@ export class MapNavigationService {
     return str;
   }
 
-  /** Deduce el BuildingId ('A'|'B'|'C'|'S') desde los campos del documento de locación */
-  private getBuildingFromLoc(loc: any): BuildingId {
-    const field = (loc?._edificioNombre || loc?.edificioNombre || loc?.Edificio || loc?.edificio || '').toString();
-    // Extraer la letra después de "Edificio" → "Edificio B" → 'B'
-    const match = field.match(/edificio\s*([a-z])/i);
-    if (match) {
-      const letra = match[1].toUpperCase();
-      if (letra === 'C') return 'C';
-      if (letra === 'B') return 'B';
-      if (letra === 'S') return 'S';
-      return 'A';
-    }
-    // Fallback: si el campo ya es una sola letra ("B", "C", "S")
-    const single = field.trim().toUpperCase();
-    if (single === 'C') return 'C';
-    if (single === 'B') return 'B';
-    if (single === 'S') return 'S';
-    if (single === 'A') return 'A';
-    return 'A';
-  }
-
-  /** Obtiene el piso como 'Piso 1' | 'Piso 2' | 'Piso 3' a partir del nombre del modelo activo */
-  public getPisoFromModel(modelName: string): string {
-    const lower = (modelName || '').toLowerCase();
-    if (lower.includes('3')) return 'Piso 3';
-    if (lower.includes('2')) return 'Piso 2';
-    return 'Piso 1';
-  }
-
   public async calculateRoute(
     destinationName: string,
     meshPositionGetter?: (locName: string, cuerpoId?: string) => BABYLON.Vector3 | null
@@ -303,49 +340,19 @@ export class MapNavigationService {
     statusText: string;
     piso: string;
     edificio: BuildingId;
-    isMultiFloor?: boolean;
-    leg1Points?: BABYLON.Vector3[];
-    leg2Points?: BABYLON.Vector3[];
-    chosenStairName?: string;
-    stairWorldPos?: { x: number; z: number };
-    direction?: 'up' | 'down';
   } | null> {
     const loc = await this.findLocationByName(destinationName);
-    if (!loc) return null;
+    if (!loc) {
+      return null;
+    }
 
     const piso = this.getPisoFromLoc(loc);
-    const edificio: BuildingId = this.getBuildingFromLoc(loc);
+    const edificioField = loc._edificioNombre || loc.Edificio || loc.edificio || 'A';
+    const edificio: BuildingId = /b/i.test(edificioField) ? 'B' : /s|sede/i.test(edificioField) ? 'S' : 'A';
     const cuerpoNum = loc.Cuerpo ?? loc.cuerpo;
     const cuerpoId = cuerpoNum != null ? `cuerpo${cuerpoNum}` : undefined;
 
-    // ── Detección de navegación multi-piso ────────────────────────────────────
-    const currentBuilding = this.currentBuildingSubject.value;
-    const currentFloorModel = this.currentFloorSubject.value;
-    const currentPiso = this.getPisoFromModel(currentFloorModel);
-    const isSameBuilding = currentBuilding === edificio;
-    const isMultiFloor = isSameBuilding && currentPiso !== piso && (edificio === 'A' || edificio === 'B');
-
-    if (isMultiFloor) {
-      const multiFloorLegs = await this.calculateMultiFloorLegs(loc, destinationName, currentPiso, piso, edificio);
-      if (multiFloorLegs) {
-        const statusText = `${destinationName} — Edificio ${edificio} / ${piso} (vía ${multiFloorLegs.chosenStairName})`;
-        return {
-          coord: multiFloorLegs.destCoord,
-          routePoints: multiFloorLegs.leg2Points,
-          statusText,
-          piso,
-          edificio,
-          isMultiFloor: true,
-          direction: multiFloorLegs.direction,
-          chosenStairName: multiFloorLegs.chosenStairName,
-          stairWorldPos: multiFloorLegs.stairWorldPos,
-          leg1Points: multiFloorLegs.leg1Points,
-          leg2Points: multiFloorLegs.leg2Points
-        };
-      }
-    }
-
-    // ── Ruta mismo piso ───────────────────────────────────────────────────────
+    // 1. Obtener posición del mesh SOLO si el piso de la escena coincide con el de la locación
     const currentFloor = this.currentFloorSubject.value.toLowerCase();
     const isSameFloor = (piso === 'Piso 1' && (currentFloor.includes('piso1') || currentFloor.includes('1.obj')))
       || (piso === 'Piso 2' && (currentFloor.includes('piso2') || currentFloor.includes('2.obj')))
@@ -356,16 +363,19 @@ export class MapNavigationService {
       meshPos = meshPositionGetter(destinationName, cuerpoId);
     }
 
+    // 2. Consumir la ruta directamente desde el backend Hexagonal
     const backendRoute = await this.navegacionApiService.getRutaEnriquecida(destinationName, {
       edificio,
       piso
     }).catch(() => null);
 
     let routePoints: BABYLON.Vector3[] = [];
+
     if (backendRoute && Array.isArray(backendRoute.coordinates) && backendRoute.coordinates.length > 0) {
       routePoints = backendRoute.coordinates.map((c) => new BABYLON.Vector3(c[0], c[1], c[2]));
     }
 
+    // Fallback de coordenadas de la locación
     const docCoord = this.extractVec3(loc);
     const destination = (routePoints.length > 0 ? routePoints[routePoints.length - 1] : null)
       ?? (docCoord ? new BABYLON.Vector3(docCoord.x, Math.max(docCoord.y, 0.05), docCoord.z) : null)
@@ -377,197 +387,14 @@ export class MapNavigationService {
     }
 
     const finalRoute = routePoints.length > 0 ? routePoints : [destination.clone()];
-    const statusText = `${destinationName} — Edificio ${edificio} / ${piso}`;
+    const statusText = `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
 
     return {
       coord: destination,
       routePoints: finalRoute,
       statusText,
       piso,
-      edificio,
-      isMultiFloor: false
+      edificio
     };
   }
-
-  // ── Helpers internos ──────────────────────────────────────────────────────
-
-  private cleanRoutePoints(points: BABYLON.Vector3[]): BABYLON.Vector3[] {
-    const result: BABYLON.Vector3[] = [];
-    for (const pt of points) {
-      if (result.length === 0) {
-        result.push(pt.clone());
-      } else {
-        const prev = result[result.length - 1];
-        if (BABYLON.Vector3.Distance(prev, pt) >= 0.15) {
-          result.push(pt.clone());
-        }
-      }
-    }
-    if (points.length > 0 && result.length > 0) {
-      const lastOrig = points[points.length - 1];
-      const lastRes = result[result.length - 1];
-      if (BABYLON.Vector3.Distance(lastRes, lastOrig) > 0.05) {
-        result.push(lastOrig.clone());
-      } else {
-        result[result.length - 1] = lastOrig.clone();
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Calcula los dos tramos de una ruta entre pisos diferentes:
-   * Tramo 1: Piso origen → pasillo → descanso interior de la escalera.
-   * Tramo 2: Descanso en piso destino → pasillo principal → sala final.
-   */
-  private async calculateMultiFloorLegs(
-    loc: any,
-    destinationName: string,
-    currentPiso: string,
-    targetPiso: string,
-    edificio: BuildingId
-  ): Promise<{
-    chosenStairName: string;
-    stairWorldPos: { x: number; z: number };
-    leg1Points: BABYLON.Vector3[];
-    leg2Points: BABYLON.Vector3[];
-    direction: 'up' | 'down';
-    destCoord: BABYLON.Vector3;
-  } | null> {
-    // 1. Coordenada de destino en el piso objetivo
-    let destCoord: BABYLON.Vector3 | null = null;
-    const backendTargetRoute = await this.navegacionApiService.getRutaEnriquecida(destinationName, {
-      edificio,
-      piso: targetPiso
-    }).catch(() => null);
-
-    if (backendTargetRoute && Array.isArray(backendTargetRoute.coordinates) && backendTargetRoute.coordinates.length > 0) {
-      const coords = backendTargetRoute.coordinates;
-      const last = coords[coords.length - 1];
-      destCoord = new BABYLON.Vector3(last[0], last[1], last[2]);
-    } else {
-      destCoord = this.extractVec3(loc);
-    }
-
-    if (!destCoord) return null;
-
-    // Alturas canónicas por piso
-    const getFloorY = (p: string): number => {
-      if (p.includes('3')) return 0.86;
-      if (p.includes('2')) return 0.41;
-      return 0.05;
-    };
-
-    const currentY = getFloorY(currentPiso);
-    const targetY  = getFloorY(targetPiso);
-    destCoord.y = targetY;
-
-    const fromNum = parseInt(currentPiso.replace(/\D/g, ''), 10) || 1;
-    const toNum   = parseInt(targetPiso.replace(/\D/g, ''), 10)   || 1;
-    const direction: 'up' | 'down' = toNum >= fromNum ? 'up' : 'down';
-
-    // 2. Geometría de escaleras
-    const EDIFICIO_A_STAIRS = [
-      {
-        nombre: 'Escalera Principal',
-        worldPos: { x: 9.80, z: 0.16 },
-        landing:   { x: 9.80, z: -0.80 },
-        threshold: { x: 9.80, z: 0.16 }
-      },
-      {
-        nombre: 'Escalera Secundaria',
-        worldPos: { x: -9.21, z: -0.44 },
-        landing:   { x: -9.21, z: 0.80 },
-        threshold: { x: -9.21, z: -0.44 }
-      }
-    ];
-
-    const EDIFICIO_B_STAIRS = [
-      {
-        nombre: 'Escalera Edificio B',
-        worldPos: { x: -0.49, z: -11.40 },
-        landing:   { x: -0.49, z: -11.40 },
-        threshold: { x: -0.50, z: -3.15 }
-      }
-    ];
-
-    const stairsList = edificio === 'B' ? EDIFICIO_B_STAIRS : EDIFICIO_A_STAIRS;
-
-    // Elegir escalera más cercana al destino
-    let chosenStair = stairsList[0];
-    let minDist = Infinity;
-    for (const stair of stairsList) {
-      const dist = Math.hypot(destCoord.x - stair.worldPos.x, destCoord.z - stair.worldPos.z);
-      if (dist < minDist) { minDist = dist; chosenStair = stair; }
-    }
-
-    // ── Tramo 1: Piso actual → descanso de escalera ────────────────────────
-    const rawLeg1: BABYLON.Vector3[] = [];
-    if (edificio === 'A') {
-      const isSecundaria = chosenStair.nombre.includes('Secundaria');
-      const entrance     = new BABYLON.Vector3(11.60, currentY, 0.50);
-      const eastApproach = new BABYLON.Vector3(10.25, currentY, 0.52);
-      const eastJunction = new BABYLON.Vector3(9.80,  currentY, 0.16);
-      if (isSecundaria) {
-        rawLeg1.push(entrance, eastApproach, eastJunction,
-          new BABYLON.Vector3(-9.21, currentY, -0.44),
-          new BABYLON.Vector3(-9.21, currentY,  0.80));
-      } else {
-        rawLeg1.push(entrance, eastApproach, eastJunction,
-          new BABYLON.Vector3(9.80, currentY, -0.80));
-      }
-    } else {
-      rawLeg1.push(
-        new BABYLON.Vector3(-0.50, currentY, -0.78),
-        new BABYLON.Vector3(-0.50, currentY, -3.15),
-        new BABYLON.Vector3(-0.49, currentY, -11.40)
-      );
-    }
-    const leg1Points = this.cleanRoutePoints(rawLeg1);
-
-    // ── Tramo 2: Descanso en piso destino → sala final ────────────────────
-    const rawLeg2: BABYLON.Vector3[] = [];
-    if (edificio === 'A') {
-      const isSecundaria = chosenStair.nombre.includes('Secundaria');
-      if (!isSecundaria) {
-        const facingX = destCoord.x < 9.80 ? Math.max(destCoord.x, 8.80) : Math.min(destCoord.x, 10.80);
-        rawLeg2.push(
-          new BABYLON.Vector3(9.80,       targetY, -0.80),
-          new BABYLON.Vector3(9.80,       targetY,  0.16),
-          new BABYLON.Vector3(facingX,    targetY,  0.16),
-          new BABYLON.Vector3(destCoord.x, targetY,  0.16),
-          new BABYLON.Vector3(destCoord.x, targetY, destCoord.z)
-        );
-      } else {
-        const facingX = destCoord.x > -9.21 ? Math.min(destCoord.x, -8.21) : Math.max(destCoord.x, -10.21);
-        rawLeg2.push(
-          new BABYLON.Vector3(-9.21,      targetY,  0.80),
-          new BABYLON.Vector3(-9.21,      targetY, -0.44),
-          new BABYLON.Vector3(facingX,    targetY, -0.44),
-          new BABYLON.Vector3(destCoord.x, targetY, -0.44),
-          new BABYLON.Vector3(destCoord.x, targetY, destCoord.z)
-        );
-      }
-    } else {
-      const facingX = destCoord.x < -0.50 ? Math.max(destCoord.x, -2.0) : Math.min(destCoord.x, 1.0);
-      rawLeg2.push(
-        new BABYLON.Vector3(-0.49,      targetY, -11.40),
-        new BABYLON.Vector3(-0.50,      targetY, -3.15),
-        new BABYLON.Vector3(-0.50,      targetY, -0.78),
-        new BABYLON.Vector3(facingX,    targetY, -0.78),
-        new BABYLON.Vector3(destCoord.x, targetY, -0.78),
-        new BABYLON.Vector3(destCoord.x, targetY, destCoord.z)
-      );
-    }
-    const leg2Points = this.cleanRoutePoints(rawLeg2);
-
-    return {
-      chosenStairName: chosenStair.nombre,
-      stairWorldPos: chosenStair.worldPos,
-      leg1Points,
-      leg2Points,
-      direction,
-      destCoord
-    };
-  }
-}
+}

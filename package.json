@@ -1,0 +1,14 @@
+{
+  "name": "inago-project",
+  "version": "2.0.0",
+  "description": "InaGo Project - Backend Express + Frontend Angular 3D",
+  "scripts": {
+    "start": "npm --prefix backEnd start",
+    "dev": "npm --prefix backEnd run dev",
+    "dev:backend": "npm --prefix backEnd run dev:backend",
+    "dev:frontend": "npm --prefix frontend start",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm --prefix frontend run build",
+    "test:backend": "npm --prefix backEnd run test:backend"
+  }
+}
