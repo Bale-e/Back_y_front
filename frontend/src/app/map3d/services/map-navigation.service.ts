@@ -122,6 +122,12 @@ export class MapNavigationService {
     return m ? parseInt(m[1], 10) : null;
   }
 
+  // Diagnóstico: solo se imprime cuando NO se encuentra información. 
+  // que empieza con [MAPA-DIAG] desde la consola del navegador (F12).
+  private diag(motivo: string, datos: any): void {
+    console.warn('[MAPA-DIAG] ' + motivo + ' ' + JSON.stringify(datos));
+  }
+
   // ──────────────────────────────────────────────────────────────
   // Búsqueda estructurada contra los datos de la base de datos:
   //   1° EDIFICIO -> 2° PISO -> 3° SALA (cuerpo)
@@ -139,6 +145,7 @@ export class MapNavigationService {
 
     const match = (meshName || '').replace(/\s+/g, '').match(/^cuerpo(\d+)/i);
     if (!match) {
+      this.diag('mesh_sin_numero_de_cuerpo', { meshRecibido: meshName });
       return null;
     }
     const cuerpoNum = parseInt(match[1], 10);
@@ -161,6 +168,13 @@ export class MapNavigationService {
         : this.cachedLocations.filter((loc: any) => this.claveEdificio(nombreEdificioDe(loc)) === claveActual);
 
       if (!esSede && delEdificio.length === 0) {
+        this.diag('edificio_no_encontrado', {
+          meshRecibido: meshName,
+          modelo,
+          edificioClave: claveActual,
+          totalLocaciones: this.cachedLocations.length,
+          edificiosEnBD: Array.from(new Set(this.cachedLocations.map((l: any) => String(nombreEdificioDe(l)))))
+        });
         return {
           nombre: 'Edificio no registrado',
           desc: 'No se encontraron locaciones de este edificio en la base de datos.',
@@ -191,6 +205,17 @@ export class MapNavigationService {
         };
       }
 
+      this.diag('sala_no_encontrada', {
+        meshRecibido: meshName,
+        cuerpoBuscado: cuerpoNum,
+        modelo,
+        edificioClave: claveActual,
+        pisoActual,
+        locacionesDelEdificio: delEdificio.length,
+        pisosDelEdificio: Array.from(new Set(delEdificio.map((l: any) => String(this.getCI(l, 'piso'))))),
+        locacionesDelPiso: delPiso.length,
+        cuerposDelPiso: delPiso.map((l: any) => this.getCI(l, 'cuerpo'))
+      });
       return {
         nombre: 'Espacio no registrado',
         desc: `No hay una sala registrada para el Cuerpo ${cuerpoNum} en este edificio y piso.`,
