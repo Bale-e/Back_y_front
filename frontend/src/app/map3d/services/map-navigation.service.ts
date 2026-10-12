@@ -340,6 +340,11 @@ export class MapNavigationService {
     statusText: string;
     piso: string;
     edificio: BuildingId;
+    isMultiFloor?: boolean;
+    leg1Points?: BABYLON.Vector3[];
+    leg2Points?: BABYLON.Vector3[];
+    chosenStairName?: string;
+    direction?: 'up' | 'down';
   } | null> {
     const loc = await this.findLocationByName(destinationName);
     if (!loc) {
