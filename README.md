@@ -218,7 +218,7 @@ Back_y_front/                          ← Raíz del monorepo
             ├── 3d-models/
             │   ├── Edificio A/       ← Piso 1, 2, 3 en formato OBJ + MTL
             │   ├── Edificio B/       ← Piso 1, 2, 3 en formato OBJ + MTL
-            │   ├── Edificio C/       ← Piso 1 en formato OBJ + MTL
+            │   ├── Edificio C/       ← Piso 1 y 2 en formato OBJ + MTL
             │   └── sede/             ← Modelo completo del campus (INSTITUTO EN 3D.obj)
             ├── icons/                ← Iconos de la interfaz
             ├── images/               ← Imágenes de la interfaz
@@ -703,6 +703,7 @@ Contiene la lógica de los modelos de piso disponibles:
 | B | Piso 2 | `Edificio B - Piso 2.obj` |
 | B | Piso 3 | `Edificio B - Piso 3.obj` |
 | C | Piso 1 | `Edificio C - Piso 1.obj` |
+| C | Piso 2 | `Edificio C - Piso 2.obj` |
 | Sede | — | `INSTITUTO EN 3D.obj` |
 
 ---
@@ -786,7 +787,8 @@ assets/3d-models/
 │   ├── Edificio B - Piso 2.obj / .mtl
 │   └── Edificio B - Piso 3.obj / .mtl
 ├── Edificio C/
-│   └── Edificio C - Piso 1.obj / .mtl
+│   ├── Edificio C - Piso 1.obj / .mtl
+│   └── Edificio C - Piso 2.obj / .mtl
 └── sede/
     └── INSTITUTO EN 3D.obj / .mtl   ← Vista panorámica del campus completo
 ```
@@ -1007,7 +1009,7 @@ La dirección (`'up'` o `'down'`) se determina comparando el número de piso act
 - [x] Cálculo de rutas con punto de inflexión exacto en 90°
 - [x] Algoritmo A* para grafos topológicos
 - [x] Visualización 3D con BabylonJS (modelos OBJ)
-- [x] Soporte para Edificio A (3 pisos), Edificio B (3 pisos), Edificio C (1 piso) y Sede
+- [x] Soporte para Edificio A (3 pisos), Edificio B (3 pisos), Edificio C (2 pisos) y Sede
 - [x] Transiciones animadas entre pisos (3 etapas, 2200ms)
 - [x] Marcadores HTML proyectados sobre objetos 3D
 - [x] Auto-rotación de presentación del mapa de la Sede

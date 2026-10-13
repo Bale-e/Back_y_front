@@ -9,7 +9,7 @@
       <p class="dialog-title">¿A qué piso quieres ir?</p>
       <div class="floor-action__dialog-buttons">
         <button type="button" (click)="selectFloor('first')">Primer piso</button>
-        <button *ngIf="currentBuilding !== 'C'" type="button" (click)="selectFloor('second')">Segundo piso</button>
+        <button type="button" (click)="selectFloor('second')">Segundo piso</button>
         <button *ngIf="currentBuilding !== 'C'" type="button" (click)="selectFloor('third')">Tercer piso</button>
       </div>
     </ng-container>
