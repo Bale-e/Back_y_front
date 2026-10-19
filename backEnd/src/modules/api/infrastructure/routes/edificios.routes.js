@@ -4,6 +4,9 @@ const {
   listarEdificios,
   obtenerEdificioPorId,
   obtenerEdificioPorNombre,
+  crearEdificio,
+  actualizarEdificio,
+  eliminarEdificio,
 } = require('../controllers/EdificiosController');
 const {
   listarLocacionesDeEdificio,
@@ -15,6 +18,11 @@ const {
 router.get('/', listarEdificios);
 router.get('/nombre/:nombre', obtenerEdificioPorNombre);
 router.get('/:id', obtenerEdificioPorId);
+
+// Métodos de Administración (CRUD)
+router.post('/', crearEdificio);
+router.put('/:id', actualizarEdificio);
+router.delete('/:id', eliminarEdificio);
 
 // Locaciones anidadas bajo un edificio: /edificios/:id/locaciones...
 router.get('/:id/locaciones', listarLocacionesDeEdificio);

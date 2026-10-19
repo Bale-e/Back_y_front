@@ -105,6 +105,39 @@ export class EspaciosApiService {
     return res.json();
   }
 
+  // ── ADMINISTRACIÓN DE EDIFICIOS (CRUD) ──────────────────────
+  async crearEdificio(datos: { Nombre: string; Pisos?: string[] | string }): Promise<Edificio> {
+    const res = await fetch(`${API_BASE_URL}/edificios`, {
+      method: 'POST',
+      headers: AUTH_HEADERS,
+      body: JSON.stringify(datos)
+    });
+    if (!res.ok) throw new Error('Error al crear edificio en el servidor');
+    this.clearCache();
+    return res.json();
+  }
+
+  async actualizarEdificio(id: string, datos: { Nombre?: string; Pisos?: string[] | string }): Promise<Edificio> {
+    const res = await fetch(`${API_BASE_URL}/edificios/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: AUTH_HEADERS,
+      body: JSON.stringify(datos)
+    });
+    if (!res.ok) throw new Error('Error al actualizar edificio');
+    this.clearCache();
+    return res.json();
+  }
+
+  async eliminarEdificio(id: string): Promise<boolean> {
+    const res = await fetch(`${API_BASE_URL}/edificios/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: AUTH_HEADERS
+    });
+    if (!res.ok) throw new Error('Error al eliminar edificio');
+    this.clearCache();
+    return true;
+  }
+
   clearCache(): void {
     this.cache.clear();
   }

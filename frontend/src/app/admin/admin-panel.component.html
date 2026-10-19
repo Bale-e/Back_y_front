@@ -1,0 +1,174 @@
+<div class="admin-overlay" role="dialog" aria-modal="true" aria-label="Panel de Administración">
+  <div class="admin-modal">
+    
+    <!-- ── 1. VISTA DE BLOQUEO POR CONTRASEÑA (Para los 4 dueños) ── -->
+    <div *ngIf="!isAuthenticated" class="auth-gate">
+      <div class="auth-gate__card">
+        <div class="auth-gate__icon">🔒</div>
+        <h2>Acceso de Administrador</h2>
+        <p class="auth-gate__sub">Este panel está restringido exclusivamente a los 4 administradores del mapa InaGo.</p>
+
+        <form (ngSubmit)="verificarAcceso()" class="auth-gate__form">
+          <label for="adminPass">Contraseña de acceso:</label>
+          <input
+            id="adminPass"
+            type="password"
+            placeholder="Introduce la clave de administrador"
+            [(ngModel)]="passwordInput"
+            name="passwordInput"
+            required
+            autocomplete="current-password"
+            autofocus
+          />
+
+          <div *ngIf="authError" class="alert alert--danger">
+            {{ authError }}
+          </div>
+
+          <div class="auth-gate__actions">
+            <button type="submit" class="btn btn--primary">
+              Desbloquear Panel
+            </button>
+            <button type="button" class="btn btn--secondary" (click)="cerrar.emit()">
+              Volver al Mapa
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── 2. VISTA PRINCIPAL DEL PANEL CRUD (Una vez autenticado) ── -->
+    <div *ngIf="isAuthenticated" class="admin-content">
+      
+      <!-- Encabezado del Panel -->
+      <header class="admin-header">
+        <div>
+          <h2>⚙️ Panel de Administración (InaGo)</h2>
+          <span class="badge badge--success">Sesión de Administrador Activa</span>
+        </div>
+        <div class="admin-header__actions">
+          <button type="button" class="btn btn--outline" (click)="cerrarSesionAdmin()">
+            🗺️ Volver al Mapa 3D
+          </button>
+        </div>
+      </header>
+
+      <!-- Alertas de éxito o error -->
+      <div *ngIf="successMessage" class="alert alert--success">
+        ✅ {{ successMessage }}
+      </div>
+      <div *ngIf="errorMessage" class="alert alert--danger">
+        ❌ {{ errorMessage }}
+      </div>
+
+      <div class="admin-grid">
+        
+        <!-- Formulario: Crear / Editar -->
+        <section class="admin-card form-card">
+          <h3>{{ isEditing ? '✏️ Editar Edificio' : '➕ Agregar Nuevo Edificio' }}</h3>
+          <p class="section-desc">
+            {{ isEditing ? 'Modifica los datos del edificio y guarda los cambios en Firestore.' : 'Registra un nuevo edificio en la base de datos de Firebase.' }}
+          </p>
+
+          <form (ngSubmit)="guardarEdificio()">
+            <div class="form-group">
+              <label for="edificioNombre">Nombre del Edificio *</label>
+              <input
+                id="edificioNombre"
+                type="text"
+                placeholder="Ej: Edificio N, Cafetería Central, etc."
+                [(ngModel)]="formData.nombre"
+                name="nombre"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="edificioPisos">Pisos (separados por coma)</label>
+              <input
+                id="edificioPisos"
+                type="text"
+                placeholder="Ej: Piso 1, Piso 2, Piso 3"
+                [(ngModel)]="formData.pisosTexto"
+                name="pisosTexto"
+              />
+              <small class="form-hint">Escribe los pisos separados por comas. Si se deja vacío, se asignará "Piso 1".</small>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn--primary">
+                {{ isEditing ? 'Guardar Cambios' : 'Registrar en Firestore' }}
+              </button>
+              <button
+                *ngIf="isEditing"
+                type="button"
+                class="btn btn--secondary"
+                (click)="cancelarEdicion()">
+                Cancelar Edición
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Tabla: Lista de Edificios en Firestore -->
+        <section class="admin-card table-card">
+          <div class="table-card__header">
+            <h3>🏢 Edificios Registrados ({{ edificios.length }})</h3>
+            <button type="button" class="btn btn--sm btn--outline" (click)="cargarEdificios()" [disabled]="isLoading">
+              {{ isLoading ? 'Cargando...' : '🔄 Actualizar' }}
+            </button>
+          </div>
+
+          <div *ngIf="isLoading" class="loading-state">
+            Cargando edificios desde Firestore...
+          </div>
+
+          <div *ngIf="!isLoading && edificios.length === 0" class="empty-state">
+            No hay edificios registrados en Firestore.
+          </div>
+
+          <div *ngIf="!isLoading && edificios.length > 0" class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Pisos</th>
+                  <th style="text-align: right;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let ed of edificios" [class.highlighted]="formData.id === ed.id">
+                  <td>
+                    <strong>{{ ed.Nombre || ed.nombre || 'Sin nombre' }}</strong>
+                    <div class="doc-id">ID: {{ ed.id }}</div>
+                  </td>
+                  <td>{{ obtenerTextoPisos(ed) }}</td>
+                  <td style="text-align: right;">
+                    <div class="action-buttons">
+                      <button
+                        type="button"
+                        class="btn btn--sm btn--warning"
+                        title="Editar edificio"
+                        (click)="seleccionarParaEditar(ed)">
+                        ✏️ Editar
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn--sm btn--danger"
+                        title="Eliminar de Firestore"
+                        (click)="eliminarEdificio(ed)">
+                        🗑️ Eliminar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+  </div>
+</div>

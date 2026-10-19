@@ -12,6 +12,7 @@ import { EspaciosApiService } from './services/espacios-api.service';
 })
 export class AppComponent implements OnInit, OnDestroy {
   drawerOpen = false;
+  adminPanelOpen = false;
   selectedOption?: string;
   servicesMenu = ['Baños', 'Biblioteca', 'Cafetería', 'Enfermería', 'Recepción'];
   locationsMenu = ['Salas', 'Laboratorios', 'Oficinas', 'Escaleras', 'Salidas'];
@@ -22,6 +23,15 @@ export class AppComponent implements OnInit, OnDestroy {
     private espaciosApiService: EspaciosApiService,
     private renderer: Renderer2
   ) {}
+
+  openAdminPanel(): void {
+    this.closeDrawer();
+    this.adminPanelOpen = true;
+  }
+
+  closeAdminPanel(): void {
+    this.adminPanelOpen = false;
+  }
 
   async ngOnInit() {
     await this.espaciosApiService.getEdificios().catch(() => []);

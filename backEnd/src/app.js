@@ -1,8 +1,7 @@
-require('dotenv').config();
-require('./shared/infrastructure/firebase/firebaseAdmin'); // inicializa Firebase Admin antes que nada
-
 const path = require('path');
 const fs = require('fs');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+require('./shared/infrastructure/firebase/firebaseAdmin'); // inicializa Firebase Admin antes que nada
 const express = require('express');
 const { createCorsMiddleware } = require('./modules/api/infrastructure/middlewares/corsConfig');
 const { notFoundHandler, errorHandler } = require('./modules/api/infrastructure/middlewares/errorHandler');

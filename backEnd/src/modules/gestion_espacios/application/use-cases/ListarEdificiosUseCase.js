@@ -16,6 +16,18 @@ class ListarEdificiosUseCase {
   async executeByNombre(nombre) {
     return this.repo.obtenerPorNombre(nombre);
   }
+
+  async crear(datos) {
+    return this.repo.crear(datos);
+  }
+
+  async actualizar(id, datos) {
+    return this.repo.actualizar(id, datos);
+  }
+
+  async eliminar(id) {
+    return this.repo.eliminar(id);
+  }
 }
 
 module.exports = new ListarEdificiosUseCase();
