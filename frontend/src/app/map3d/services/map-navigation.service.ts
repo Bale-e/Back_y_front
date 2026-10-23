@@ -194,7 +194,29 @@ export class MapNavigationService {
         }
         const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
                                            : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+                // Handle inter‑building transitions
+        const isInterBuilding = !!backendRoute.interBuilding;
+        const connectionName = backendRoute.connectionName || null;
+        // Adjust status message for inter‑building routes
+        let interBuildingMessage = '';
+        if (isInterBuilding && connectionName) {
+          interBuildingMessage = `Cruzando al edificio ${edificio} vía ${connectionName}`;
+        }
+        const statusText = floorMessage || interBuildingMessage
+          ? `${floorMessage || interBuildingMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+          : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+          isInterBuilding,
+          connectionName,
+        };
           coord: destination,
           routePoints: finalRoute,
           statusText,
@@ -244,7 +266,29 @@ export class MapNavigationService {
         }
         const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
                                            : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+                // Handle inter‑building transitions
+        const isInterBuilding = !!backendRoute.interBuilding;
+        const connectionName = backendRoute.connectionName || null;
+        // Adjust status message for inter‑building routes
+        let interBuildingMessage = '';
+        if (isInterBuilding && connectionName) {
+          interBuildingMessage = `Cruzando al edificio ${edificio} vía ${connectionName}`;
+        }
+        const statusText = floorMessage || interBuildingMessage
+          ? `${floorMessage || interBuildingMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+          : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+          isInterBuilding,
+          connectionName,
+        };
           coord: destination,
           routePoints: finalRoute,
           statusText,
@@ -291,7 +335,29 @@ export class MapNavigationService {
         }
         const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
                                            : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+                // Handle inter‑building transitions
+        const isInterBuilding = !!backendRoute.interBuilding;
+        const connectionName = backendRoute.connectionName || null;
+        // Adjust status message for inter‑building routes
+        let interBuildingMessage = '';
+        if (isInterBuilding && connectionName) {
+          interBuildingMessage = `Cruzando al edificio ${edificio} vía ${connectionName}`;
+        }
+        const statusText = floorMessage || interBuildingMessage
+          ? `${floorMessage || interBuildingMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+          : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+          isInterBuilding,
+          connectionName,
+        };
           coord: destination,
           routePoints: finalRoute,
           statusText,
@@ -327,7 +393,29 @@ export class MapNavigationService {
         }
         const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
                                            : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+                // Handle inter‑building transitions
+        const isInterBuilding = !!backendRoute.interBuilding;
+        const connectionName = backendRoute.connectionName || null;
+        // Adjust status message for inter‑building routes
+        let interBuildingMessage = '';
+        if (isInterBuilding && connectionName) {
+          interBuildingMessage = `Cruzando al edificio ${edificio} vía ${connectionName}`;
+        }
+        const statusText = floorMessage || interBuildingMessage
+          ? `${floorMessage || interBuildingMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+          : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+          isInterBuilding,
+          connectionName,
+        };
           coord: destination,
           routePoints: finalRoute,
           statusText,
@@ -401,7 +489,29 @@ export class MapNavigationService {
         }
         const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
                                            : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+                // Handle inter‑building transitions
+        const isInterBuilding = !!backendRoute.interBuilding;
+        const connectionName = backendRoute.connectionName || null;
+        // Adjust status message for inter‑building routes
+        let interBuildingMessage = '';
+        if (isInterBuilding && connectionName) {
+          interBuildingMessage = `Cruzando al edificio ${edificio} vía ${connectionName}`;
+        }
+        const statusText = floorMessage || interBuildingMessage
+          ? `${floorMessage || interBuildingMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+          : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+          isInterBuilding,
+          connectionName,
+        };
           coord: destination,
           routePoints: finalRoute,
           statusText,
@@ -579,7 +689,29 @@ export class MapNavigationService {
         }
         const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
                                            : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+                // Handle inter‑building transitions
+        const isInterBuilding = !!backendRoute.interBuilding;
+        const connectionName = backendRoute.connectionName || null;
+        // Adjust status message for inter‑building routes
+        let interBuildingMessage = '';
+        if (isInterBuilding && connectionName) {
+          interBuildingMessage = `Cruzando al edificio ${edificio} vía ${connectionName}`;
+        }
+        const statusText = floorMessage || interBuildingMessage
+          ? `${floorMessage || interBuildingMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+          : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+          isInterBuilding,
+          connectionName,
+        };
           coord: destination,
           routePoints: finalRoute,
           statusText,

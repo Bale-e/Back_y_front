@@ -14,7 +14,17 @@ function extractVec3Point(obj) {
     const y = Number(obj[1]);
     const z = Number(obj[2]);
     if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-      return { x, y, z };
+      return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        }; x, y, z };
     }
   }
 
@@ -30,7 +40,17 @@ function extractVec3Point(obj) {
     const z = getVal('z');
 
     if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-      return { x, y, z };
+      return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        }; x, y, z };
     }
   }
 
@@ -43,7 +63,17 @@ function extractNavPathPoints(doc) {
   const conexiones = {};
 
   if (!doc || typeof doc !== 'object') {
-    return { accesos, giros, conexiones };
+    return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        }; accesos, giros, conexiones };
   }
 
   // 1. Accesos
@@ -96,7 +126,17 @@ function extractNavPathPoints(doc) {
     }
   }
 
-  return { accesos, giros, conexiones };
+  return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        }; accesos, giros, conexiones };
 }
 
 function findDestinationInPaths(paths, destinationName) {
@@ -108,13 +148,33 @@ function findDestinationInPaths(paths, destinationName) {
 
     for (const [name, pos] of Object.entries(conexiones)) {
       if (name.trim().toLowerCase() === targetLower || name.trim().toLowerCase().includes(targetLower)) {
-        return { path, pointName: name, position: pos };
+        return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        }; path, pointName: name, position: pos };
       }
     }
 
     for (const [name, pos] of Object.entries(accesos)) {
       if (name.trim().toLowerCase() === targetLower || name.trim().toLowerCase().includes(targetLower)) {
-        return { path, pointName: name, position: pos };
+        return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        }; path, pointName: name, position: pos };
       }
     }
   }
@@ -141,7 +201,17 @@ function findDestinationInPaths(paths, destinationName) {
  */
 function findTurnPointOnPath(startPos, giros, destPos) {
   if (!giros || giros.length === 0) {
-    return { turnPoint: { ...destPos }, girosToInclude: 0 };
+    return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        }; turnPoint: { ...destPos }, girosToInclude: 0 };
   }
 
   // pathPoints = [startPos, giros[0], giros[1], ..., giros[n-1]]
@@ -192,7 +262,17 @@ function findTurnPointOnPath(startPos, giros, destPos) {
   // Incluir giros[0 .. bestSegIdx-1]: los que están antes del segmento de inflexión.
   // bestSegIdx 0 → segmento (startPos → giros[0]) → incluir 0 giros
   // bestSegIdx k → segmento (giros[k-1] → giros[k]) → incluir k giros
-  return { turnPoint, girosToInclude: bestSegIdx };
+  return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        }; turnPoint, girosToInclude: bestSegIdx };
 }
 
 function cleanDuplicatePoints(points, thresholdSq = 0.0001) {
@@ -416,6 +496,16 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
     }
 
     return {
+          startName: selectedStartName,
+          endName: destino,
+          startPathId: startPath?.id || null,
+          endPathId: endPath?.id || startPath?.id || null,
+          coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+          distance: Number(totalDist.toFixed(2)),
+          // New fields for inter‑building handling
+          connectionName: commonAcc ? commonAccKey : null,
+          interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
+        };
       startName: selectedStartName,
       endName: destino,
       startPathId: startPath?.id || null,
