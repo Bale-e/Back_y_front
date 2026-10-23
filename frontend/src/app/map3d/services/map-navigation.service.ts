@@ -175,7 +175,35 @@ export class MapNavigationService {
           totalLocaciones: this.cachedLocations.length,
           edificiosEnBD: Array.from(new Set(this.cachedLocations.map((l: any) => String(nombreEdificioDe(l)))))
         });
+                // Build statusText with floor change indication
+        let floorMessage = '';
+        const currentFloorMatch = this.currentFloorSubject.value.match(/Piso\s*(\-?\d+)/i);
+        const currentFloorNum = currentFloorMatch ? parseInt(currentFloorMatch[1], 10) : 1;
+        const destFloorMatch = piso.match(/Piso\s*(\-?\d+)/i);
+        const destFloorNum = destFloorMatch ? parseInt(destFloorMatch[1], 10) : null;
+        if (destFloorNum !== null && destFloorNum !== currentFloorNum) {
+          const diff = Math.abs(destFloorNum - currentFloorNum);
+          const direction = destFloorNum > currentFloorNum ? 'Sube' : 'Baja';
+          // If the route uses stairs (chosenStairName provided), add explicit message
+          if (chosenStairName) {
+            floorMessage = `${direction} hasta el ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          } else {
+            // Elevator case – just show destination floor as before
+            floorMessage = `${direction} al ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          }
+        }
+        const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+                                           : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+        };
           nombre: 'Edificio no registrado',
           desc: 'No se encontraron locaciones de este edificio en la base de datos.',
           edificio: currentBld,
@@ -197,7 +225,35 @@ export class MapNavigationService {
         const tipo = (this.getCI(found, 'tipo') ?? 'Espacio académico').toString();
         const edificioTxt = (nombreEdificioDe(found) ?? currentBld).toString();
         const pisoTxt = `Piso ${this.pisoDeLocacion(found)}`;
+                // Build statusText with floor change indication
+        let floorMessage = '';
+        const currentFloorMatch = this.currentFloorSubject.value.match(/Piso\s*(\-?\d+)/i);
+        const currentFloorNum = currentFloorMatch ? parseInt(currentFloorMatch[1], 10) : 1;
+        const destFloorMatch = piso.match(/Piso\s*(\-?\d+)/i);
+        const destFloorNum = destFloorMatch ? parseInt(destFloorMatch[1], 10) : null;
+        if (destFloorNum !== null && destFloorNum !== currentFloorNum) {
+          const diff = Math.abs(destFloorNum - currentFloorNum);
+          const direction = destFloorNum > currentFloorNum ? 'Sube' : 'Baja';
+          // If the route uses stairs (chosenStairName provided), add explicit message
+          if (chosenStairName) {
+            floorMessage = `${direction} hasta el ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          } else {
+            // Elevator case – just show destination floor as before
+            floorMessage = `${direction} al ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          }
+        }
+        const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+                                           : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+        };
           nombre,
           desc: `${tipo} — Cuerpo ${cuerpoNum}, ${edificioTxt}, ${pisoTxt}.`,
           edificio: currentBld,
@@ -216,7 +272,35 @@ export class MapNavigationService {
         locacionesDelPiso: delPiso.length,
         cuerposDelPiso: delPiso.map((l: any) => this.getCI(l, 'cuerpo'))
       });
-      return {
+              // Build statusText with floor change indication
+        let floorMessage = '';
+        const currentFloorMatch = this.currentFloorSubject.value.match(/Piso\s*(\-?\d+)/i);
+        const currentFloorNum = currentFloorMatch ? parseInt(currentFloorMatch[1], 10) : 1;
+        const destFloorMatch = piso.match(/Piso\s*(\-?\d+)/i);
+        const destFloorNum = destFloorMatch ? parseInt(destFloorMatch[1], 10) : null;
+        if (destFloorNum !== null && destFloorNum !== currentFloorNum) {
+          const diff = Math.abs(destFloorNum - currentFloorNum);
+          const direction = destFloorNum > currentFloorNum ? 'Sube' : 'Baja';
+          // If the route uses stairs (chosenStairName provided), add explicit message
+          if (chosenStairName) {
+            floorMessage = `${direction} hasta el ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          } else {
+            // Elevator case – just show destination floor as before
+            floorMessage = `${direction} al ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          }
+        }
+        const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+                                           : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+        return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+        };
         nombre: 'Espacio no registrado',
         desc: `No hay una sala registrada para el Cuerpo ${cuerpoNum} en este edificio y piso.`,
         edificio: currentBld,
@@ -224,7 +308,35 @@ export class MapNavigationService {
       };
     } catch (err) {
       console.warn('Error al buscar info por meshName:', err);
-      return {
+              // Build statusText with floor change indication
+        let floorMessage = '';
+        const currentFloorMatch = this.currentFloorSubject.value.match(/Piso\s*(\-?\d+)/i);
+        const currentFloorNum = currentFloorMatch ? parseInt(currentFloorMatch[1], 10) : 1;
+        const destFloorMatch = piso.match(/Piso\s*(\-?\d+)/i);
+        const destFloorNum = destFloorMatch ? parseInt(destFloorMatch[1], 10) : null;
+        if (destFloorNum !== null && destFloorNum !== currentFloorNum) {
+          const diff = Math.abs(destFloorNum - currentFloorNum);
+          const direction = destFloorNum > currentFloorNum ? 'Sube' : 'Baja';
+          // If the route uses stairs (chosenStairName provided), add explicit message
+          if (chosenStairName) {
+            floorMessage = `${direction} hasta el ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          } else {
+            // Elevator case – just show destination floor as before
+            floorMessage = `${direction} al ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          }
+        }
+        const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+                                           : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+        return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+        };
         nombre: 'Error al consultar información',
         desc: 'Ocurrió un problema al consultar la base de datos. Intenta nuevamente.',
         edificio: currentBld,
@@ -270,7 +382,35 @@ export class MapNavigationService {
         const edificio = nearestLoc.Edificio || nearestLoc._edificioId || 'S';
         const piso = nearestLoc.Piso || nearestLoc.piso || 'General';
 
+                // Build statusText with floor change indication
+        let floorMessage = '';
+        const currentFloorMatch = this.currentFloorSubject.value.match(/Piso\s*(\-?\d+)/i);
+        const currentFloorNum = currentFloorMatch ? parseInt(currentFloorMatch[1], 10) : 1;
+        const destFloorMatch = piso.match(/Piso\s*(\-?\d+)/i);
+        const destFloorNum = destFloorMatch ? parseInt(destFloorMatch[1], 10) : null;
+        if (destFloorNum !== null && destFloorNum !== currentFloorNum) {
+          const diff = Math.abs(destFloorNum - currentFloorNum);
+          const direction = destFloorNum > currentFloorNum ? 'Sube' : 'Baja';
+          // If the route uses stairs (chosenStairName provided), add explicit message
+          if (chosenStairName) {
+            floorMessage = `${direction} hasta el ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          } else {
+            // Elevator case – just show destination floor as before
+            floorMessage = `${direction} al ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          }
+        }
+        const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+                                           : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
         return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+        };
           nombre: name,
           desc: `${tipo} — ${edificio ? 'Edificio ' + edificio : 'Sede Inacap'}${piso ? ', ' + piso : ''}.`,
           edificio,
@@ -420,7 +560,35 @@ export class MapNavigationService {
     const finalRoute = routePoints.length > 0 ? routePoints : [destination.clone()];
     const statusText = `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
 
-    return {
+            // Build statusText with floor change indication
+        let floorMessage = '';
+        const currentFloorMatch = this.currentFloorSubject.value.match(/Piso\s*(\-?\d+)/i);
+        const currentFloorNum = currentFloorMatch ? parseInt(currentFloorMatch[1], 10) : 1;
+        const destFloorMatch = piso.match(/Piso\s*(\-?\d+)/i);
+        const destFloorNum = destFloorMatch ? parseInt(destFloorMatch[1], 10) : null;
+        if (destFloorNum !== null && destFloorNum !== currentFloorNum) {
+          const diff = Math.abs(destFloorNum - currentFloorNum);
+          const direction = destFloorNum > currentFloorNum ? 'Sube' : 'Baja';
+          // If the route uses stairs (chosenStairName provided), add explicit message
+          if (chosenStairName) {
+            floorMessage = `${direction} hasta el ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          } else {
+            // Elevator case – just show destination floor as before
+            floorMessage = `${direction} al ${destFloorNum}${destFloorNum === 1 ? 'er' : 'º'} piso`;
+          }
+        }
+        const statusText = floorMessage ? `${floorMessage} — ${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`
+                                           : `${destinationName} — Edificio ${edificio} / ${piso} (Coord: ${destination.x.toFixed(2)}, ${destination.y.toFixed(2)}, ${destination.z.toFixed(2)})`;
+        return {
+          coord: destination,
+          routePoints: finalRoute,
+          statusText,
+          piso,
+          edificio,
+          isMultiFloor: !!chosenStairName,
+          chosenStairName,
+          direction,
+        };
       coord: destination,
       routePoints: finalRoute,
       statusText,
