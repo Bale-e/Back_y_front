@@ -644,7 +644,111 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     // para dejar libre el espacio de las indicaciones a la izquierda.
     this.closeDetailPanel();
 
-    if (result.isMultiFloor && result.leg1Points && result.leg2Points) {
+    if (result.isInterBuilding && result.leg1Points && result.leg2Points) {
+      // ══════════════════════════════════════════════════════════════════════
+      // NAVEGACIÓN INTER-EDIFICIO SECUENCIAL (TRANSICIÓN LATERAL)
+      // ══════════════════════════════════════════════════════════════════════
+      this.isMultiFloorNavigating = true;
+      try {
+        this.babylonSceneService.clearDestinationMarker();
+
+        // Tramo 1: En edificio origen hacia la salida/conector
+        this.destinationCoordinatesText = `Dirígete a la salida hacia Edificio ${result.targetBuilding} (${result.connectorName})...`;
+        const cb1 = this.buildNavSteps(
+          result.leg1Points,
+          destinationName,
+          `Paso 1: Salida hacia Edificio ${result.targetBuilding}`
+        );
+        this.cd.detectChanges();
+        await this.babylonSceneService.drawAnimatedRoute(result.leg1Points, true, cb1);
+
+        // Esperar a que el usuario complete el tramo 1 y confirme el cruce
+        await this.waitForFloorTransition(`Cruzar al Edificio ${result.targetBuilding} →`);
+
+        // Transición LATERAL 3D al nuevo edificio
+        this.destinationCoordinatesText = `Cruzando al Edificio ${result.targetBuilding}...`;
+        this.cd.detectChanges();
+
+        const interBuilding = result.intermediateBuilding || result.targetBuilding!;
+        const interFloor = result.intermediateFloor || result.piso;
+        const interFloorModel = this.resolveFloorModel(interBuilding, interFloor);
+
+        this.currentBuilding = interBuilding;
+        this.currentFloor = interFloorModel;
+        this.currentFloorModel = interFloorModel;
+        this._lastLoadedFloor = interFloorModel;
+        this.mapNavService.setBuilding(interBuilding);
+        this.mapNavService.setFloor(interFloorModel);
+        this.cd.detectChanges();
+
+        await this.babylonSceneService.loadModelWithTransition(
+          interFloorModel,
+          interBuilding,
+          result.lateralDirection || 'right'
+        );
+
+        if (result.needsFloorChangeInTarget && result.leg3Points) {
+          // Tramo 2: Desde entrada en edificio destino hacia la escalera
+          this.destinationCoordinatesText = `Paso 2: Dirígete a la ${result.stairNameInTarget || 'escalera'}...`;
+          const cb2 = this.buildNavSteps(
+            result.leg2Points,
+            destinationName,
+            `Paso 2: Escalera hacia ${result.targetFloor || result.piso}`
+          );
+          this.cd.detectChanges();
+          await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true, cb2);
+
+          // Esperar confirmación de cambio de piso
+          const vertAction = result.verticalDirection === 'up' ? 'Subir' : 'Bajar';
+          await this.waitForFloorTransition(`${vertAction} a ${result.targetFloor || result.piso} →`);
+
+          // Transición VERTICAL 3D al piso final del edificio destino
+          this.destinationCoordinatesText = `${vertAction === 'Subir' ? 'Subiendo' : 'Bajando'} a ${result.targetFloor || result.piso}...`;
+          this.cd.detectChanges();
+
+          const finalFloorModel = this.resolveFloorModel(result.targetBuilding!, result.targetFloor || result.piso);
+          this.currentFloor = finalFloorModel;
+          this.currentFloorModel = finalFloorModel;
+          this._lastLoadedFloor = finalFloorModel;
+          this.mapNavService.setFloor(finalFloorModel);
+          this.cd.detectChanges();
+
+          await this.babylonSceneService.loadModelWithTransition(
+            finalFloorModel,
+            result.targetBuilding!,
+            result.verticalDirection || 'up'
+          );
+
+          // Tramo 3: Desde la escalera hasta la sala destino
+          this.destinationCoordinatesText = `Paso 3: Continúa hacia ${destinationName}`;
+          const cb3 = this.buildNavSteps(
+            result.leg3Points,
+            destinationName,
+            `Paso 3: en ${result.targetFloor || result.piso}`
+          );
+          this.cd.detectChanges();
+
+          this.babylonSceneService.setDestinationMarker(result.coord);
+          await this.babylonSceneService.drawAnimatedRoute(result.leg3Points, true, cb3);
+          this.destinationCoordinatesText = result.statusText;
+        } else {
+          // Tramo 2: Directo a la sala destino en el mismo piso del edificio destino
+          this.destinationCoordinatesText = `Paso 2: Continúa hacia ${destinationName}`;
+          const cb2 = this.buildNavSteps(
+            result.leg2Points,
+            destinationName,
+            `Paso 2: en ${result.piso}`
+          );
+          this.cd.detectChanges();
+
+          this.babylonSceneService.setDestinationMarker(result.coord);
+          await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true, cb2);
+          this.destinationCoordinatesText = result.statusText;
+        }
+      } finally {
+        this.isMultiFloorNavigating = false;
+      }
+    } else if (result.isMultiFloor && result.leg1Points && result.leg2Points) {
       // ══════════════════════════════════════════════════════════════════════
       // NAVEGACIÓN MULTI-PISO SECUENCIAL
       // ══════════════════════════════════════════════════════════════════════
@@ -932,6 +1036,10 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     // navPendingFloorTransition se activará cuando el callback del último
     // segmento del tramo 1 detecte isLast=true.
     this.navPendingFloorLabel = label;
+    const total = this.babylonSceneService.getRouteSegmentCount();
+    if (total <= 1 || this.currentRouteSegment >= total - 1) {
+      this.navPendingFloorTransition = true;
+    }
     this.cd.detectChanges();
     return new Promise<void>(resolve => {
       this.pendingFloorResolve = resolve;

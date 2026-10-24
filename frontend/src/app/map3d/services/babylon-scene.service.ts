@@ -362,7 +362,7 @@ export class BabylonSceneService implements OnDestroy {
   public async loadModelWithTransition(
     modelName: string,
     building: BuildingId | boolean = 'A',
-    direction: 'up' | 'down' = 'up'
+    direction: 'up' | 'down' | 'left' | 'right' | 'lateral-right' | 'lateral-left' = 'up'
   ): Promise<void> {
     if (!this.scene) return;
 
@@ -394,29 +394,53 @@ export class BabylonSceneService implements OnDestroy {
     this.modelRoot = incomingRoot;
 
     // ── Preparar animación en 3 etapas con proximidad clara ───────────────────
-    const OFFSET = 26;
-    const GAP    = 4.2;
+    const isLateral = direction === 'left' || direction === 'right' || direction === 'lateral-right' || direction === 'lateral-left';
+    const isSlideRight = direction === 'right' || direction === 'lateral-right';
+
+    const OFFSET_Y = 26;
+    const GAP_Y    = 4.2;
+    const OFFSET_X = 35;
+    const GAP_X    = 6.0;
 
     const incomingBaseY = incomingRoot.position.y;
     const outgoingBaseY = outgoingRoot ? outgoingRoot.position.y : 0;
+    const incomingBaseX = incomingRoot.position.x;
+    const outgoingBaseX = outgoingRoot ? outgoingRoot.position.x : 0;
 
-    // Subir → nuevo piso entra desde arriba (+OFFSET) hacia meetY (+GAP sobre el actual). Saliente sale hacia abajo (-OFFSET).
-    // Bajar → nuevo piso entra desde abajo (-OFFSET) hacia meetY (-GAP bajo el actual). Saliente sale hacia arriba (+OFFSET).
-    const incomingStartY = direction === 'up' ? incomingBaseY + OFFSET : incomingBaseY - OFFSET;
-    const meetY          = direction === 'up' ? outgoingBaseY + GAP   : outgoingBaseY - GAP;
-    const outgoingExitY  = direction === 'up' ? outgoingBaseY - OFFSET : outgoingBaseY + OFFSET;
+    let incomingStartY: number, meetY: number, outgoingExitY: number;
+    let incomingStartX: number, meetX: number, outgoingExitX: number;
+
+    if (isLateral) {
+      incomingStartY = incomingBaseY;
+      meetY          = incomingBaseY;
+      outgoingExitY  = outgoingBaseY;
+
+      incomingStartX = isSlideRight ? incomingBaseX + OFFSET_X : incomingBaseX - OFFSET_X;
+      meetX          = isSlideRight ? outgoingBaseX + GAP_X   : outgoingBaseX - GAP_X;
+      outgoingExitX  = isSlideRight ? outgoingBaseX - OFFSET_X : outgoingBaseX + OFFSET_X;
+
+      incomingRoot.position.x = incomingStartX;
+      incomingRoot.position.y = incomingBaseY;
+    } else {
+      incomingStartX = incomingBaseX;
+      meetX          = incomingBaseX;
+      outgoingExitX  = outgoingBaseX;
+
+      incomingStartY = direction === 'up' ? incomingBaseY + OFFSET_Y : incomingBaseY - OFFSET_Y;
+      meetY          = direction === 'up' ? outgoingBaseY + GAP_Y   : outgoingBaseY - GAP_Y;
+      outgoingExitY  = direction === 'up' ? outgoingBaseY - OFFSET_Y : outgoingBaseY + OFFSET_Y;
+
+      incomingRoot.position.x = incomingBaseX;
+      incomingRoot.position.y = incomingStartY;
+    }
 
     const incomingMeshes = incomingRoot.getChildMeshes(false);
     const outgoingMeshes = outgoingRoot ? outgoingRoot.getChildMeshes(false) : [];
     const arrowMeshes    = this.guideArrowMeshes.slice();
 
     incomingMeshes.forEach(m => { m.visibility = 0; });
-    incomingRoot.position.y = incomingStartY;
 
     // ── Animación en 3 etapas (~2200ms total) ──────────────────────────────────
-    // Etapa 1 (0 -> P1): El nuevo piso se acerca desde arriba/abajo hasta posicionarse muy cerca (meetY).
-    // Etapa 2 (P1 -> P2): Pausa de proximidad clara donde ambos pisos están alineados sin tocarse.
-    // Etapa 3 (P2 -> 1.0): El piso anterior se aleja y desvanece, mientras el nuevo se asienta en el centro.
     const DURATION_MS = 2200;
     const P1 = 0.44; // fin de etapa 1 (~968ms)
     const P2 = 0.64; // fin de etapa 2 (~1408ms, pausa de proximidad de ~440ms)
@@ -432,39 +456,46 @@ export class BabylonSceneService implements OnDestroy {
         const elapsed = performance.now() - startTime;
         const raw     = Math.min(elapsed / DURATION_MS, 1);
 
+        let incomingX: number;
+        let outgoingX: number;
         let incomingY: number;
         let outgoingY: number;
         let incomingAlpha: number;
         let outgoingAlpha: number;
 
         if (raw <= P1) {
-          // ── Etapa 1: Acercamiento suave del nuevo piso hacia meetY ──────────
           const t = easeOutCubic(raw / P1);
-          incomingY     = incomingStartY + (meetY - incomingStartY) * t;
+          incomingX     = isLateral ? incomingStartX + (meetX - incomingStartX) * t : incomingBaseX;
+          incomingY     = isLateral ? incomingBaseY : incomingStartY + (meetY - incomingStartY) * t;
+          outgoingX     = outgoingBaseX;
           outgoingY     = outgoingBaseY;
           incomingAlpha = Math.min(1, t * 1.25);
           outgoingAlpha = 1;
         } else if (raw <= P2) {
-          // ── Etapa 2: Proximidad. Ambos pisos visibles y muy cercanos ─────────
-          incomingY     = meetY;
+          incomingX     = isLateral ? meetX : incomingBaseX;
+          incomingY     = isLateral ? incomingBaseY : meetY;
+          outgoingX     = outgoingBaseX;
           outgoingY     = outgoingBaseY;
           incomingAlpha = 1;
           outgoingAlpha = 1;
         } else {
-          // ── Etapa 3: Alejamiento del piso anterior y asentamiento final ───────
           const localProgress = (raw - P2) / (1 - P2);
           const tExit         = easeInOutQuad(localProgress);
 
-          incomingY     = meetY + (incomingBaseY - meetY) * localProgress;
-          outgoingY     = outgoingBaseY + (outgoingExitY - outgoingBaseY) * tExit;
+          incomingX     = isLateral ? meetX + (incomingBaseX - meetX) * localProgress : incomingBaseX;
+          incomingY     = isLateral ? incomingBaseY : meetY + (incomingBaseY - meetY) * localProgress;
+          outgoingX     = isLateral ? outgoingBaseX + (outgoingExitX - outgoingBaseX) * tExit : outgoingBaseX;
+          outgoingY     = isLateral ? outgoingBaseY : outgoingBaseY + (outgoingExitY - outgoingBaseY) * tExit;
           incomingAlpha = 1;
           outgoingAlpha = Math.max(0, 1 - localProgress);
         }
 
         if (incomingRoot && !incomingRoot.isDisposed()) {
+          incomingRoot.position.x = incomingX;
           incomingRoot.position.y = incomingY;
         }
         if (outgoingRoot && !outgoingRoot.isDisposed()) {
+          outgoingRoot.position.x = outgoingX;
           outgoingRoot.position.y = outgoingY;
         }
 
@@ -477,6 +508,7 @@ export class BabylonSceneService implements OnDestroy {
         } else {
           // Finalizar transición en el estado exacto
           if (incomingRoot && !incomingRoot.isDisposed()) {
+            incomingRoot.position.x = incomingBaseX;
             incomingRoot.position.y = incomingBaseY;
             incomingRoot.getChildMeshes(false).forEach(m => { m.visibility = 1; });
           }
@@ -485,6 +517,7 @@ export class BabylonSceneService implements OnDestroy {
           resolve();
         }
       };
+
       requestAnimationFrame(step);
     });
 
