@@ -376,15 +376,36 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         normalizedMeshName.includes('fixed');
 
       if (isSede) {
-        if (normalizedMeshName.includes('mesh71') || normalizedMeshName.includes('c1')) {
+        // Edificio C: indicador Grupo 42, C1, mesh119, etc.
+        if (
+          normalizedMeshName.includes('group42') ||
+          normalizedMeshName.includes('group41') ||
+          normalizedMeshName.includes('c1') ||
+          normalizedMeshName.includes('mesh119') ||
+          normalizedMeshName.includes('edificioc')
+        ) {
           this.goToBuildingCFirstFloor();
           return;
         }
-        if (normalizedMeshName.includes('mesh73') || normalizedMeshName.includes('b1')) {
+        // Edificio B: indicador Grupo 31, B1, mesh71, mesh73, etc.
+        if (
+          normalizedMeshName.includes('group31') ||
+          normalizedMeshName.includes('b1') ||
+          normalizedMeshName.includes('mesh71') ||
+          normalizedMeshName.includes('mesh73') ||
+          normalizedMeshName.includes('edificiob')
+        ) {
           this.goToBuildingBFirstFloor();
           return;
         }
-        if (normalizedMeshName.includes('mesh74') || normalizedMeshName.includes('a1')) {
+        // Edificio A: indicador Grupo 65, A1, mesh178, mesh74, etc.
+        if (
+          normalizedMeshName.includes('group65') ||
+          normalizedMeshName.includes('a1') ||
+          normalizedMeshName.includes('mesh178') ||
+          normalizedMeshName.includes('mesh74') ||
+          normalizedMeshName.includes('edificioa')
+        ) {
           this.goToBuildingAFirstFloor();
           return;
         }

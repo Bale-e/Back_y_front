@@ -187,6 +187,196 @@ export class BabylonSceneService implements OnDestroy {
     skybox.material = skyboxMaterial;
   }
 
+
+  private readonly buildingCentersInSede: Record<string, BABYLON.Vector3> = {
+    A: new BABYLON.Vector3(31.2, 11.6, 25.5),
+    B: new BABYLON.Vector3(31.9, 11.8, 46.1),
+    C: new BABYLON.Vector3(-16.3, 10.5, 54.1),
+    S: new BABYLON.Vector3(0, 0, 0)
+  };
+
+  private getBuildingCenterInSede(sedeRoot: BABYLON.TransformNode, building: BuildingId): BABYLON.Vector3 {
+    const regex = building === 'B'
+      ? /b1|group31|mesh71|mesh73/i
+      : building === 'C'
+        ? /c1|group42|group41|mesh119/i
+        : /a1|group65|mesh178|mesh74/i;
+
+    const bMeshes = sedeRoot.getChildMeshes(false).filter(m => regex.test(m.name));
+    if (bMeshes.length > 0) {
+      let bMin = new BABYLON.Vector3(Infinity, Infinity, Infinity);
+      let bMax = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
+      bMeshes.forEach(m => {
+        m.computeWorldMatrix(true);
+        const bbox = m.getBoundingInfo().boundingBox;
+        bMin = BABYLON.Vector3.Minimize(bMin, bbox.minimumWorld);
+        bMax = BABYLON.Vector3.Maximize(bMax, bbox.maximumWorld);
+      });
+      if (isFinite(bMin.x) && isFinite(bMax.x) && isFinite(bMin.z) && isFinite(bMax.z)) {
+        return BABYLON.Vector3.Center(bMin, bMax);
+      }
+    }
+
+    return this.buildingCentersInSede[building] ? this.buildingCentersInSede[building].clone() : new BABYLON.Vector3(31.2, 11.6, 25.5);
+  }
+
+  private async animateTransitionToSede(
+    outgoingRoot: BABYLON.TransformNode | null,
+    incomingRoot: BABYLON.TransformNode,
+    originBuilding: BuildingId
+  ): Promise<void> {
+    if (!this.camera || !this.scene) {
+      outgoingRoot?.dispose(false, true);
+      return;
+    }
+
+    const buildingCenter = this.getBuildingCenterInSede(incomingRoot, originBuilding);
+
+    const incomingMeshes = incomingRoot.getChildMeshes(false);
+    const outgoingMeshes = outgoingRoot ? outgoingRoot.getChildMeshes(false) : [];
+
+    incomingMeshes.forEach(m => { m.visibility = 0; });
+    outgoingMeshes.forEach(m => { m.visibility = 1; });
+
+    const startTarget = buildingCenter.clone();
+    startTarget.y = 0;
+
+    const startRadius = Math.min(this.camera.radius, 22);
+    const endRadius   = 77;
+
+    const startAlpha = this.camera.alpha;
+    const startBeta  = this.camera.beta;
+    const endAlpha   = -Math.PI / 2;
+    const endBeta    = 1.25;
+    const endTarget  = BABYLON.Vector3.Zero();
+
+    this.camera.setTarget(startTarget);
+    this.camera.radius = startRadius;
+
+    const duration = 1400;
+    const startTime = performance.now();
+
+    await new Promise<void>(resolve => {
+      const step = () => {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        const eased = progress < 0.5
+          ? 4 * progress * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+        if (this.camera) {
+          this.camera.target = BABYLON.Vector3.Lerp(startTarget, endTarget, eased);
+          this.camera.radius = startRadius + (endRadius - startRadius) * eased;
+          this.camera.alpha  = startAlpha + (endAlpha - startAlpha) * eased;
+          this.camera.beta   = startBeta + (endBeta - startBeta) * eased;
+          this.baseRadius    = this.camera.radius;
+        }
+
+        const outVis = Math.max(0, 1 - progress * 1.5);
+        const inVis  = Math.min(1, progress * 1.3);
+        outgoingMeshes.forEach(m => { m.visibility = outVis; });
+        incomingMeshes.forEach(m => { m.visibility = inVis; });
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          incomingMeshes.forEach(m => { m.visibility = 1; });
+          outgoingRoot?.dispose(false, true);
+          this.clearGuideArrows();
+          if (this.camera) {
+            this.camera.setTarget(endTarget);
+            this.camera.radius = endRadius;
+            this.camera.alpha  = endAlpha;
+            this.camera.beta   = endBeta;
+            this.baseRadius    = endRadius;
+            this.zoomTime      = 0;
+          }
+          resolve();
+        }
+      };
+
+      requestAnimationFrame(step);
+    });
+  }
+
+  private async animateTransitionFromSede(
+    outgoingRoot: BABYLON.TransformNode | null,
+    incomingRoot: BABYLON.TransformNode,
+    targetBuilding: BuildingId
+  ): Promise<void> {
+    if (!this.camera || !this.scene) {
+      outgoingRoot?.dispose(false, true);
+      return;
+    }
+
+    const buildingCenter = outgoingRoot
+      ? this.getBuildingCenterInSede(outgoingRoot, targetBuilding)
+      : (this.buildingCentersInSede[targetBuilding] || new BABYLON.Vector3(31.2, 11.6, 25.5));
+
+    const incomingMeshes = incomingRoot.getChildMeshes(false);
+    const outgoingMeshes = outgoingRoot ? outgoingRoot.getChildMeshes(false) : [];
+
+    incomingMeshes.forEach(m => { m.visibility = 0; });
+    outgoingMeshes.forEach(m => { m.visibility = 1; });
+
+    const startTarget = this.camera.target.clone();
+    const endTarget   = BABYLON.Vector3.Zero();
+
+    const startRadius = this.camera.radius;
+    const endRadius   = 36.4;
+
+    const startAlpha = this.camera.alpha;
+    const startBeta  = this.camera.beta;
+    const endAlpha   = Math.PI / 4;
+    const endBeta    = Math.PI / 3;
+
+    const duration = 1200;
+    const startTime = performance.now();
+
+    await new Promise<void>(resolve => {
+      const step = () => {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        const eased = progress < 0.5
+          ? 4 * progress * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+        if (this.camera) {
+          this.camera.target = BABYLON.Vector3.Lerp(startTarget, endTarget, eased);
+          this.camera.radius = startRadius + (endRadius - startRadius) * eased;
+          this.camera.alpha  = startAlpha + (endAlpha - startAlpha) * eased;
+          this.camera.beta   = startBeta + (endBeta - startBeta) * eased;
+          this.baseRadius    = this.camera.radius;
+        }
+
+        const outVis = Math.max(0, 1 - progress * 1.5);
+        const inVis  = Math.min(1, progress * 1.3);
+        outgoingMeshes.forEach(m => { m.visibility = outVis; });
+        incomingMeshes.forEach(m => { m.visibility = inVis; });
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          incomingMeshes.forEach(m => { m.visibility = 1; });
+          outgoingRoot?.dispose(false, true);
+          this.clearGuideArrows();
+          if (this.camera) {
+            this.camera.setTarget(endTarget);
+            this.camera.radius = endRadius;
+            this.camera.alpha  = endAlpha;
+            this.camera.beta   = endBeta;
+            this.baseRadius    = endRadius;
+          }
+          resolve();
+        }
+      };
+
+      requestAnimationFrame(step);
+    });
+  }
+
   public async loadModel(modelName: string, building: BuildingId | boolean = 'A'): Promise<void> {
     if (!this.scene) return;
 
@@ -226,25 +416,24 @@ export class BabylonSceneService implements OnDestroy {
     this.modelRoot = newRoot;
 
     if (this.camera && this.modelRoot) {
-      this.camera.setTarget(BABYLON.Vector3.Zero());
+      const isFirstInit = this.baseRadius === 0;
       const isSede      = this.isSedeModelName(modelName, buildingId);
-      const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
-      if (isSede) {
-        this.camera.radius = 77;
-        this.camera.alpha  = -Math.PI / 2;
-        this.camera.beta   = 1.25;
-        this.baseRadius    = 77;
-        this.zoomTime      = 0;
-      } else if (isBuildingB) {
-        this.camera.radius = 36.4;
-        this.camera.alpha  = Math.PI / 4;
-        this.camera.beta   = Math.PI / 3;
-        this.baseRadius    = 36.4;
+      if (isFirstInit) {
+        this.camera.setTarget(BABYLON.Vector3.Zero());
+        if (isSede) {
+          this.camera.radius = 77;
+          this.camera.alpha  = -Math.PI / 2;
+          this.camera.beta   = 1.25;
+          this.baseRadius    = 77;
+          this.zoomTime      = 0;
+        } else {
+          this.camera.radius = 36.4;
+          this.camera.alpha  = Math.PI / 4;
+          this.camera.beta   = Math.PI / 3;
+          this.baseRadius    = 36.4;
+        }
       } else {
-        this.camera.radius = 36.4;
-        this.camera.alpha  = Math.PI / 4;
-        this.camera.beta   = Math.PI / 3;
-        this.baseRadius    = 36.4;
+        this.baseRadius = this.camera.radius;
       }
     }
   }
@@ -393,6 +582,27 @@ export class BabylonSceneService implements OnDestroy {
     }
     this.modelRoot = incomingRoot;
 
+    const prevBuilding = this.currentBuilding;
+    const prevFloor = this.currentFloorModel;
+    const isSede = this.isSedeModelName(modelName, buildingId);
+    const wasSede = this.isSedeModelName(prevFloor, prevBuilding);
+
+    // ── Transición especial hacia la SEDE (Zoom-out desde el edificio de origen) ──
+    if (isSede && !wasSede && (prevBuilding === 'A' || prevBuilding === 'B' || prevBuilding === 'C')) {
+      this.currentFloorModel = modelName;
+      this.currentBuilding   = buildingId;
+      await this.animateTransitionToSede(outgoingRoot, incomingRoot, prevBuilding);
+      return;
+    }
+
+    // ── Transición especial desde la SEDE hacia un edificio (Zoom-in hacia el pasillo) ──
+    if (wasSede && !isSede && (buildingId === 'A' || buildingId === 'B' || buildingId === 'C')) {
+      this.currentFloorModel = modelName;
+      this.currentBuilding   = buildingId;
+      await this.animateTransitionFromSede(outgoingRoot, incomingRoot, buildingId);
+      return;
+    }
+
     // ── Preparar animación en 3 etapas con proximidad clara ───────────────────
     const isLateral = direction === 'left' || direction === 'right' || direction === 'lateral-right' || direction === 'lateral-left';
     const isSlideRight = direction === 'right' || direction === 'lateral-right';
@@ -521,23 +731,11 @@ export class BabylonSceneService implements OnDestroy {
       requestAnimationFrame(step);
     });
 
-    // Recentrar cámara al modelo activo
-    if (this.camera && this.modelRoot) {
-      this.camera.setTarget(BABYLON.Vector3.Zero());
-      const isSede      = this.isSedeModelName(modelName, buildingId);
-      const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
-      if (isSede) {
-        this.camera.radius = 77;
-        this.camera.alpha  = -Math.PI / 2;
-        this.camera.beta   = 1.25;
-        this.baseRadius    = 77;
-        this.zoomTime      = 0;
-      } else {
-        this.camera.radius = 36.4;
-        this.camera.alpha  = Math.PI / 4;
-        this.camera.beta   = Math.PI / 3;
-        this.baseRadius    = 36.4;
-      }
+    // ── Respetar la perspectiva activa del usuario ─────────────────────────
+    // NO forzar camera.setTarget, alpha, beta ni radius en cambios de piso o mapa.
+    // La vista se mantiene fluida y continua exactamente donde el usuario la tenía.
+    if (this.camera) {
+      this.baseRadius = this.camera.radius;
     }
   }
 

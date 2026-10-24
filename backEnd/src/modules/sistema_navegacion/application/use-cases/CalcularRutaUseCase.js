@@ -315,7 +315,45 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
         });
       }
       if (!endPath) {
-        endPath = allPaths[0];
+        if (targetEdificio === 'b' || targetEdificio.includes('b')) {
+          const floorNum = targetFloor.replace(/\D/g, '') || '1';
+          const targetY = floorNum === '3' ? 0.86 : (floorNum === '2' ? 0.41 : 0.05);
+          endPath = {
+            id: `NavPathEdificioB-Piso${floorNum}`,
+            edificio: 'B',
+            piso: `Piso ${floorNum}`,
+            Accesos: {
+              ConectorEdificioA: { x: -0.50, y: targetY, z: -0.78 },
+              Escalera: { x: -0.49, y: targetY, z: -11.40 }
+            },
+            Giros: [
+              { x: -0.50, y: targetY, z: -11.40 },
+              { x: -0.50, y: targetY, z: -3.15 },
+              { x: -0.50, y: targetY, z: -0.78 },
+              { x: -0.50, y: targetY, z: 8.00 }
+            ]
+          };
+        } else if (targetEdificio === 'c' || targetEdificio.includes('c')) {
+          const floorNum = targetFloor.replace(/\D/g, '') || '1';
+          const targetY = floorNum === '2' ? 0.41 : 0.05;
+          endPath = {
+            id: `NavPathEdificioC-Piso${floorNum}`,
+            edificio: 'C',
+            piso: `Piso ${floorNum}`,
+            Accesos: {
+              EntradaPrincipal: { x: 0.30, y: targetY, z: 9.68 },
+              Escalera: { x: 0.30, y: targetY, z: 8.00 }
+            },
+            Giros: [
+              { x: 0.30, y: targetY, z: 11.00 },
+              { x: 0.30, y: targetY, z: 8.00 },
+              { x: 0.30, y: targetY, z: 0.00 },
+              { x: 0.30, y: targetY, z: -7.00 }
+            ]
+          };
+        } else {
+          endPath = allPaths[0];
+        }
       }
     }
 

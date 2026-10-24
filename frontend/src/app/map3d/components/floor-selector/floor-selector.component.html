@@ -11,6 +11,7 @@
         <button type="button" (click)="selectFloor('first')">Primer piso</button>
         <button type="button" (click)="selectFloor('second')">Segundo piso</button>
         <button *ngIf="currentBuilding !== 'C'" type="button" (click)="selectFloor('third')">Tercer piso</button>
+        <button type="button" (click)="selectBuilding('S')">🏛️ Mapa principal</button>
       </div>
     </ng-container>
     <ng-template #selectBuildingTpl>

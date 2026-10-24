@@ -541,17 +541,23 @@ export class MapNavigationService {
 
         rawLeg2.push(pLanding, pThreshold, pFacing, pCorridor, pDest);
       }
-    } else {
-      // Edificio B:
-      const pLanding = new BABYLON.Vector3(-0.49, targetY, -11.40);
+    } else if (edificio === 'B') {
+      // Edificio B: el pasillo principal corre a lo largo del eje Z en X = -0.50
+      const pLanding   = new BABYLON.Vector3(-0.49, targetY, -11.40);
       const pThreshold = new BABYLON.Vector3(-0.50, targetY, -3.15);
-      const pJunction = new BABYLON.Vector3(-0.50, targetY, -0.78);
-      const facingX = destCoord.x < -0.50 ? Math.max(destCoord.x, -2.0) : Math.min(destCoord.x, 1.0);
-      const pFacing = new BABYLON.Vector3(facingX, targetY, -0.78);
-      const pCorridor = new BABYLON.Vector3(destCoord.x, targetY, -0.78);
-      const pDest = new BABYLON.Vector3(destCoord.x, targetY, destCoord.z);
+      // Avanzar por el pasillo central en Z hasta la altura de la sala:
+      const pCorridor  = new BABYLON.Vector3(-0.50, targetY, destCoord.z);
+      // Girar 90° hacia la sala en X:
+      const pDest      = new BABYLON.Vector3(destCoord.x, targetY, destCoord.z);
 
-      rawLeg2.push(pLanding, pThreshold, pJunction, pFacing, pCorridor, pDest);
+      rawLeg2.push(pLanding, pThreshold, pCorridor, pDest);
+    } else {
+      // Edificio C: el pasillo principal corre a lo largo del eje Z en X = 0.30
+      const pLanding   = new BABYLON.Vector3(0.30, targetY, 8.00);
+      const pCorridor  = new BABYLON.Vector3(0.30, targetY, destCoord.z);
+      const pDest      = new BABYLON.Vector3(destCoord.x, targetY, destCoord.z);
+
+      rawLeg2.push(pLanding, pCorridor, pDest);
     }
 
     const leg2Points = this.cleanRoutePoints(rawLeg2);
@@ -737,10 +743,14 @@ export class MapNavigationService {
       if (targetBuilding === 'B') {
         const pLanding   = new BABYLON.Vector3(-0.49, targetY, -11.40);
         const pThreshold = new BABYLON.Vector3(-0.50, targetY, -3.15);
-        const pJunction  = new BABYLON.Vector3(-0.50, targetY, -0.78);
-        const pFacing    = new BABYLON.Vector3(finalDestCoord.x, targetY, -0.78);
+        const pCorridor  = new BABYLON.Vector3(-0.50, targetY, finalDestCoord.z);
         const pDest      = new BABYLON.Vector3(finalDestCoord.x, targetY, finalDestCoord.z);
-        rawLeg3.push(pLanding, pThreshold, pJunction, pFacing, pDest);
+        rawLeg3.push(pLanding, pThreshold, pCorridor, pDest);
+      } else if (targetBuilding === 'C') {
+        const pLanding   = new BABYLON.Vector3(0.30, targetY, 8.00);
+        const pCorridor  = new BABYLON.Vector3(0.30, targetY, finalDestCoord.z);
+        const pDest      = new BABYLON.Vector3(finalDestCoord.x, targetY, finalDestCoord.z);
+        rawLeg3.push(pLanding, pCorridor, pDest);
       } else {
         const pLanding   = new BABYLON.Vector3(9.80, targetY, -0.80);
         const pThreshold = new BABYLON.Vector3(9.80, targetY, 0.16);
@@ -768,10 +778,15 @@ export class MapNavigationService {
       // Mismo piso en edificio destino: del conector directo a la sala final
       const rawLeg2: BABYLON.Vector3[] = [];
       if (targetBuilding === 'B') {
-        const entryB  = new BABYLON.Vector3(-0.50, intermediateY, -0.78);
-        const pFacing = new BABYLON.Vector3(finalDestCoord.x, intermediateY, -0.78);
-        const pDest   = new BABYLON.Vector3(finalDestCoord.x, intermediateY, finalDestCoord.z);
-        rawLeg2.push(entryB, pFacing, pDest);
+        const entryB    = new BABYLON.Vector3(-0.50, intermediateY, -0.78);
+        const pCorridor = new BABYLON.Vector3(-0.50, intermediateY, finalDestCoord.z);
+        const pDest     = new BABYLON.Vector3(finalDestCoord.x, intermediateY, finalDestCoord.z);
+        rawLeg2.push(entryB, pCorridor, pDest);
+      } else if (targetBuilding === 'C') {
+        const entryC    = new BABYLON.Vector3(0.30, intermediateY, 9.68);
+        const pCorridor = new BABYLON.Vector3(0.30, intermediateY, finalDestCoord.z);
+        const pDest     = new BABYLON.Vector3(finalDestCoord.x, intermediateY, finalDestCoord.z);
+        rawLeg2.push(entryC, pCorridor, pDest);
       } else {
         const entryA  = new BABYLON.Vector3(11.60, intermediateY, 0.50);
         const pFacing = new BABYLON.Vector3(finalDestCoord.x, intermediateY, 0.16);
@@ -928,6 +943,25 @@ export class MapNavigationService {
     if (!destination) {
       console.warn(`[MapNav] Sin coordenadas disponibles para: ${destinationName}`);
       return null;
+    }
+
+    // Para Edificio B y C, asegurar que el recorrido en el mismo piso siga el pasillo longitudinal (eje Z)
+    if (edificio === 'B') {
+      const targetY = destination.y;
+      const startZ = currentFloor.includes('piso3') ? -11.40 : -0.78;
+      routePoints = this.cleanRoutePoints([
+        new BABYLON.Vector3(-0.50, targetY, startZ),
+        new BABYLON.Vector3(-0.50, targetY, destination.z),
+        destination.clone()
+      ]);
+    } else if (edificio === 'C') {
+      const targetY = destination.y;
+      const startZ = 8.00;
+      routePoints = this.cleanRoutePoints([
+        new BABYLON.Vector3(0.30, targetY, startZ),
+        new BABYLON.Vector3(0.30, targetY, destination.z),
+        destination.clone()
+      ]);
     }
 
     const finalRoute = routePoints.length > 0 ? routePoints : [destination.clone()];
