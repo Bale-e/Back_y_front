@@ -98,5 +98,55 @@
       (close)="closeDetailPanel()"
       (navigateTo)="onDestinationSelected($event)"
     ></app-location-detail-panel>
+
+    <!-- Cartel interactivo de confirmación para entrar a un edificio desde el modelo de la Sede -->
+    <div
+      class="building-enter-card"
+      *ngIf="pendingBuildingPrompt"
+      [ngClass]="'building-enter-card--' + pendingBuildingPrompt.buildingId.toLowerCase()"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="building-card__header">
+        <div class="building-card__badge" [ngClass]="'badge--' + pendingBuildingPrompt.buildingId.toLowerCase()">
+          <span class="badge__icon">{{ pendingBuildingPrompt.icon }}</span>
+          <span class="badge__text">{{ pendingBuildingPrompt.buildingName }}</span>
+        </div>
+        <button
+          type="button"
+          class="building-card__close"
+          (click)="closeBuildingPrompt()"
+          title="Cerrar cartel"
+          aria-label="Cerrar cartel"
+        >&times;</button>
+      </div>
+
+      <div class="building-card__body">
+        <h3 class="building-card__title">¿Deseas entrar al {{ pendingBuildingPrompt.buildingName }}?</h3>
+        <p class="building-card__desc">{{ pendingBuildingPrompt.description }}</p>
+        <div class="building-card__pills">
+          <span class="info-pill">🏛️ {{ pendingBuildingPrompt.floorsCount }}</span>
+          <span class="info-pill highlight-pill">✨ Edificio iluminado</span>
+        </div>
+      </div>
+
+      <div class="building-card__actions">
+        <button
+          type="button"
+          class="btn-cancel"
+          (click)="closeBuildingPrompt()"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn-enter"
+          [ngClass]="'btn-enter--' + pendingBuildingPrompt.buildingId.toLowerCase()"
+          (click)="confirmEnterBuilding()"
+        >
+          <span>Entrar al edificio</span>
+          <span class="btn-arrow">&rarr;</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>

@@ -7,7 +7,7 @@ import { BuildingId } from '../../../core/models/navegacion.model';
   styleUrls: ['./floor-selector.component.scss']
 })
 export class FloorSelectorComponent {
-  @Input() currentBuilding: BuildingId = 'A';
+  @Input() currentBuilding: BuildingId = 'S';
   @Input() currentFloorName = 'Piso 1';
   @Output() floorSelected = new EventEmitter<string>();
   @Output() buildingSelected = new EventEmitter<BuildingId>();

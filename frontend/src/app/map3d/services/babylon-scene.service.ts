@@ -26,8 +26,8 @@ export class BabylonSceneService implements OnDestroy {
   private guideArrowMeshes: BABYLON.AbstractMesh[] = [];
   private currentRouteAnimId = 0;
 
-  private currentBuilding: BuildingId = 'A';
-  private currentFloorModel = 'Edifico A - Piso 1.obj';
+  private currentBuilding: BuildingId = 'S';
+  private currentFloorModel = 'INSTITUTO EN 3D.obj';
 
   private onMarkersUpdatedCb?: (markers: ScreenMarker[]) => void;
 
@@ -35,8 +35,13 @@ export class BabylonSceneService implements OnDestroy {
   private isAutoRotateEnabled = true;
   private isUserInteracting = false;
   private idleTimer: any = null;
-  private baseRadius = 77;
+  private baseRadius = 210;
   private zoomTime = 0;
+
+  // Iluminación y destacado de grupos en el modelo Sede
+  private highlightLayer: BABYLON.HighlightLayer | null = null;
+  private highlightedBuildingMeshes: BABYLON.AbstractMesh[] = [];
+  private highlightPulseObserver: BABYLON.Observer<BABYLON.Scene> | null = null;
 
   constructor(private ngZone: NgZone) {}
 
@@ -79,6 +84,19 @@ export class BabylonSceneService implements OnDestroy {
       }
     };
 
+    this.scene.onPointerMove = (_evt, pickResult) => {
+      const isSede = this.currentBuilding === 'S' || this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
+      if (isSede && canvas) {
+        if (pickResult.hit && pickResult.pickedMesh && this.identifyBuildingFromMesh(pickResult.pickedMesh.name)) {
+          canvas.style.cursor = 'pointer';
+        } else {
+          canvas.style.cursor = 'default';
+        }
+      } else if (canvas && canvas.style.cursor === 'pointer') {
+        canvas.style.cursor = 'default';
+      }
+    };
+
     this.ngZone.runOutsideAngular(() => {
       this.engine?.runRenderLoop(() => {
         this.scene?.render();
@@ -93,16 +111,19 @@ export class BabylonSceneService implements OnDestroy {
 
   private setupCamera(canvas: HTMLCanvasElement): void {
     if (!this.scene) return;
+    const isSede = this.currentBuilding === 'S' || this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
+    const initialRadius = isSede ? 210 : 25;
     this.camera = new BABYLON.ArcRotateCamera(
       'camera1',
-      Math.PI / 4,
-      Math.PI / 3,
-      25,
+      isSede ? -Math.PI / 2 : Math.PI / 4,
+      isSede ? 1.18 : Math.PI / 3,
+      initialRadius,
       new BABYLON.Vector3(0, 0, 0),
       this.scene
     );
     this.camera.lowerRadiusLimit = 2;
-    this.camera.upperRadiusLimit = 200;
+    this.camera.upperRadiusLimit = 350;
+    this.baseRadius = initialRadius;
     this.camera.attachControl(canvas, true);
 
     const onInteraction = () => this.registerUserInteraction();
@@ -149,7 +170,7 @@ export class BabylonSceneService implements OnDestroy {
       Math.abs(this.camera.inertialPanningX) > 0.0001 ||
       Math.abs(this.camera.inertialPanningY) > 0.0001;
 
-    if (this.isUserInteracting || hasInertia) {
+    if (this.isUserInteracting || hasInertia || this.highlightedBuildingMeshes.length > 0) {
       this.baseRadius = this.camera.radius;
       return;
     }
@@ -162,7 +183,7 @@ export class BabylonSceneService implements OnDestroy {
     const zoomOscillation = Math.sin(this.zoomTime * 0.7) * 2.5;
 
     const minR = this.camera.lowerRadiusLimit ?? 5;
-    const maxR = this.camera.upperRadiusLimit ?? 150;
+    const maxR = this.camera.upperRadiusLimit ?? 350;
     this.camera.radius = Math.max(minR, Math.min(maxR, this.baseRadius + zoomOscillation));
   }
 
@@ -195,6 +216,142 @@ export class BabylonSceneService implements OnDestroy {
     S: new BABYLON.Vector3(0, 0, 0)
   };
 
+  /**
+   * Identifica a qué edificio de la sede pertenece un mesh a partir de su nombre o grupos OBJ.
+   */
+  public identifyBuildingFromMesh(meshName: string): BuildingId | null {
+    if (!meshName) return null;
+    const normalized = meshName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+    // Edificio C: Grupo 41, 42, 43, C1, mesh119, etc.
+    if (
+      normalized.includes('group42') ||
+      normalized.includes('group41') ||
+      normalized.includes('group43') ||
+      normalized.includes('c1') ||
+      normalized.includes('mesh119') ||
+      normalized.includes('edificioc')
+    ) {
+      return 'C';
+    }
+
+    // Edificio B: Grupo 31, 32, B1, mesh71, mesh73, etc.
+    if (
+      normalized.includes('group31') ||
+      normalized.includes('group32') ||
+      normalized.includes('b1') ||
+      normalized.includes('mesh71') ||
+      normalized.includes('mesh73') ||
+      normalized.includes('edificiob')
+    ) {
+      return 'B';
+    }
+
+    // Edificio A: Grupo 65, 66, A1, mesh178, mesh74, etc.
+    if (
+      normalized.includes('group65') ||
+      normalized.includes('group66') ||
+      normalized.includes('a1') ||
+      normalized.includes('mesh178') ||
+      normalized.includes('mesh74') ||
+      normalized.includes('edificioa')
+    ) {
+      return 'A';
+    }
+
+    return null;
+  }
+
+  /**
+   * Obtiene todos los meshes que componen el volumen de un edificio dentro del modelo de la sede.
+   */
+  public getBuildingMeshesInSede(building: BuildingId, root?: BABYLON.TransformNode | null): BABYLON.AbstractMesh[] {
+    const parentNode = root || this.modelRoot;
+    if (!parentNode) return [];
+    const regex = building === 'B'
+      ? /b1|group31|group32|mesh71|mesh73|edificiob/i
+      : building === 'C'
+        ? /c1|group42|group41|group43|mesh119|edificioc/i
+        : /a1|group65|group66|mesh178|mesh74|edificioa/i;
+
+    return parentNode.getChildMeshes(false).filter(m => regex.test(m.name));
+  }
+
+  /**
+   * Ilumina y destaca con resplandor y contorno el grupo de mallas de un edificio en la Sede.
+   * Si building es null, remueve cualquier iluminación previa.
+   */
+  public highlightBuildingInSede(building: BuildingId | null): void {
+    this.clearBuildingHighlight();
+    if (!building || !this.modelRoot || !this.scene) return;
+
+    const meshes = this.getBuildingMeshesInSede(building);
+    if (meshes.length === 0) return;
+
+    this.highlightedBuildingMeshes = meshes;
+
+    // Color temático distintivo para cada edificio
+    const glowColor = building === 'A'
+      ? new BABYLON.Color3(1.0, 0.45, 0.08)  // Naranja característico INACAP
+      : building === 'B'
+        ? new BABYLON.Color3(0.08, 0.75, 1.0) // Cian tecnológico
+        : new BABYLON.Color3(0.15, 0.88, 0.45); // Verde esmeralda
+
+    // Capa de resplandor (HighlightLayer)
+    if (!this.highlightLayer && this.scene) {
+      this.highlightLayer = new BABYLON.HighlightLayer('sedeBuildingHighlight', this.scene, {
+        mainTextureRatio: 1,
+        blurHorizontalSize: 1.5,
+        blurVerticalSize: 1.5
+      });
+      this.highlightLayer.innerGlow = true;
+      this.highlightLayer.outerGlow = true;
+    }
+
+    for (const mesh of meshes) {
+      mesh.renderOverlay = true;
+      mesh.overlayColor = glowColor;
+      mesh.overlayAlpha = 0.32;
+      mesh.renderOutline = true;
+      mesh.outlineColor = glowColor;
+      mesh.outlineWidth = 0.06;
+
+      if (this.highlightLayer && mesh instanceof BABYLON.Mesh && mesh.getTotalVertices() > 0) {
+        this.highlightLayer.addMesh(mesh, glowColor);
+      }
+    }
+
+    // Efecto sutil de pulso / respiración luminosa mientras el cartel esté activo
+    let pulseAngle = 0;
+    this.highlightPulseObserver = this.scene.onBeforeRenderObservable.add(() => {
+      pulseAngle += 0.05;
+      const dynamicAlpha = 0.28 + 0.12 * Math.sin(pulseAngle);
+      for (const m of this.highlightedBuildingMeshes) {
+        m.overlayAlpha = dynamicAlpha;
+      }
+    });
+  }
+
+  /**
+   * Apaga la iluminación del edificio seleccionado y restaura el aspecto original.
+   */
+  public clearBuildingHighlight(): void {
+    if (this.highlightPulseObserver && this.scene) {
+      this.scene.onBeforeRenderObservable.remove(this.highlightPulseObserver);
+      this.highlightPulseObserver = null;
+    }
+
+    for (const mesh of this.highlightedBuildingMeshes) {
+      mesh.renderOverlay = false;
+      mesh.renderOutline = false;
+    }
+    this.highlightedBuildingMeshes = [];
+
+    if (this.highlightLayer) {
+      this.highlightLayer.removeAllMeshes();
+    }
+  }
+
   private getBuildingCenterInSede(sedeRoot: BABYLON.TransformNode, building: BuildingId): BABYLON.Vector3 {
     const regex = building === 'B'
       ? /b1|group31|mesh71|mesh73/i
@@ -202,7 +359,7 @@ export class BabylonSceneService implements OnDestroy {
         ? /c1|group42|group41|mesh119/i
         : /a1|group65|mesh178|mesh74/i;
 
-    const bMeshes = sedeRoot.getChildMeshes(false).filter(m => regex.test(m.name));
+    const bMeshes = this.getBuildingMeshesInSede(building, sedeRoot);
     if (bMeshes.length > 0) {
       let bMin = new BABYLON.Vector3(Infinity, Infinity, Infinity);
       let bMax = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
@@ -242,12 +399,12 @@ export class BabylonSceneService implements OnDestroy {
     startTarget.y = 0;
 
     const startRadius = Math.min(this.camera.radius, 22);
-    const endRadius   = 77;
+    const endRadius   = 210;
 
     const startAlpha = this.camera.alpha;
     const startBeta  = this.camera.beta;
     const endAlpha   = -Math.PI / 2;
-    const endBeta    = 1.25;
+    const endBeta    = 1.18;
     const endTarget  = BABYLON.Vector3.Zero();
 
     this.camera.setTarget(startTarget);
@@ -390,6 +547,7 @@ export class BabylonSceneService implements OnDestroy {
 
     this.currentFloorModel = modelName;
     this.currentBuilding = buildingId;
+    this.clearBuildingHighlight();
 
     if (this.modelRoot) {
       this.modelRoot.dispose(false, true);
@@ -416,22 +574,14 @@ export class BabylonSceneService implements OnDestroy {
     this.modelRoot = newRoot;
 
     if (this.camera && this.modelRoot) {
-      const isFirstInit = this.baseRadius === 0;
-      const isSede      = this.isSedeModelName(modelName, buildingId);
-      if (isFirstInit) {
+      const isSede = this.isSedeModelName(modelName, buildingId);
+      if (isSede) {
         this.camera.setTarget(BABYLON.Vector3.Zero());
-        if (isSede) {
-          this.camera.radius = 77;
-          this.camera.alpha  = -Math.PI / 2;
-          this.camera.beta   = 1.25;
-          this.baseRadius    = 77;
-          this.zoomTime      = 0;
-        } else {
-          this.camera.radius = 36.4;
-          this.camera.alpha  = Math.PI / 4;
-          this.camera.beta   = Math.PI / 3;
-          this.baseRadius    = 36.4;
-        }
+        this.camera.radius = 210;
+        this.camera.alpha  = -Math.PI / 2;
+        this.camera.beta   = 1.18;
+        this.baseRadius    = 210;
+        this.zoomTime      = 0;
       } else {
         this.baseRadius = this.camera.radius;
       }
@@ -562,6 +712,7 @@ export class BabylonSceneService implements OnDestroy {
 
     this.currentFloorModel = modelName;
     this.currentBuilding   = buildingId;
+    this.clearBuildingHighlight();
 
     this.clearDestinationMarker();
 
@@ -591,6 +742,7 @@ export class BabylonSceneService implements OnDestroy {
     if (isSede && !wasSede && (prevBuilding === 'A' || prevBuilding === 'B' || prevBuilding === 'C')) {
       this.currentFloorModel = modelName;
       this.currentBuilding   = buildingId;
+    this.clearBuildingHighlight();
       await this.animateTransitionToSede(outgoingRoot, incomingRoot, prevBuilding);
       return;
     }
@@ -599,6 +751,7 @@ export class BabylonSceneService implements OnDestroy {
     if (wasSede && !isSede && (buildingId === 'A' || buildingId === 'B' || buildingId === 'C')) {
       this.currentFloorModel = modelName;
       this.currentBuilding   = buildingId;
+    this.clearBuildingHighlight();
       await this.animateTransitionFromSede(outgoingRoot, incomingRoot, buildingId);
       return;
     }
@@ -1145,14 +1298,14 @@ export class BabylonSceneService implements OnDestroy {
 
   public zoomIn(): void {
     if (!this.camera) return;
-    this.camera.radius = Math.max(4, this.camera.radius - 3);
+    this.camera.radius = Math.max(4, this.camera.radius - 8);
     this.baseRadius = this.camera.radius;
     this.registerUserInteraction();
   }
 
   public zoomOut(): void {
     if (!this.camera) return;
-    this.camera.radius = Math.min(200, this.camera.radius + 3);
+    this.camera.radius = Math.min(350, this.camera.radius + 8);
     this.baseRadius = this.camera.radius;
     this.registerUserInteraction();
   }
@@ -1162,7 +1315,10 @@ export class BabylonSceneService implements OnDestroy {
     this.camera.target = new BABYLON.Vector3(0, 0, 0);
     this.camera.alpha = Math.PI / 4;
     this.camera.beta = Math.PI / 3;
-    this.camera.radius = this.currentBuilding === 'A' ? 52 : (this.currentBuilding === 'S' ? 77 : 25);
+    const isSede = this.currentBuilding === 'S' || this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
+    this.camera.alpha = isSede ? -Math.PI / 2 : Math.PI / 4;
+    this.camera.beta = isSede ? 1.18 : Math.PI / 3;
+    this.camera.radius = isSede ? 210 : (this.currentBuilding === 'A' ? 52 : 25);
     this.baseRadius = this.camera.radius;
     this.registerUserInteraction();
   }
@@ -1283,6 +1439,11 @@ export class BabylonSceneService implements OnDestroy {
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
       this.idleTimer = null;
+    }
+    this.clearBuildingHighlight();
+    if (this.highlightLayer) {
+      this.highlightLayer.dispose();
+      this.highlightLayer = null;
     }
     if (this.engine) {
       this.engine.stopRenderLoop();

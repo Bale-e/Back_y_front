@@ -2,12 +2,20 @@
   Componente principal contenedor del visor 3D (Map3dContainerComponent).
   Orquesta renderizado 3D, navegación, búsqueda y marcadores proyectados en pantalla.
 */
-import { Component, AfterViewInit, OnDestroy, ElementRef, ViewChild, ChangeDetectorRef } from '@angular/core';
+import { Component, AfterViewInit, OnDestroy, ElementRef, ViewChild, ChangeDetectorRef, HostListener } from '@angular/core';
 import { BabylonSceneService, ScreenMarker } from '../services/babylon-scene.service';
 import { MapNavigationService } from '../services/map-navigation.service';
 import { BuildingId, SelectedLocationInfo } from '../../core/models/navegacion.model';
 import { Subscription } from 'rxjs';
 import { FloorSelectorComponent } from './floor-selector/floor-selector.component';
+
+export interface BuildingPromptData {
+  buildingId: BuildingId;
+  buildingName: string;
+  icon: string;
+  description: string;
+  floorsCount: string;
+}
 
 @Component({
   selector: 'app-map3d',
@@ -22,8 +30,8 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   floorSelectorComponent?: FloorSelectorComponent;
 
   viewMode: '2d' | '3d' = '3d';
-  currentBuilding: BuildingId = 'A';
-  currentFloorModel = 'Edifico A - Piso 1.obj';
+  currentBuilding: BuildingId = 'S';
+  currentFloorModel = 'INSTITUTO EN 3D.obj';
 
   destinations: string[] = [];
   // Alias esperado por los tests
@@ -33,6 +41,7 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   destinationCoordinatesText = '';
   selectedLocationInfo: SelectedLocationInfo | null = null;
   isDetailPanelOpen = false;
+  pendingBuildingPrompt: BuildingPromptData | null = null;
 
   // Búsqueda/autocomplete esperado por spec
   searchQuery = '';
@@ -65,7 +74,7 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   navPendingFloorLabel = '';
   /** Resolver interno de la promesa que bloquea la transición de piso */
   private pendingFloorResolve: (() => void) | null = null;
-  currentFloor = 'Edifico A - Piso 1.obj';
+  currentFloor = 'INSTITUTO EN 3D.obj';
 
 
   /**
@@ -243,6 +252,13 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
     }
 
     this.subscriptions.add(
+      this.mapNavService.currentBuilding$.subscribe(bld => {
+        this.currentBuilding = bld;
+        this.cd.detectChanges();
+      })
+    );
+
+    this.subscriptions.add(
       this.mapNavService.destinations$.subscribe(dests => {
         this.destinations = dests;
         console.log('DESTINATIONS CARGADOS:', dests.length, dests);
@@ -376,40 +392,14 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         normalizedMeshName.includes('fixed');
 
       if (isSede) {
-        // Edificio C: indicador Grupo 42, C1, mesh119, etc.
-        if (
-          normalizedMeshName.includes('group42') ||
-          normalizedMeshName.includes('group41') ||
-          normalizedMeshName.includes('c1') ||
-          normalizedMeshName.includes('mesh119') ||
-          normalizedMeshName.includes('edificioc')
-        ) {
-          this.goToBuildingCFirstFloor();
+        const clickedBuilding = this.babylonSceneService.identifyBuildingFromMesh(meshName);
+        if (clickedBuilding) {
+          this.openBuildingPrompt(clickedBuilding);
           return;
         }
-        // Edificio B: indicador Grupo 31, B1, mesh71, mesh73, etc.
-        if (
-          normalizedMeshName.includes('group31') ||
-          normalizedMeshName.includes('b1') ||
-          normalizedMeshName.includes('mesh71') ||
-          normalizedMeshName.includes('mesh73') ||
-          normalizedMeshName.includes('edificiob')
-        ) {
-          this.goToBuildingBFirstFloor();
-          return;
-        }
-        // Edificio A: indicador Grupo 65, A1, mesh178, mesh74, etc.
-        if (
-          normalizedMeshName.includes('group65') ||
-          normalizedMeshName.includes('a1') ||
-          normalizedMeshName.includes('mesh178') ||
-          normalizedMeshName.includes('mesh74') ||
-          normalizedMeshName.includes('edificioa')
-        ) {
-          this.goToBuildingAFirstFloor();
-          return;
-        }
-        // No abrir tarjetas de salas ni cuadros emergentes para el mapa de la Sede
+
+        // Si se hace clic en otra parte de la Sede (suelo, accesos, etc.), cerramos el cartel si estaba abierto
+        this.closeBuildingPrompt();
         this.closeDetailPanel();
         if (this.infoBox) this.infoBox.style.display = 'none';
         return;
@@ -649,6 +639,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   async onDestinationSelected(destinationName: string): Promise<void> {
+    this.closeBuildingPrompt();
     this.selectedDestination = destinationName;
     this.clearNavSteps();
     const result = await this.mapNavService.calculateRoute(
@@ -1105,6 +1096,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   onFloorSelected(floorKey: string): void {
+    this.closeBuildingPrompt();
     const targetFloor = this.currentBuilding === 'C'
       ? floorKey === 'second'
         ? this.buildingCSecondFloorModel
@@ -1240,7 +1232,80 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.mapNavService.setFloor(this.sedeModel);
   }
 
+  @HostListener('window:keydown.escape')
+  onEscapeKey(): void {
+    if (this.pendingBuildingPrompt) {
+      this.closeBuildingPrompt();
+    }
+  }
+
+  public getBuildingInfo(building: BuildingId): BuildingPromptData {
+    switch (building) {
+      case 'A':
+        return {
+          buildingId: 'A',
+          buildingName: 'Edificio A',
+          icon: '🏛️',
+          description: 'Pabellón principal con salas docentes, laboratorios y áreas administrativas.',
+          floorsCount: '3 pisos disponibles'
+        };
+      case 'B':
+        return {
+          buildingId: 'B',
+          buildingName: 'Edificio B',
+          icon: '🏢',
+          description: 'Pabellón con salas de clases, talleres y laboratorios informáticos.',
+          floorsCount: '3 pisos disponibles'
+        };
+      case 'C':
+        return {
+          buildingId: 'C',
+          buildingName: 'Edificio C',
+          icon: '🏬',
+          description: 'Pabellón de talleres prácticos y áreas técnicas de especialidad.',
+          floorsCount: '2 pisos disponibles'
+        };
+      default:
+        return {
+          buildingId: building,
+          buildingName: 'Edificio ' + building,
+          icon: '🏢',
+          description: 'Acceso a las dependencias del edificio seleccionado.',
+          floorsCount: 'Pisos disponibles'
+        };
+    }
+  }
+
+  public openBuildingPrompt(building: BuildingId): void {
+    this.pendingBuildingPrompt = this.getBuildingInfo(building);
+    this.babylonSceneService.highlightBuildingInSede(building);
+    this.closeDetailPanel();
+    this.cd.detectChanges();
+  }
+
+  public confirmEnterBuilding(): void {
+    if (!this.pendingBuildingPrompt) return;
+    const building = this.pendingBuildingPrompt.buildingId;
+    this.closeBuildingPrompt();
+
+    if (building === 'A') {
+      this.goToBuildingAFirstFloor();
+    } else if (building === 'B') {
+      this.goToBuildingBFirstFloor();
+    } else if (building === 'C') {
+      this.goToBuildingCFirstFloor();
+    }
+  }
+
+  public closeBuildingPrompt(): void {
+    if (!this.pendingBuildingPrompt) return;
+    this.pendingBuildingPrompt = null;
+    this.babylonSceneService.highlightBuildingInSede(null);
+    this.cd.detectChanges();
+  }
+
   public selectBuilding(building: BuildingId): void {
+    this.closeBuildingPrompt();
     this.floorDialogVisible = false;
     if (building === 'A') {
       this.goToBuildingAFirstFloor();
@@ -1327,8 +1392,8 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
     const initialAlpha = (isSede || this.isTopDownView) ? -Math.PI / 2 : -Math.PI / 3;
     const initialBeta = isSede ? 1.25 : (this.isTopDownView ? 0.12 : Math.PI / 5);
-    // iniciar un 30% más cerca para una vista inicial más próxima
-    const initialRadius = (this.isTopDownView ? 30 : 28) * 0.7;
+    // iniciar más alejado cuando se carga la sede para ver el modelo completo
+    const initialRadius = isSede ? 160 : ((this.isTopDownView ? 30 : 28) * 0.7);
 
     this.camera = new BABYLON.ArcRotateCamera('camera', initialAlpha, initialBeta, initialRadius, BABYLON.Vector3.Zero(), this.scene);
     this.camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
@@ -1338,7 +1403,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.camera.wheelDeltaPercentage = 0.01;
     // permitir acercarse más (valor mínimo reducido) para respetar el zoom inicial
     this.camera.lowerRadiusLimit = 2;
-    this.camera.upperRadiusLimit = 150;
+    this.camera.upperRadiusLimit = isSede ? 300 : 150;
     this.camera.panningSensibility = 25;
     this.camera.checkCollisions = true;
     this.camera.collisionRadius = new BABYLON.Vector3(0.75, 0.75, 0.75);
@@ -1908,6 +1973,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   onBuildingSelected(building: BuildingId): void {
+    this.closeBuildingPrompt();
     if (building === 'B') {
       this.goToBuildingBFirstFloor();
     } else if (building === 'C') {
@@ -1971,6 +2037,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   ngOnDestroy(): void {
+    this.closeBuildingPrompt();
     this.subscriptions.unsubscribe();
     this.babylonSceneService.dispose();
   }

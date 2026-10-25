@@ -10,10 +10,10 @@ import { Locacion } from '../../core/models/locacion.model';
   providedIn: 'root'
 })
 export class MapNavigationService {
-  private currentBuildingSubject = new BehaviorSubject<BuildingId>('A');
+  private currentBuildingSubject = new BehaviorSubject<BuildingId>('S');
   public currentBuilding$ = this.currentBuildingSubject.asObservable();
 
-  private currentFloorSubject = new BehaviorSubject<string>('Edifico A - Piso 1.obj');
+  private currentFloorSubject = new BehaviorSubject<string>('INSTITUTO EN 3D.obj');
   public currentFloor$ = this.currentFloorSubject.asObservable();
 
   private selectedLocationSubject = new BehaviorSubject<SelectedLocationInfo | null>(null);
