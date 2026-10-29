@@ -351,6 +351,11 @@
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 28px rgba(76, 175, 80, 0.18);
   }
 
+  &.building-enter-card--d {
+    border-color: rgba(171, 71, 188, 0.45);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 28px rgba(171, 71, 188, 0.18);
+  }
+
   @media (max-width: 600px) {
     bottom: 16px;
     width: calc(100% - 32px);
@@ -392,6 +397,12 @@
     background: rgba(76, 175, 80, 0.16);
     border: 1px solid rgba(76, 175, 80, 0.45);
     color: #81c784;
+  }
+
+  &.badge--d {
+    background: rgba(171, 71, 188, 0.16);
+    border: 1px solid rgba(171, 71, 188, 0.45);
+    color: #ce93d8;
   }
 }
 
@@ -523,6 +534,16 @@
       &:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(46, 125, 50, 0.5);
+      }
+    }
+
+    &.btn-enter--d {
+      background: linear-gradient(135deg, #ab47bc, #7b1fa2);
+      box-shadow: 0 4px 16px rgba(171, 71, 188, 0.35);
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(171, 71, 188, 0.5);
       }
     }
 

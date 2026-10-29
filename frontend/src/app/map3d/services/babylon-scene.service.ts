@@ -10,7 +10,7 @@ export interface ScreenMarker {
   x: number;
   y: number;
   visible: boolean;
-  type: 'building-b' | 'building-a' | 'building-c' | 'sede';
+  type: 'building-b' | 'building-a' | 'building-c' | 'building-d' | 'sede';
   data?: any;
 }
 
@@ -213,6 +213,7 @@ export class BabylonSceneService implements OnDestroy {
     A: new BABYLON.Vector3(31.2, 11.6, 25.5),
     B: new BABYLON.Vector3(31.9, 11.8, 46.1),
     C: new BABYLON.Vector3(-16.3, 10.5, 54.1),
+    D: new BABYLON.Vector3(0, 10.0, 0),
     S: new BABYLON.Vector3(0, 0, 0)
   };
 
@@ -223,40 +224,55 @@ export class BabylonSceneService implements OnDestroy {
     if (!meshName) return null;
     const normalized = meshName.replace(/[^a-z0-9]/gi, '').toLowerCase();
 
-    // Edificio C: Grupo 41, 42, 43, C1, mesh119, etc.
+    // Edificio A: Mesh 121
     if (
-      normalized.includes('group42') ||
-      normalized.includes('group41') ||
-      normalized.includes('group43') ||
-      normalized.includes('c1') ||
-      normalized.includes('mesh119') ||
-      normalized.includes('edificioc')
+      normalized.includes('mesh121') ||
+      normalized === '121' ||
+      normalized.includes('group67') ||
+      normalized.includes('group66') ||
+      normalized.includes('edificioa') ||
+      normalized.includes('a1')
     ) {
-      return 'C';
+      return 'A';
     }
 
-    // Edificio B: Grupo 31, 32, B1, mesh71, mesh73, etc.
+    // Edificio B: Mesh 159
     if (
-      normalized.includes('group31') ||
-      normalized.includes('group32') ||
-      normalized.includes('b1') ||
-      normalized.includes('mesh71') ||
-      normalized.includes('mesh73') ||
-      normalized.includes('edificiob')
+      normalized.includes('mesh159') ||
+      normalized === '159' ||
+      normalized.includes('group77') ||
+      normalized.includes('group70') ||
+      normalized.includes('group69') ||
+      normalized.includes('edificiob') ||
+      normalized.includes('b1')
     ) {
       return 'B';
     }
 
-    // Edificio A: Grupo 65, 66, A1, mesh178, mesh74, etc.
+    // Edificio C: Mesh 168
     if (
-      normalized.includes('group65') ||
-      normalized.includes('group66') ||
-      normalized.includes('a1') ||
-      normalized.includes('mesh178') ||
-      normalized.includes('mesh74') ||
-      normalized.includes('edificioa')
+      normalized.includes('mesh168') ||
+      normalized === '168' ||
+      normalized.includes('group82') ||
+      normalized.includes('group81') ||
+      normalized.includes('group80') ||
+      normalized.includes('edificioc') ||
+      normalized.includes('c1')
     ) {
-      return 'A';
+      return 'C';
+    }
+
+    // Edificio D: Mesh 65
+    if (
+      normalized.includes('mesh65') ||
+      normalized === '65' ||
+      normalized.includes('group37') ||
+      normalized.includes('group36') ||
+      normalized.includes('group35') ||
+      normalized.includes('edificiod') ||
+      normalized.includes('d1')
+    ) {
+      return 'D';
     }
 
     return null;
@@ -268,11 +284,15 @@ export class BabylonSceneService implements OnDestroy {
   public getBuildingMeshesInSede(building: BuildingId, root?: BABYLON.TransformNode | null): BABYLON.AbstractMesh[] {
     const parentNode = root || this.modelRoot;
     if (!parentNode) return [];
-    const regex = building === 'B'
-      ? /b1|group31|group32|mesh71|mesh73|edificiob/i
-      : building === 'C'
-        ? /c1|group42|group41|group43|mesh119|edificioc/i
-        : /a1|group65|group66|mesh178|mesh74|edificioa/i;
+    const regex = building === 'A'
+      ? /mesh121|group67|group66|edificioa|a1/i
+      : building === 'B'
+        ? /mesh159|group77|group70|group69|edificiob|b1/i
+        : building === 'C'
+          ? /mesh168|group82|group81|group80|edificioc|c1/i
+          : building === 'D'
+            ? /mesh65|group37|group36|group35|edificiod|d1/i
+            : /^$/;
 
     return parentNode.getChildMeshes(false).filter(m => regex.test(m.name));
   }
@@ -295,7 +315,9 @@ export class BabylonSceneService implements OnDestroy {
       ? new BABYLON.Color3(1.0, 0.45, 0.08)  // Naranja característico INACAP
       : building === 'B'
         ? new BABYLON.Color3(0.08, 0.75, 1.0) // Cian tecnológico
-        : new BABYLON.Color3(0.15, 0.88, 0.45); // Verde esmeralda
+        : building === 'D'
+          ? new BABYLON.Color3(0.85, 0.25, 0.85) // Violeta
+          : new BABYLON.Color3(0.15, 0.88, 0.45); // Verde esmeralda
 
     // Capa de resplandor (HighlightLayer)
     if (!this.highlightLayer && this.scene) {
@@ -353,11 +375,15 @@ export class BabylonSceneService implements OnDestroy {
   }
 
   private getBuildingCenterInSede(sedeRoot: BABYLON.TransformNode, building: BuildingId): BABYLON.Vector3 {
-    const regex = building === 'B'
-      ? /b1|group31|mesh71|mesh73/i
-      : building === 'C'
-        ? /c1|group42|group41|mesh119/i
-        : /a1|group65|mesh178|mesh74/i;
+    const regex = building === 'A'
+      ? /mesh121|group67|group66|edificioa|a1/i
+      : building === 'B'
+        ? /mesh159|group77|group70|group69|edificiob|b1/i
+        : building === 'C'
+          ? /mesh168|group82|group81|group80|edificioc|c1/i
+          : building === 'D'
+            ? /mesh65|group37|group36|group35|edificiod|d1/i
+            : /^$/;
 
     const bMeshes = this.getBuildingMeshesInSede(building, sedeRoot);
     if (bMeshes.length > 0) {
@@ -609,6 +635,7 @@ export class BabylonSceneService implements OnDestroy {
     const isSede      = this.isSedeModelName(modelName, buildingId);
     const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
     const isBuildingC = buildingId === 'C' || modelName.includes('Edificio C');
+    const isBuildingD = buildingId === 'D' || modelName.includes('Edificio D');
 
     const rootUrl = isSede
       ? '/assets/3d-models/sede/'
@@ -616,7 +643,9 @@ export class BabylonSceneService implements OnDestroy {
         ? '/assets/3d-models/Edificio B/'
         : isBuildingC
           ? '/assets/3d-models/Edificio C/'
-          : '/assets/3d-models/Edificio A/';
+          : isBuildingD
+            ? '/assets/3d-models/Edificio D/'
+            : '/assets/3d-models/Edificio A/';
 
     let result: BABYLON.ISceneLoaderAsyncResult;
     try {
@@ -635,11 +664,9 @@ export class BabylonSceneService implements OnDestroy {
 
     const allNodes = new BABYLON.TransformNode('modelRoot', this.scene);
 
-    allNodes.rotation = isSede
+    allNodes.rotation = (isSede || isBuildingC || isBuildingD)
       ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
-      : isBuildingC
-        ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
-        : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
+      : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
 
     if (isBuildingB) {
       allNodes.scaling = new BABYLON.Vector3(1.2, 1.2, 1.2);
@@ -739,7 +766,7 @@ export class BabylonSceneService implements OnDestroy {
     const wasSede = this.isSedeModelName(prevFloor, prevBuilding);
 
     // ── Transición especial hacia la SEDE (Zoom-out desde el edificio de origen) ──
-    if (isSede && !wasSede && (prevBuilding === 'A' || prevBuilding === 'B' || prevBuilding === 'C')) {
+    if (isSede && !wasSede && (prevBuilding === 'A' || prevBuilding === 'B' || prevBuilding === 'C' || prevBuilding === 'D')) {
       this.currentFloorModel = modelName;
       this.currentBuilding   = buildingId;
     this.clearBuildingHighlight();
@@ -748,7 +775,7 @@ export class BabylonSceneService implements OnDestroy {
     }
 
     // ── Transición especial desde la SEDE hacia un edificio (Zoom-in hacia el pasillo) ──
-    if (wasSede && !isSede && (buildingId === 'A' || buildingId === 'B' || buildingId === 'C')) {
+    if (wasSede && !isSede && (buildingId === 'A' || buildingId === 'B' || buildingId === 'C' || buildingId === 'D')) {
       this.currentFloorModel = modelName;
       this.currentBuilding   = buildingId;
     this.clearBuildingHighlight();
@@ -1027,6 +1054,19 @@ export class BabylonSceneService implements OnDestroy {
     // Marcador Sede (desde Edificio C)
     if (this.currentBuilding === 'C') {
       const proj = projectWorldPointOnGround(4.407557547931399, 9.68820615481936);
+      markers.push({
+        id: 'marker-sede',
+        label: '→ al mapa principal',
+        x: proj.x,
+        y: proj.y,
+        visible: proj.visible,
+        type: 'sede'
+      });
+    }
+
+    // Marcador Sede (desde Edificio D)
+    if (this.currentBuilding === 'D') {
+      const proj = projectWorldPointOnGround(0, 0);
       markers.push({
         id: 'marker-sede',
         label: '→ al mapa principal',

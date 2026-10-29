@@ -10,7 +10,7 @@
       <div class="floor-action__dialog-buttons">
         <button type="button" (click)="selectFloor('first')">Primer piso</button>
         <button type="button" (click)="selectFloor('second')">Segundo piso</button>
-        <button *ngIf="currentBuilding !== 'C'" type="button" (click)="selectFloor('third')">Tercer piso</button>
+        <button *ngIf="currentBuilding !== 'C' && currentBuilding !== 'D'" type="button" (click)="selectFloor('third')">Tercer piso</button>
         <button type="button" (click)="selectBuilding('S')">🏛️ Mapa principal</button>
       </div>
     </ng-container>
@@ -20,6 +20,7 @@
         <button type="button" (click)="selectBuilding('A')">Edificio A</button>
         <button type="button" (click)="selectBuilding('B')">Edificio B</button>
         <button type="button" (click)="selectBuilding('C')">Edificio C</button>
+        <button type="button" (click)="selectBuilding('D')">Edificio D</button>
       </div>
     </ng-template>
     <button class="floor-action__dialog-close" type="button" (click)="closeDialog()">Cancelar</button>
