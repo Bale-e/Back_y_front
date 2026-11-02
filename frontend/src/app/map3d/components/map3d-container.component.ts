@@ -413,8 +413,9 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         normalizedMeshName.includes('fixed');
 
       if (isSede) {
-        const clickedBuilding = this.babylonSceneService.identifyBuildingFromMesh(meshName);
+        const clickedBuilding = this.babylonSceneService.identifyBuildingFromMesh(meshName, pickResult?.pickedMesh);
         if (clickedBuilding) {
+          console.log('[Menú Edificio] Malla detectada:', clickedBuilding, '-> Abriendo menú para entrar al Edificio', clickedBuilding);
           this.openBuildingPrompt(clickedBuilding);
           return;
         }

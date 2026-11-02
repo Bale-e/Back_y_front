@@ -77,7 +77,13 @@ export class BabylonSceneService implements OnDestroy {
     this.scene.onPointerDown = (evt, pickResult) => {
       this.registerUserInteraction();
       if (evt.button === 0 && pickResult.hit && pickResult.pickedMesh) {
-        console.log('Mesh seleccionado:', pickResult.pickedMesh.name, 'Coordenadas:', pickResult.pickedPoint);
+        const picked = pickResult.pickedMesh;
+        const building = this.identifyBuildingFromMesh(picked.name, picked);
+        if (building) {
+          console.log(`[Click Sede] Malla seleccionada: ${building} (${picked.name}) | Coordenadas:`, pickResult.pickedPoint);
+        } else {
+          console.log('Mesh seleccionado:', picked.name, 'Coordenadas:', pickResult.pickedPoint);
+        }
         if (onMeshClicked) {
           onMeshClicked(pickResult.pickedMesh.name, pickResult);
         }
@@ -87,7 +93,7 @@ export class BabylonSceneService implements OnDestroy {
     this.scene.onPointerMove = (_evt, pickResult) => {
       const isSede = this.currentBuilding === 'S' || this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
       if (isSede && canvas) {
-        if (pickResult.hit && pickResult.pickedMesh && this.identifyBuildingFromMesh(pickResult.pickedMesh.name)) {
+        if (pickResult.hit && pickResult.pickedMesh && this.identifyBuildingFromMesh(pickResult.pickedMesh.name, pickResult.pickedMesh)) {
           canvas.style.cursor = 'pointer';
         } else {
           canvas.style.cursor = 'default';
@@ -220,7 +226,14 @@ export class BabylonSceneService implements OnDestroy {
   /**
    * Identifica a qué edificio de la sede pertenece un mesh a partir de su nombre o grupos OBJ.
    */
-  public identifyBuildingFromMesh(meshName: string): BuildingId | null {
+  public identifyBuildingFromMesh(meshName: string, mesh?: BABYLON.AbstractMesh | null): BuildingId | null {
+    const buildingGroup = (mesh?.metadata as any)?.buildingGroup;
+    if (buildingGroup) {
+      if (/^A$/i.test(buildingGroup)) return 'A';
+      if (/^B$/i.test(buildingGroup)) return 'B';
+      if (/^C$/i.test(buildingGroup)) return 'C';
+      if (/^D$/i.test(buildingGroup)) return 'D';
+    }
     if (!meshName) return null;
     const normalized = meshName.replace(/[^a-z0-9]/gi, '').toLowerCase();
 
@@ -306,7 +319,11 @@ export class BabylonSceneService implements OnDestroy {
             ? /^(?:d(?=[_\-\s]|_mm|$)|edificio[\s_\-]*d(?=[_\-\s]|$))|mesh65|group37|group36|group35|edificiod|d1/i
             : /^$/;
 
-    return parentNode.getChildMeshes(false).filter(m => regex.test(m.name));
+    return parentNode.getChildMeshes(false).filter(m => {
+      const meta = (m.metadata as any)?.buildingGroup;
+      if (meta && meta.toUpperCase() === building) return true;
+      return regex.test(m.name);
+    });
   }
 
   /**
@@ -686,11 +703,24 @@ export class BabylonSceneService implements OnDestroy {
       allNodes.scaling = new BABYLON.Vector3(1.2, 1.2, 1.2);
     }
 
+    let currentGroupName = '';
+    let subIndex = 0;
     result.meshes.forEach((mesh, index) => {
       mesh.isVisible = true;
       mesh.parent = allNodes;
       mesh.isPickable = true;
       mesh.checkCollisions = true;
+
+      if (isSede) {
+        if (mesh.name && !mesh.name.startsWith('mesh_mm') && mesh.name !== 'default') {
+          currentGroupName = mesh.name;
+          subIndex = 0;
+        } else if (currentGroupName) {
+          subIndex++;
+          mesh.name = `${currentGroupName}_mm${subIndex}`;
+        }
+        mesh.metadata = { ...(mesh.metadata || {}), buildingGroup: currentGroupName };
+      }
 
       if (!mesh.material) {
         const defaultMat = new BABYLON.StandardMaterial(`defaultMat_${index}`, this.scene!);
