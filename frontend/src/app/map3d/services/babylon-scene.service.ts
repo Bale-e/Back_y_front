@@ -27,7 +27,7 @@ export class BabylonSceneService implements OnDestroy {
   private currentRouteAnimId = 0;
 
   private currentBuilding: BuildingId = 'S';
-  private currentFloorModel = 'INSTITUTO EN 3D.obj';
+  private currentFloorModel = 'Instituto3D-color.obj';
 
   private onMarkersUpdatedCb?: (markers: ScreenMarker[]) => void;
 
@@ -158,9 +158,9 @@ export class BabylonSceneService implements OnDestroy {
 
     const isSede =
       this.currentBuilding === 'S' ||
-      this.currentFloorModel === 'INSTITUTO EN 3D.obj' ||
-      this.currentFloorModel === 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj' ||
-      this.currentFloorModel === 'MODELO_INACAP_FIXED.obj';
+      this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
+
+
     if (!isSede) return;
 
     const hasInertia =
@@ -213,7 +213,7 @@ export class BabylonSceneService implements OnDestroy {
     A: new BABYLON.Vector3(31.2, 11.6, 25.5),
     B: new BABYLON.Vector3(31.9, 11.8, 46.1),
     C: new BABYLON.Vector3(-16.3, 10.5, 54.1),
-    D: new BABYLON.Vector3(0, 10.0, 0),
+    D: new BABYLON.Vector3(-41.8, 8.5, 61.5),
     S: new BABYLON.Vector3(0, 0, 0)
   };
 
@@ -226,6 +226,9 @@ export class BabylonSceneService implements OnDestroy {
 
     // Edificio A: Mesh 121
     if (
+      /^(?:a(?=[_\-\s]|_mm|$)|edificio[\s_\-]*a(?=[_\-\s]|$))/i.test(meshName) ||
+      normalized === 'a' ||
+      normalized.startsWith('amm') ||
       normalized.includes('mesh121') ||
       normalized === '121' ||
       normalized.includes('group67') ||
@@ -238,6 +241,9 @@ export class BabylonSceneService implements OnDestroy {
 
     // Edificio B: Mesh 159
     if (
+      /^(?:b(?=[_\-\s]|_mm|$)|edificio[\s_\-]*b(?=[_\-\s]|$))/i.test(meshName) ||
+      normalized === 'b' ||
+      normalized.startsWith('bmm') ||
       normalized.includes('mesh159') ||
       normalized === '159' ||
       normalized.includes('group77') ||
@@ -251,6 +257,9 @@ export class BabylonSceneService implements OnDestroy {
 
     // Edificio C: Mesh 168
     if (
+      /^(?:c(?=[_\-\s]|_mm|$)|edificio[\s_\-]*c(?=[_\-\s]|$))/i.test(meshName) ||
+      normalized === 'c' ||
+      normalized.startsWith('cmm') ||
       normalized.includes('mesh168') ||
       normalized === '168' ||
       normalized.includes('group82') ||
@@ -264,6 +273,9 @@ export class BabylonSceneService implements OnDestroy {
 
     // Edificio D: Mesh 65
     if (
+      /^(?:d(?=[_\-\s]|_mm|$)|edificio[\s_\-]*d(?=[_\-\s]|$))/i.test(meshName) ||
+      normalized === 'd' ||
+      normalized.startsWith('dmm') ||
       normalized.includes('mesh65') ||
       normalized === '65' ||
       normalized.includes('group37') ||
@@ -285,13 +297,13 @@ export class BabylonSceneService implements OnDestroy {
     const parentNode = root || this.modelRoot;
     if (!parentNode) return [];
     const regex = building === 'A'
-      ? /mesh121|group67|group66|edificioa|a1/i
+      ? /^(?:a(?=[_\-\s]|_mm|$)|edificio[\s_\-]*a(?=[_\-\s]|$))|mesh121|group67|group66|edificioa|a1/i
       : building === 'B'
-        ? /mesh159|group77|group70|group69|edificiob|b1/i
+        ? /^(?:b(?=[_\-\s]|_mm|$)|edificio[\s_\-]*b(?=[_\-\s]|$))|mesh159|group77|group70|group69|edificiob|b1/i
         : building === 'C'
-          ? /mesh168|group82|group81|group80|edificioc|c1/i
+          ? /^(?:c(?=[_\-\s]|_mm|$)|edificio[\s_\-]*c(?=[_\-\s]|$))|mesh168|group82|group81|group80|edificioc|c1/i
           : building === 'D'
-            ? /mesh65|group37|group36|group35|edificiod|d1/i
+            ? /^(?:d(?=[_\-\s]|_mm|$)|edificio[\s_\-]*d(?=[_\-\s]|$))|mesh65|group37|group36|group35|edificiod|d1/i
             : /^$/;
 
     return parentNode.getChildMeshes(false).filter(m => regex.test(m.name));
@@ -376,13 +388,13 @@ export class BabylonSceneService implements OnDestroy {
 
   private getBuildingCenterInSede(sedeRoot: BABYLON.TransformNode, building: BuildingId): BABYLON.Vector3 {
     const regex = building === 'A'
-      ? /mesh121|group67|group66|edificioa|a1/i
+      ? /^(?:a(?=[_\-\s]|_mm|$)|edificio[\s_\-]*a(?=[_\-\s]|$))|mesh121|group67|group66|edificioa|a1/i
       : building === 'B'
-        ? /mesh159|group77|group70|group69|edificiob|b1/i
+        ? /^(?:b(?=[_\-\s]|_mm|$)|edificio[\s_\-]*b(?=[_\-\s]|$))|mesh159|group77|group70|group69|edificiob|b1/i
         : building === 'C'
-          ? /mesh168|group82|group81|group80|edificioc|c1/i
+          ? /^(?:c(?=[_\-\s]|_mm|$)|edificio[\s_\-]*c(?=[_\-\s]|$))|mesh168|group82|group81|group80|edificioc|c1/i
           : building === 'D'
-            ? /mesh65|group37|group36|group35|edificiod|d1/i
+            ? /^(?:d(?=[_\-\s]|_mm|$)|edificio[\s_\-]*d(?=[_\-\s]|$))|mesh65|group37|group36|group35|edificiod|d1/i
             : /^$/;
 
     const bMeshes = this.getBuildingMeshesInSede(building, sedeRoot);
@@ -619,6 +631,8 @@ export class BabylonSceneService implements OnDestroy {
    */
   private isSedeModelName(modelName: string, buildingId: BuildingId): boolean {
     return buildingId === 'S' ||
+      modelName === 'Instituto3D-color.obj' ||
+      modelName.includes('Instituto3D') ||
       modelName === 'INSTITUTO EN 3D.obj' ||
       modelName === 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj' ||
       modelName === 'MODELO_INACAP_FIXED.obj';
@@ -692,6 +706,7 @@ export class BabylonSceneService implements OnDestroy {
         if ('metallic'      in material) material.metallic      = 0;
         if ('roughness'     in material) material.roughness     = Math.min(1, Math.max(material.roughness ?? 1, 0.85));
         if ('specularPower' in material) material.specularPower = 8;
+        material.backFaceCulling = false;
       }
     });
 

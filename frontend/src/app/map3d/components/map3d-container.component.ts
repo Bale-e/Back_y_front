@@ -31,7 +31,7 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
 
   viewMode: '2d' | '3d' = '3d';
   currentBuilding: BuildingId = 'S';
-  currentFloorModel = 'INSTITUTO EN 3D.obj';
+  currentFloorModel = 'Instituto3D-color.obj';
 
   destinations: string[] = [];
   // Alias esperado por los tests
@@ -74,7 +74,7 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   navPendingFloorLabel = '';
   /** Resolver interno de la promesa que bloquea la transición de piso */
   private pendingFloorResolve: (() => void) | null = null;
-  currentFloor = 'INSTITUTO EN 3D.obj';
+  currentFloor = 'Instituto3D-color.obj';
 
 
   /**
@@ -124,7 +124,7 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   private readonly buildingDFirstFloorModel = 'Edificio D - Piso1.obj';
   private readonly buildingDSecondFloorModel = 'Edificio D - Piso 2.obj';
 
-  private readonly sedeModel = 'INSTITUTO EN 3D.obj';
+  private readonly sedeModel = 'Instituto3D-color.obj';
   private readonly legacySedeModel = 'MODELO_INACAP_FIXED.obj';
   private readonly oldSedeModel = 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj';
 
@@ -132,7 +132,10 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
     return !!modelName && (
       modelName === this.sedeModel ||
       modelName === this.legacySedeModel ||
-      modelName === this.oldSedeModel
+      modelName === this.oldSedeModel ||
+      modelName === 'INSTITUTO EN 3D.obj' ||
+      modelName.includes('Instituto3D') ||
+      modelName.includes('INSTITUTO')
     );
   }
 
@@ -405,6 +408,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         this.currentBuilding === 'S' ||
         this.isSedeModel(this.currentFloor) ||
         normalizedMeshName.includes('sede') ||
+        normalizedMeshName.includes('instituto') ||
         normalizedMeshName.includes('untitled') ||
         normalizedMeshName.includes('fixed');
 

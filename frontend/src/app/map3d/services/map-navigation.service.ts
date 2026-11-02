@@ -13,7 +13,7 @@ export class MapNavigationService {
   private currentBuildingSubject = new BehaviorSubject<BuildingId>('S');
   public currentBuilding$ = this.currentBuildingSubject.asObservable();
 
-  private currentFloorSubject = new BehaviorSubject<string>('INSTITUTO EN 3D.obj');
+  private currentFloorSubject = new BehaviorSubject<string>('Instituto3D-color.obj');
   public currentFloor$ = this.currentFloorSubject.asObservable();
 
   private selectedLocationSubject = new BehaviorSubject<SelectedLocationInfo | null>(null);
