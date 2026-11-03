@@ -694,25 +694,34 @@ El componente orquestador principal del visor 3D. Coordina:
 
 Contiene la lógica de los modelos de piso disponibles:
 
-| Edificio | Pisos | Archivo OBJ |
-|---|---|---|
-| A | Piso 1 | `Edifico A - Piso 1.obj` |
-| A | Piso 2 | `Edificio A - piso 2.obj` |
-| A | Piso 3 | `Edificio A - piso 3.obj` |
-| B | Piso 1 | `Edificio B - Piso 1.obj` |
-| B | Piso 2 | `Edificio B - Piso 2.obj` |
-| B | Piso 3 | `Edificio B - Piso 3.obj` |
-| C | Piso 1 | `Edificio C - Piso 1.obj` |
-| C | Piso 2 | `Edificio C - Piso 2.obj` |
-| Sede | — | `INSTITUTO EN 3D.obj` |
+| Edificio | Pisos | Archivo OBJ | Archivo MTL |
+|---|---|---|---|
+| A | Piso 1 | `Edifico A - Piso 1.obj` | `Edifico A - Piso 1.mtl` |
+| A | Piso 2 | `Edificio A - piso 2.obj` | `Edificio A - piso 2.mtl` |
+| A | Piso 3 | `Edificio A - piso 3.obj` | `Edificio A - piso 3.mtl` |
+| B | Piso 1 | `Edificio B - Piso 1.obj` | `Edificio B - Piso 1.mtl` |
+| B | Piso 2 | `Edificio B - Piso 2.obj` | `Edificio B - Piso 2.mtl` |
+| B | Piso 3 | `Edificio B - Piso 3.obj` | `Edificio B - Piso 3.mtl` |
+| C | Piso 1 | `Edificio C - Piso 1.obj` | `Edificio C - Piso 1.mtl` |
+| C | Piso 2 | `Edificio C - Piso 2.obj` | `Edificio C - Piso 2.mtl` |
+| D | Piso 1 | `Edificio D - Piso1.obj` | — |
+| D | Piso 2 | `Edificio D - Piso 2.obj` | — |
+| Sede | Campus completo | `Instituto3D-color.obj` | `Instituto3D-color.mtl` |
 
 ---
 
 #### `BabylonSceneService`
 Servicio Angular que encapsula toda la interacción con el motor BabylonJS. Responsable de:
 
-- **Inicializar la escena**: crea el canvas, el engine, la cámara `ArcRotateCamera`, luces hemisférica y direccional, y un skybox oscuro
-- **Cargar modelos OBJ**: carga archivos `.obj` + `.mtl` desde `/assets/3d-models/`, los centra automáticamente usando bounding boxes y aplica materiales con propiedades de reflejo controladas
+- **Inicializar la escena**: crea el canvas, el engine, la cámara `ArcRotateCamera`, luces hemisférica y direccional, skybox oscuro y el entorno urbano 3D
+- **Cargar modelos OBJ con materiales**: carga archivos `.obj` + `.mtl` desde `/assets/3d-models/`, los centra automáticamente usando bounding boxes y aplica materiales con propiedades de reflejo controladas y doble cara (`backFaceCulling = false`)
+- **Gestión de submallas multi-material y grupos de edificio**: resuelve el comportamiento nativo del OBJLoader de BabylonJS (que asigna nombres genéricos `mesh_mmX` a las submallas con materiales secundarios), rastreando el nombre de grupo (`A`, `B`, `C`, `D`), renombrando las submallas como `${grupo}_mm${indice}` e inyectando metadatos `mesh.metadata.buildingGroup`. Esto garantiza la detección, resaltado y apertura del menú de ingreso al edificio con un solo clic sobre cualquier parte de la estructura
+- **Entorno Cartográfico y Urbano 3D (Estilo Tótem / Parque Arauco)**:
+  - **Suelo Cartográfico con Pavimento Gris Arquitectónico Neutro (`DynamicTexture` 2048×2048)**: dibuja el masterplan con pavimento urbano gris neutro (`#383838` / `#333333`) modulado con paños de losas de hormigón y juntas de dilatación que rodean el perímetro del campus. Incluye calzadas en asfalto vial oscuro neutro (`#1e1e1e` en Av. Bravo de Saravia y Av. Vicuña Mackenna), paso de cebra peatonal frente a la entrada principal, bahías de estacionamiento con demarcación vial, aceras de concreto (`#4a4a4a`), soleras (`#5e5e5e`) y señalética vial estilo tótem.
+  - **Suelo del Campus y Suelo Nivel 1 en Gris Pavimento (Apertura Geométrica Piso -1)**: todo el suelo del nivel 1 de la Sede —tanto el suelo exterior del campus (`Piso`), las canchas deportivas (`Cancha`), como los pisos interiores de edificios (`Piso_Interior`) y patios— se visualiza en gris pavimento arquitectónico neutro (`Color3(0.40, 0.40, 0.40)` y `Color3(0.42, 0.42, 0.42)`), eliminando cualquier matiz celeste o azul. Las 253 caras superiores que en el modelo original formaban una losa ciega cubriendo el patio inglés subterráneo fueron retiradas de la geometría, dejando el **Piso -1** (`Patio_Inferior`) al aire libre y plenamente visible desde cualquier ángulo cenital o en perspectiva, con sus barandas, escalinatas y pavimento. La base de maqueta sólida de SketchUp (`Base_Maqueta__base`, 53 caras que encajonaban de $Y=-2832$ a $Y=+52$) se oculta, y el plano exterior (`cartoGround`) enmarca el campus con un vano perimetral ($X \in [-105, 105], Z \in [-74, 74]$), asegurando una transición continua entre las calzadas urbanas y el pavimento del campus.
+  - **Volúmenes 3D contextuales y arbolado urbano perimetral con paralaje real**: renderiza 8 bloques volumétricos de edificios vecinos (alturas entre 7.5m y 12m) y una arboleda volumétrica estilizada distribuida por el entorno (hilera frontal en Av. Bravo de Saravia, franja poniente hacia Vicuña Mackenna, alameda oriente y sector norte), permitiendo que al rotar o inclinar la cámara en un tótem interactivo el entorno exhiba profundidad física tridimensional y paralaje auténtico.
+  - **Aislamiento contextual**: el entorno urbano se agrupa en un nodo raíz `urbanContextRoot` que se activa en la vista general de la Sede y se oculta de forma automática al ingresar a los pisos interiores de cualquier edificio.
+  - **Calibración vertical de cota cero (Piso -1 subterráneo y nivel de calle)**: en el modelo global de la Sede (`Instituto3D-color.obj`), el punto geométrico de menor altura (`scaledBounds.min.y`) corresponde al fondo del nivel subterráneo (**Piso -1** y `Patio_Inferior` a $Y=-2564$ en coordenadas OBJ). El sistema calibra la posición vertical con la cota de calle ($Y=52.4 \times scale$), evitando que los edificios queden flotando 5.4 metros en el aire y permitiendo que la calle y accesos queden exactamente en $Y=0.0$, mientras el nivel subterráneo y patio inglés se visualizan bajo el nivel de calle a $Y \approx -4.8$.
 - **Transición entre pisos**: animación fluida de 2200ms en 3 etapas (acercamiento, proximidad, alejamiento/desvanecimiento) al cambiar de piso
 - **Auto-rotación**: rotación lenta de presentación del modelo de Sede con efecto de "respiración" (zoom suave oscilante)
 - **Marcadores proyectados**: proyecta puntos 3D a coordenadas de pantalla usando raycast al suelo, permitiendo mostrar botones HTML sobre objetos 3D (ej. "Ir al Edificio B")
@@ -789,11 +798,27 @@ assets/3d-models/
 ├── Edificio C/
 │   ├── Edificio C - Piso 1.obj / .mtl
 │   └── Edificio C - Piso 2.obj / .mtl
+├── Edificio D/
+│   ├── Edificio D - Piso1.obj
+│   └── Edificio D - Piso 2.obj
 └── sede/
-    └── INSTITUTO EN 3D.obj / .mtl   ← Vista panorámica del campus completo
+    ├── Instituto3D-color.obj          ← Geometría 3D completa de la sede (edificios, accesos, pistas)
+    └── Instituto3D-color.mtl          ← Paleta cromática y materiales (ladrillo, hormigón, vidrio)
 ```
 
-Cada modelo de piso está nombrado con mallas tipo `cuerpoN`, donde `N` corresponde al número de sala registrado en Firestore en el campo `Cuerpo`. Esto permite que al hacer clic en un mesh se resuelva automáticamente la información de la sala consultando Firestore.
+### Formatos de archivo y consideraciones de carga
+
+* **Formatos requeridos en tiempo de ejecución:**
+  * **`.obj` (Wavefront OBJ):** contiene la geometría tridimensional (vértices, normales, coordenadas UV y caras).
+  * **`.mtl` (Material Template Library):** define las propiedades cromáticas de los materiales (colores difusos, especulares, emisivos y nombres de material referenciados en el OBJ con `usemtl`).
+  * Solo los archivos **`.obj`** y **`.mtl`** son requeridos e interpretados por BabylonJS en el navegador. Los archivos fuente de autoría como **`.skp`** (Trimble SketchUp) sirven como respaldo de edición pero no son interpretados en la web.
+
+* **Estructura de mallas y nomenclatura en el modelo de la Sede:**
+  * En el modelo principal (`Instituto3D-color.obj`), los objetos están organizados según la letra del edificio (`o A`, `o B`, `o C`, `o D`, `o E`, etc.) y elementos del campus (`Piso`, `Cancha`, `Letras_INACAP`, `Patio_Inferior`).
+  * El sistema identifica automáticamente a qué edificio pertenece cada submalla a través de metadatos inyectados (`buildingGroup`) y expresiones regulares, permitiendo que un clic en cualquier parte de un edificio lo resalte y abra el diálogo interactivo para ingresar a sus pisos.
+
+* **Nomenclatura de salas en modelos de piso interior:**
+  * Cada modelo de piso está nombrado con mallas tipo `cuerpoN`, donde `N` corresponde al número de sala registrado en Firestore en el campo `Cuerpo`. Esto permite que al hacer clic en un mesh se resuelva automáticamente la información de la sala consultando Firestore.
 
 ---
 

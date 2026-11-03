@@ -43,6 +43,11 @@ export class BabylonSceneService implements OnDestroy {
   private highlightedBuildingMeshes: BABYLON.AbstractMesh[] = [];
   private highlightPulseObserver: BABYLON.Observer<BABYLON.Scene> | null = null;
 
+  // Entorno urbano y cartográfico 3D (estilo tótem interactivo Parque Arauco)
+  private urbanContextRoot: BABYLON.TransformNode | null = null;
+  private cartoGround: BABYLON.Mesh | null = null;
+  private cartoTexture: BABYLON.DynamicTexture | null = null;
+
   constructor(private ngZone: NgZone) {}
 
   public initScene(
@@ -67,12 +72,13 @@ export class BabylonSceneService implements OnDestroy {
     });
 
     this.scene = new BABYLON.Scene(this.engine);
-    this.scene.clearColor = new BABYLON.Color4(0.06, 0.08, 0.12, 1);
+    this.scene.clearColor = new BABYLON.Color4(0.08, 0.08, 0.08, 1);
 
     this.setupCamera(canvas);
     (window as any).__cam = this.camera; // TEMPORAL, solo para calibrar — borrar después
     this.setupLights();
     this.setupSkybox();
+    this.setupUrbanContext();
 
     this.scene.onPointerDown = (evt, pickResult) => {
       this.registerUserInteraction();
@@ -210,16 +216,440 @@ export class BabylonSceneService implements OnDestroy {
     skyboxMaterial.backFaceCulling = false;
     skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
     skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-    skyboxMaterial.emissiveColor = new BABYLON.Color3(0.06, 0.08, 0.12);
+    skyboxMaterial.emissiveColor = new BABYLON.Color3(0.08, 0.08, 0.08);
     skybox.material = skyboxMaterial;
+  }
+
+    /**
+   * Genera el entorno cartográfico y arquitectónico 3D alrededor de la Sede INACAP
+   * (calles vectoriales, aceras, áreas verdes, señalética urbana y volúmenes 3D contextuales con paralaje).
+   */
+  private setupUrbanContext(): void {
+    if (!this.scene) return;
+
+    if (this.urbanContextRoot) {
+      this.urbanContextRoot.dispose(false, true);
+      this.urbanContextRoot = null;
+    }
+    if (this.cartoTexture) {
+      this.cartoTexture.dispose();
+      this.cartoTexture = null;
+    }
+
+    const root = new BABYLON.TransformNode('urbanContextRoot', this.scene);
+    this.urbanContextRoot = root;
+
+    // 1. Plano de suelo cartográfico perimetral con vano geométrico real (sin malla bajo el modelo)
+    // El vano físico en el centro garantiza que bajo el campus no exista ningún polígono, evitando
+    // bases celestes u opacas y dejando el suelo bajo el modelo 100% transparente para ver el piso -1.
+    const ground = this.createCartoGroundWithHole(root);
+
+    // Crear DynamicTexture 2048x2048 para dibujo nítido de pavimento gris, calles, veredas y señalética
+    const texSize = 2048;
+    const dt = new BABYLON.DynamicTexture('cartoDT', { width: texSize, height: texSize }, this.scene, false);
+    dt.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE;
+    dt.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE;
+
+    const ctx = dt.getContext() as CanvasRenderingContext2D;
+    this.drawCartographicMap(ctx, texSize, texSize);
+    dt.update();
+
+    const groundMat = new BABYLON.StandardMaterial('cartoGroundMat', this.scene);
+    groundMat.diffuseTexture = dt;
+    groundMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    groundMat.emissiveColor = new BABYLON.Color3(0, 0, 0);
+    groundMat.ambientColor = new BABYLON.Color3(0, 0, 0);
+    groundMat.backFaceCulling = false;
+
+    ground.material = groundMat;
+    this.cartoGround = ground;
+    this.cartoTexture = dt;
+
+    // 2. Volúmenes 3D contextuales (edificios vecinos y árboles estilizados con paralaje)
+    this.buildContextual3DEnvironment(root);
+  }
+
+  /**
+   * Construye la malla del suelo exterior con un vano/apertura física en el centro.
+   * Al no existir geometría bajo la huella del campus (X: [-65, 65], Z: [-75, 75]),
+   * el espacio bajo el modelo queda completamente despejado en 3D real sin bases celestes ni oclusión del piso -1.
+   */
+  private createCartoGroundWithHole(root: BABYLON.TransformNode): BABYLON.Mesh {
+    const holeMinX = -105;
+    const holeMaxX =  105;
+    const holeMinZ = -74;
+    const holeMaxZ =  74;
+    const worldMinX = -200;
+    const worldMaxX =  200;
+    const worldMinZ = -200;
+    const worldMaxZ =  200;
+
+    const quads = [
+      { minX: worldMinX, maxX: worldMaxX, minZ: worldMinZ, maxZ: holeMinZ }, // Sur (Av. Bravo de Saravia)
+      { minX: worldMinX, maxX: worldMaxX, minZ: holeMaxZ, maxZ: worldMaxZ }, // Norte (Parque posterior)
+      { minX: worldMinX, maxX: holeMinX,  minZ: holeMinZ, maxZ: holeMaxZ },  // Poniente (Av. Vicuña Mackenna)
+      { minX: holeMaxX,  maxX: worldMaxX, minZ: holeMinZ, maxZ: holeMaxZ },  // Oriente (Pradera oriente)
+    ];
+
+    const positions: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    const normals: number[] = [];
+
+    quads.forEach((q, qIdx) => {
+      const baseIdx = qIdx * 4;
+      const corners = [
+        { x: q.minX, z: q.minZ },
+        { x: q.maxX, z: q.minZ },
+        { x: q.maxX, z: q.maxZ },
+        { x: q.minX, z: q.maxZ },
+      ];
+
+      corners.forEach(c => {
+        positions.push(c.x, -0.06, c.z);
+        normals.push(0, 1, 0);
+        const u = (c.x - worldMinX) / (worldMaxX - worldMinX);
+        const v = (c.z - worldMinZ) / (worldMaxZ - worldMinZ);
+        uvs.push(u, v);
+      });
+
+      indices.push(baseIdx, baseIdx + 2, baseIdx + 1);
+      indices.push(baseIdx, baseIdx + 3, baseIdx + 2);
+    });
+
+    const customMesh = new BABYLON.Mesh('cartoGround', this.scene);
+    const vertexData = new BABYLON.VertexData();
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    vertexData.normals = normals;
+    vertexData.uvs = uvs;
+    vertexData.applyToMesh(customMesh);
+
+    customMesh.parent = root;
+    customMesh.isPickable = false;
+    customMesh.checkCollisions = false;
+
+    return customMesh;
+  }
+
+  /**
+   * Dibuja la planimetría urbana vectorial sobre el DynamicTexture con estilo arquitectónico / tótem.
+   */
+  private drawCartographicMap(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    // ── 1. Fondo base de suelo: Pavimento arquitectónico urbano gris neutro (#383838) ──
+    ctx.fillStyle = '#383838';
+    ctx.fillRect(0, 0, w, h);
+
+    // Losas y paños alternados de pavimento / adoquines de hormigón urbano gris
+    const slabWidth = 64;
+    ctx.fillStyle = '#333333';
+    for (let x = 0; x < w; x += slabWidth * 2) {
+      ctx.fillRect(x, 0, slabWidth, h);
+    }
+
+    // Trama de juntas de dilatación y modulado de pavimento
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.lineWidth = 1.5;
+    const gridStep = 64;
+    for (let x = 0; x < w; x += gridStep) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (let y = 0; y < h; y += gridStep) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Líneas secundarias sutiles para textura de baldosas de hormigón
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 32; x < w; x += gridStep) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (let y = 32; y < h; y += gridStep) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // ── 2. Av. Bravo de Saravia (Avenida principal frontal frente al acceso) ──
+    // Ubicada horizontalmente entre Y=1495 y Y=1675 (180px de ancho)
+    ctx.fillStyle = '#1e1e1e';
+    ctx.fillRect(0, 1495, w, 180);
+
+    // Bordes de calzada (líneas blancas continuas)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, 1500); ctx.lineTo(w, 1500); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, 1670); ctx.lineTo(w, 1670); ctx.stroke();
+
+    // Línea central divisoria de pistas (blanca entrecortada)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([32, 22]);
+    ctx.beginPath(); ctx.moveTo(0, 1585); ctx.lineTo(w, 1585); ctx.stroke();
+    ctx.setLineDash([]); // reset
+
+    // ── 3. Av. Vicuña Mackenna (Avenida lateral) ──
+    ctx.fillStyle = '#1e1e1e';
+    ctx.fillRect(320, 0, 140, 1500);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(325, 0); ctx.lineTo(325, 1500); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(455, 0); ctx.lineTo(455, 1500); ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([28, 18]);
+    ctx.beginPath(); ctx.moveTo(390, 0); ctx.lineTo(390, 1500); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── 4. Aceras y Concreto de Veredas con bordillos ──
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(60, 1450, w - 120, 45); // Vereda norte frente a acceso
+    ctx.fillRect(60, 1675, w - 120, 45); // Vereda sur
+
+    // Bordillo / Solera de concreto
+    ctx.strokeStyle = '#5e5e5e';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(60, 1450); ctx.lineTo(w - 60, 1450); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(60, 1720); ctx.lineTo(w - 60, 1720); ctx.stroke();
+
+    // Vereda lateral oriente y poniente de Av. Vicuña Mackenna
+    ctx.fillRect(460, 100, 30, 1395);
+    ctx.fillRect(290, 100, 30, 1395);
+    ctx.beginPath(); ctx.moveTo(490, 100); ctx.lineTo(490, 1495); ctx.stroke();
+
+    // ── 5. Paso de Cebra / Cruce Peatonal frente a entrada principal INACAP ──
+    const zebraX = 940;
+    const zebraW = 95;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    for (let y = 1510; y < 1665; y += 22) {
+      ctx.fillRect(zebraX, y, zebraW, 11);
+    }
+
+    // ── 6. Acceso vehicular y zona de estacionamientos frontal ──
+    ctx.fillStyle = '#262626';
+    ctx.fillRect(zebraX - 40, 1380, 175, 70);
+
+    // Bahías y líneas de estacionamiento
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 2;
+    for (let sx = 620; sx < 890; sx += 34) {
+      ctx.beginPath(); ctx.moveTo(sx, 1390); ctx.lineTo(sx, 1445); ctx.stroke();
+    }
+
+    // ── 7. Enmarcado perimetral y Vano para el modelo 3D y Piso -1 ──
+    const campusApronX = 490;
+    const campusApronY = 645;
+    const campusApronW = 1070;
+    const campusApronH = 758;
+
+    // Vereda perimetral y solera de hormigón que circunda el vano del campus
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 14;
+    this.drawRoundedRect(ctx, campusApronX - 7, campusApronY - 7, campusApronW + 14, campusApronH + 14, 16);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#5e5e5e';
+    ctx.lineWidth = 2;
+    this.drawRoundedRect(ctx, campusApronX, campusApronY, campusApronW, campusApronH, 12);
+    ctx.stroke();
+
+    // Vano en textura que calza exactamente con la apertura física 3D del suelo
+    ctx.clearRect(campusApronX, campusApronY, campusApronW, campusApronH);
+
+    // ── 8. Señalética y Badges Vectoriales estilo Tótem ──
+    this.drawStreetBadge(ctx, 'AV. BRAVO DE SARAVIA', w / 2, 1585, 0);
+    this.drawStreetBadge(ctx, 'AV. VICUÑA MACKENNA', 390, 750, -Math.PI / 2);
+    this.drawInfoBadge(ctx, 'ACCESO PRINCIPAL INACAP', zebraX + 48, 1345);
+    this.drawBusStopBadge(ctx, 'PARADA PB423 - INACAP', zebraX + 180, 1690);
+
+    // ── 9. Viñeta radial suave para desvanecer los bordes hacia el fondo infinito ──
+    const radius = Math.min(w, h) * 0.48;
+    const grad = ctx.createRadialGradient(w / 2, h / 2, radius * 0.65, w / 2, h / 2, radius);
+    grad.addColorStop(0, 'rgba(20, 20, 20, 0)');
+    grad.addColorStop(1, 'rgba(20, 20, 20, 1)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  private drawStreetBadge(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, angle = 0): void {
+    ctx.save();
+    ctx.translate(x, y);
+    if (angle !== 0) ctx.rotate(angle);
+
+    ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+    const textWidth = ctx.measureText(text).width;
+    const boxW = textWidth + 36;
+    const boxH = 36;
+
+    ctx.fillStyle = 'rgba(8, 12, 18, 0.9)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1.5;
+    this.drawRoundedRect(ctx, -boxW / 2, -boxH / 2, boxW, boxH, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 0, 1);
+    ctx.restore();
+  }
+
+  private drawInfoBadge(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
+    ctx.save();
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+    const textWidth = ctx.measureText(text).width;
+    const boxW = textWidth + 26;
+    const boxH = 30;
+
+    ctx.fillStyle = '#c5221f'; // Rojo institucional INACAP
+    this.drawRoundedRect(ctx, x - boxW / 2, y - boxH / 2, boxW, boxH, 6);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  private drawBusStopBadge(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
+    ctx.save();
+    ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+    const textWidth = ctx.measureText(text).width;
+    const boxW = textWidth + 24;
+    const boxH = 26;
+
+    ctx.fillStyle = '#2b3544'; // Gris pizarra oscuro neutro (sin azul)
+    this.drawRoundedRect(ctx, x - boxW / 2, y - boxH / 2, boxW, boxH, 6);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  private drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(x, y, w, h, r);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+  }
+
+  /**
+   * Construye los volúmenes 3D del entorno urbano (edificios vecinos y arboleda) para lograr
+   * profundidad física y paralaje real al rotar la cámara en el tótem interactivo.
+   */
+  private buildContextual3DEnvironment(root: BABYLON.TransformNode): void {
+    if (!this.scene) return;
+
+    // Material de edificios vecinos: gris neutro arquitectónico sobrio
+    const neighborMat = new BABYLON.StandardMaterial('ctxNeighborMat', this.scene);
+    neighborMat.diffuseColor = new BABYLON.Color3(0.18, 0.18, 0.18);
+    neighborMat.emissiveColor = new BABYLON.Color3(0.04, 0.04, 0.04);
+    neighborMat.specularColor = new BABYLON.Color3(0.02, 0.02, 0.02);
+
+    // Definición de manzanas/edificios vecinos (ancho, profundidad, altura, posX, posY, posZ)
+    const buildingsConfig: Array<{ w: number; d: number; h: number; x: number; z: number }> = [
+      // Manzana frente a Av. Bravo de Saravia
+      { w: 52, d: 36, h: 9.0,  x: -75, z: -130 },
+      { w: 42, d: 32, h: 11.5, x: -20, z: -128 },
+      { w: 50, d: 38, h: 8.5,  x:  40, z: -132 },
+      { w: 38, d: 30, h: 12.0, x:  95, z: -126 },
+      // Manzanas laterales a lo largo de Av. Vicuña Mackenna
+      { w: 34, d: 58, h: 8.0,  x: -140, z: 20 },
+      { w: 36, d: 48, h: 10.0, x: -140, z: 90 },
+      // Manzanas posteriores
+      { w: 62, d: 34, h: 7.5,  x:  10, z: 128 },
+      { w: 48, d: 30, h: 9.0,  x:  78, z: 122 },
+    ];
+
+    buildingsConfig.forEach((cfg, idx) => {
+      const box = BABYLON.MeshBuilder.CreateBox(`ctx_bld_${idx}`, {
+        width: cfg.w,
+        depth: cfg.d,
+        height: cfg.h
+      }, this.scene!);
+      box.parent = root;
+      box.position = new BABYLON.Vector3(cfg.x, cfg.h / 2, cfg.z);
+      box.material = neighborMat;
+      box.isPickable = false;
+      box.checkCollisions = false;
+    });
+
+    // Materiales para árboles volumétricos estilizados
+    const trunkMat = new BABYLON.StandardMaterial('ctxTrunkMat', this.scene);
+    trunkMat.diffuseColor = new BABYLON.Color3(0.18, 0.15, 0.12);
+    trunkMat.emissiveColor = new BABYLON.Color3(0.03, 0.02, 0.02);
+
+    const foliageMat = new BABYLON.StandardMaterial('ctxFoliageMat', this.scene);
+    foliageMat.diffuseColor = new BABYLON.Color3(0.16, 0.32, 0.22);
+    foliageMat.emissiveColor = new BABYLON.Color3(0.06, 0.12, 0.08);
+
+    // Plantar árboles volumétricos estilizados (arbolado urbano / alamedas) en el perímetro del campus
+    const treeCoords: Array<{ x: number; z: number; d?: number }> = [
+      // Hilera frontal a lo largo de Av. Bravo de Saravia (Z = -84)
+      { x: -95, z: -84 }, { x: -75, z: -84 }, { x: -55, z: -84 }, { x: -35, z: -84 },
+      { x: -15, z: -84 }, { x:   5, z: -84 }, { x:  25, z: -84 }, { x:  45, z: -84 },
+      { x:  65, z: -84 }, { x:  85, z: -84 }, { x: 100, z: -84 },
+      // Franja poniente (alameda Av. Vicuña Mackenna, X = -118)
+      { x: -118, z: -50 }, { x: -118, z: -20 }, { x: -118, z: 10 }, { x: -118, z: 40 }, { x: -118, z: 70 },
+      // Alameda oriente (costado oriente del campus, X = 118)
+      { x: 118, z: -50 }, { x: 118, z: -20 }, { x: 118, z: 15 }, { x: 118, z: 45 }, { x: 118, z: 75 },
+      // Sector norte (parque posterior, Z = 88 a 115)
+      { x: -75, z: 90 }, { x: -45, z: 92 }, { x: -15, z: 95 }, { x: 15, z: 95 }, { x: 45, z: 92 }, { x: 75, z: 90 }
+    ];
+
+    treeCoords.forEach((tc, idx) => {
+      const scaleDiam = tc.d ?? 2.8;
+      // Tronco
+      const trunk = BABYLON.MeshBuilder.CreateCylinder(`tree_trunk_${idx}`, {
+        height: 2.4,
+        diameter: 0.35,
+        tessellation: 8
+      }, this.scene!);
+      trunk.parent = root;
+      trunk.position = new BABYLON.Vector3(tc.x, 1.2, tc.z);
+      trunk.material = trunkMat;
+      trunk.isPickable = false;
+      trunk.checkCollisions = false;
+
+      // Copa del árbol (geometría facetada estilizada)
+      const foliage = BABYLON.MeshBuilder.CreateSphere(`tree_foliage_${idx}`, {
+        diameter: scaleDiam,
+        segments: 6
+      }, this.scene!);
+      foliage.parent = root;
+      foliage.position = new BABYLON.Vector3(tc.x, 3.2, tc.z);
+      foliage.material = foliageMat;
+      foliage.isPickable = false;
+      foliage.checkCollisions = false;
+    });
+  }
+
+  /**
+   * Muestra u oculta todo el entorno urbano exterior de forma atómica.
+   */
+  public setUrbanContextVisible(visible: boolean): void {
+    if (!this.urbanContextRoot) return;
+    this.urbanContextRoot.setEnabled(visible);
   }
 
 
   private readonly buildingCentersInSede: Record<string, BABYLON.Vector3> = {
-    A: new BABYLON.Vector3(31.2, 11.6, 25.5),
-    B: new BABYLON.Vector3(31.9, 11.8, 46.1),
-    C: new BABYLON.Vector3(-16.3, 10.5, 54.1),
-    D: new BABYLON.Vector3(-41.8, 8.5, 61.5),
+    A: new BABYLON.Vector3(31.2, 6.2, 25.5),
+    B: new BABYLON.Vector3(31.9, 6.4, 46.1),
+    C: new BABYLON.Vector3(-16.3, 5.1, 54.1),
+    D: new BABYLON.Vector3(-41.8, 3.1, 61.5),
     S: new BABYLON.Vector3(0, 0, 0)
   };
 
@@ -449,6 +879,7 @@ export class BabylonSceneService implements OnDestroy {
 
     incomingMeshes.forEach(m => { m.visibility = 0; });
     outgoingMeshes.forEach(m => { m.visibility = 1; });
+    this.setUrbanContextVisible(true);
 
     const startTarget = buildingCenter.clone();
     startTarget.y = 0;
@@ -531,6 +962,7 @@ export class BabylonSceneService implements OnDestroy {
 
     incomingMeshes.forEach(m => { m.visibility = 0; });
     outgoingMeshes.forEach(m => { m.visibility = 1; });
+    this.setUrbanContextVisible(false);
 
     const startTarget = this.camera.target.clone();
     const endTarget   = BABYLON.Vector3.Zero();
@@ -611,7 +1043,7 @@ export class BabylonSceneService implements OnDestroy {
 
     // Disponer cualquier malla previa que no sea skybox o marcador
     this.scene.meshes.slice().forEach(mesh => {
-      if (mesh.name !== 'skyBox' && !mesh.name.startsWith('dest') && mesh.name !== 'ground') {
+      if (mesh.name !== 'skyBox' && mesh.name !== 'cartoGround' && !mesh.name.startsWith('ctx_') && !mesh.name.startsWith('tree_') && mesh.name !== 'ground' && !mesh.name.startsWith('dest')) {
         mesh.dispose();
       }
     });
@@ -627,6 +1059,9 @@ export class BabylonSceneService implements OnDestroy {
       this.modelRoot.dispose(false, true);
     }
     this.modelRoot = newRoot;
+
+    const isSedeCurrent = this.isSedeModelName(modelName, buildingId);
+    this.setUrbanContextVisible(isSedeCurrent);
 
     if (this.camera && this.modelRoot) {
       const isSede = this.isSedeModelName(modelName, buildingId);
@@ -722,14 +1157,66 @@ export class BabylonSceneService implements OnDestroy {
         mesh.metadata = { ...(mesh.metadata || {}), buildingGroup: currentGroupName };
       }
 
+      // 1. Ocultar la base sólida de la maqueta de SketchUp (53 caras que encajonan de Y=-2832 a Y=+52)
+      // para que no encajone el nivel subterráneo ni tape el patio inferior desde vistas laterales
+      const isBaseMaqueta =
+        mesh.name.toLowerCase().includes('base_maqueta') ||
+        (mesh.material && (mesh.material as any).name?.toLowerCase().includes('base_maqueta'));
+
+      if (isBaseMaqueta) {
+        mesh.isVisible = false;
+        mesh.visibility = 0;
+        mesh.isPickable = false;
+        mesh.checkCollisions = false;
+        return;
+      }
+
+      // 2. Suelo del campus ("Piso"): visible en gris pavimento arquitectónico neutro (Color3(0.40, 0.40, 0.40))
+      // Las 253 caras superiores que tapaban el patio inglés del piso -1 han sido retiradas de la geometría,
+      // permitiendo ver el piso -1 al aire libre mientras el suelo del campus es plenamente visible en gris.
+      const isPisoMesh =
+        currentGroupName.toLowerCase() === 'piso' ||
+        mesh.name.toLowerCase().startsWith('piso');
+
+      if (isSede && isPisoMesh) {
+        mesh.isVisible = true;
+        mesh.visibility = 1;
+        mesh.isPickable = false;
+        mesh.checkCollisions = false;
+
+        const pisoMat = new BABYLON.StandardMaterial(`sedePisoMat_${index}`, this.scene!);
+        pisoMat.diffuseColor = new BABYLON.Color3(0.40, 0.40, 0.40); // Gris pavimento neutro
+        pisoMat.specularColor = new BABYLON.Color3(0.02, 0.02, 0.02);
+        pisoMat.ambientColor = new BABYLON.Color3(0.04, 0.04, 0.04);
+        pisoMat.emissiveColor = new BABYLON.Color3(0.02, 0.02, 0.02);
+        pisoMat.backFaceCulling = false;
+        mesh.material = pisoMat;
+        return;
+      }
+
       if (!mesh.material) {
         const defaultMat = new BABYLON.StandardMaterial(`defaultMat_${index}`, this.scene!);
-        defaultMat.diffuseColor = new BABYLON.Color3(0.85, 0.85, 0.9);
+        defaultMat.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5);
         mesh.material = defaultMat;
       }
 
       const material: any = mesh.material;
       if (material) {
+        const matName = (material.name || '').toLowerCase();
+        // Garantizar que todo el suelo del nivel 1 (interiores, exteriores, canchas y patios) sea gris pavimento neutro
+        if (isSede && (matName.includes('piso_interior') || matName.includes('pavimento_exterior') || matName.includes('hormigon'))) {
+          material.diffuseColor = new BABYLON.Color3(0.42, 0.42, 0.42); // Gris pavimento nivel 1
+        }
+        if (isSede && (matName.includes('cancha_azul') || matName.includes('cancha_coral'))) {
+          material.diffuseColor = new BABYLON.Color3(0.38, 0.38, 0.38); // Gris pavimento deportivo
+        }
+        if (isSede && matName.includes('patio_menta')) {
+          material.diffuseColor = new BABYLON.Color3(0.40, 0.40, 0.40); // Gris pavimento patio
+        }
+        if (isSede && matName.includes('vidrio_turquesa')) {
+          material.diffuseColor = new BABYLON.Color3(0.25, 0.25, 0.25); // Gris neutro acristalamiento
+        }
+
         material.emissiveColor = new BABYLON.Color3(0, 0, 0);
         if ('specularColor' in material) material.specularColor = new BABYLON.Color3(0.03, 0.03, 0.03);
         if ('ambientColor'  in material) material.ambientColor  = new BABYLON.Color3(0.04, 0.04, 0.04);
@@ -753,7 +1240,11 @@ export class BabylonSceneService implements OnDestroy {
       const centerX = (scaledBounds.min.x + scaledBounds.max.x) / 2;
       const centerZ = (scaledBounds.min.z + scaledBounds.max.z) / 2;
       allNodes.position.x = -centerX;
-      allNodes.position.y = -scaledBounds.min.y;
+      // En la Sede, el punto más bajo (scaledBounds.min.y) corresponde al subterráneo (Piso -1 / Patio Inferior).
+      // El nivel de suelo real de la calle y accesos está en Y=52.4 (raw).
+      // Alineamos Y para que el nivel de suelo del campus quede en Y=0.0 sobre la calle,
+      // evitando que el edificio flote 5 metros en el aire mientras Piso -1 queda bajo tierra.
+      allNodes.position.y = isSede ? -(52.4 * scale) : -scaledBounds.min.y;
       allNodes.position.z = -centerZ;
     }
 
@@ -1526,6 +2017,15 @@ export class BabylonSceneService implements OnDestroy {
       this.idleTimer = null;
     }
     this.clearBuildingHighlight();
+    if (this.cartoTexture) {
+      this.cartoTexture.dispose();
+      this.cartoTexture = null;
+    }
+    if (this.urbanContextRoot) {
+      this.urbanContextRoot.dispose(false, true);
+      this.urbanContextRoot = null;
+      this.cartoGround = null;
+    }
     if (this.highlightLayer) {
       this.highlightLayer.dispose();
       this.highlightLayer = null;
