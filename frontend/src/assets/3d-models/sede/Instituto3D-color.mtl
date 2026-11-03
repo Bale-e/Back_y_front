@@ -1,321 +1,344 @@
-# Instituto3D: interpretacion cromatica basada en referencias visuales de INACAP Renca.
-
-newmtl Lucarna_Marfil__base
+newmtl Marble_07_1K
 Ka 0 0 0
-Kd 0.862745 0.878431 0.827451
-Ks 0.0800 0.0800 0.0800
-Ns 6.0000
+Kd 0.141176 0.133333 0.141176
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
-
-newmtl Rotulo_Techo__base
-Ka 0 0 0
-Kd 0.337255 0.368627 0.349020
-Ks 0.0500 0.0500 0.0500
-Ns 1.0000
-d 1
-illum 2
+map_Kd textures/Marble_07_1K.png
 
 newmtl Hormigon__base
 Ka 0 0 0
-Kd 0.500000 0.500000 0.500000
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
+Kd 0.803922 0.815686 0.788235
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Marco_Oscuro__base
+newmtl Fascia_Gris__base
 Ka 0 0 0
-Kd 0.211765 0.270588 0.282353
-Ks 0.3200 0.3200 0.3200
-Ns 6.6806
-d 1
-illum 2
-
-newmtl Zocalo_Gris__base
-Ka 0 0 0
-Kd 0.454902 0.474510 0.435294
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Chapa_Blanca__base
-Ka 0 0 0
-Kd 0.850980 0.850980 0.815686
-Ks 0.1200 0.1200 0.1200
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Fascia_Grafito__base
-Ka 0 0 0
-Kd 0.294118 0.317647 0.313725
-Ks 0.1200 0.1200 0.1200
-Ns 1.8580
+Kd 0.768627 0.803922 0.815686
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
 newmtl Cielo_Marfil__base
 Ka 0 0 0
 Kd 0.831373 0.803922 0.733333
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Piso_Interior__base
-Ka 0 0 0
-Kd 0.500000 0.500000 0.500000
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
 newmtl Zinc_Claro__base
 Ka 0 0 0
-Kd 0.678431 0.698039 0.678431
-Ks 0.2500 0.2500 0.2500
-Ns 2.0816
+Kd 0.545098 0.572549 0.588235
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Estuco_Crema__base
+newmtl Vidrio_Torre_A__glazing
 Ka 0 0 0
-Kd 0.843137 0.815686 0.729412
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Pasamanos_Grafito__base
-Ka 0 0 0
-Kd 0.270588 0.309804 0.298039
-Ks 0.4500 0.4500 0.4500
-Ns 5.3964
-d 1
-illum 2
-
-newmtl Puerta_Gris__base
-Ka 0 0 0
-Kd 0.447059 0.490196 0.470588
-Ks 0.2500 0.2500 0.2500
-Ns 3.0391
-d 1
+Kd 0.890196078431 0.960784313725 0.98431372549
+Ks 0.03 0.03 0.03
+Ns 8
+d 0.14
 illum 2
 
 newmtl Local_Amarillo__base
 Ka 0 0 0
 Kd 0.811765 0.627451 0.247059
-Ks 0.0300 0.0300 0.0300
-Ns 1.0000
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Letras_Negras__base
+newmtl Puerta_Gris__base
 Ka 0 0 0
-Kd 0.145098 0.176471 0.176471
-Ks 0.0300 0.0300 0.0300
-Ns 1.5556
+Kd 0.729412 0.772549 0.772549
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Intradós_Arena__base
+newmtl Letras_Blancas__base
 Ka 0 0 0
-Kd 0.670588 0.607843 0.494118
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Grafito_Frontis__base
-Ka 0 0 0
-Kd 0.207843 0.231373 0.231373
-Ks 0.1800 0.1800 0.1800
-Ns 2.3253
-d 1
-illum 2
-
-newmtl Estuco_Marfil__base
-Ka 0 0 0
-Kd 0.788235 0.764706 0.678431
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Marco_Blanco__base
-Ka 0 0 0
-Kd 0.815686 0.823529 0.796078
-Ks 0.3000 0.3000 0.3000
-Ns 4.6116
-d 1
-illum 2
-
-newmtl Marco_Aluminio__base
-Ka 0 0 0
-Kd 0.635294 0.666667 0.658824
-Ks 0.5000 0.5000 0.5000
-Ns 9.3379
-d 1
-illum 2
-
-newmtl Cesped_Oliva__base
-Ka 0 0 0
-Kd 0.447059 0.521569 0.325490
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Rojo_INACAP__red
-Ka 0 0 0
-Kd 0.776471 0.168627 0.196078
-Ks 0.0400 0.0400 0.0400
-Ns 1.5556
+Kd 0.984314 0.980392 0.956863
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
 newmtl Rojo_INACAP__base
 Ka 0 0 0
 Kd 0.776471 0.168627 0.196078
-Ks 0.0400 0.0400 0.0400
-Ns 1.5556
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Pasamanos_Grafito__charcoal
+newmtl Intrad_s_Arena__base
 Ka 0 0 0
-Kd 0.270588 0.309804 0.298039
-Ks 0.4500 0.4500 0.4500
-Ns 5.3964
+Kd 0.670588 0.607843 0.494118
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Vidrio_Turquesa__glazing
+Ka 0 0 0
+Kd 0.890196078431 0.960784313725 0.98431372549
+Ks 0.03 0.03 0.03
+Ns 8
+d 0.14
+illum 2
+
+newmtl Marco_Blanco__base
+Ka 0 0 0
+Kd 0.909804 0.92549 0.909804
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Vidrio_Taller__glazing
+Ka 0 0 0
+Kd 0.890196078431 0.960784313725 0.98431372549
+Ks 0.03 0.03 0.03
+Ns 8
+d 0.14
+illum 2
+
+newmtl Cesped_Oliva__base
+Ka 0 0 0
+Kd 0.513725 0.686275 0.388235
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Rojo_INACAP__red
+Ka 0 0 0
+Kd 0.776471 0.168627 0.196078
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
 newmtl Marco_Blanco__charcoal
 Ka 0 0 0
-Kd 0.815686 0.823529 0.796078
-Ks 0.3000 0.3000 0.3000
-Ns 4.6116
+Kd 0.909804 0.92549 0.909804
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
 newmtl Linea_Blanca__base
 Ka 0 0 0
 Kd 0.929412 0.909804 0.854902
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Soporte_Basquet_Negro__base
+Ka 0 0 0
+Kd 0.12549 0.14902 0.160784
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
 newmtl Cancha_Azul__base
 Ka 0 0 0
-Kd 0.420000 0.420000 0.420000
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
+Kd 0.247059 0.513725 0.678431
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
 newmtl Cancha_Coral__base
 Ka 0 0 0
-Kd 0.460000 0.460000 0.460000
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
+Kd 0.807843 0.486275 0.529412
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Zocalo_Terracota__base
+newmtl Mostrador_Gris__base
 Ka 0 0 0
-Kd 0.650980 0.458824 0.337255
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
+Kd 0.615686 0.647059 0.666667
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Auditorio_Oliva__base
+newmtl Reja_Negra__base
 Ka 0 0 0
-Kd 0.576471 0.584314 0.513725
-Ks 0.0200 0.0200 0.0200
-Ns 1.0000
+Kd 0.12549 0.14902 0.160784
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Zinc_Envejecido__base
+newmtl Basurero_Verde__base
 Ka 0 0 0
-Kd 0.596078 0.615686 0.584314
-Ks 0.1500 0.1500 0.1500
-Ns 1.0000
+Kd 0.141176 0.337255 0.25098
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Banca_Madera__base
+newmtl Reciclaje_Blanco__base
 Ka 0 0 0
-Kd 0.466667 0.321569 0.235294
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
+Kd 0.968627 0.980392 0.960784
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Local_Terracota__base
+newmtl Muros_Patio_Gris__base
 Ka 0 0 0
-Kd 0.658824 0.368627 0.250980
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Patio_Menta__base
-Ka 0 0 0
-Kd 0.450000 0.450000 0.450000
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Pavimento_Exterior__base
-Ka 0 0 0
-Kd 0.450000 0.450000 0.450000
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
-d 1
-illum 2
-
-newmtl Base_Maqueta__base
-Ka 0 0 0
-Kd 0.396078 0.419608 0.380392
-Ks 0.0000 0.0000 0.0000
-Ns 1.0000
+Kd 0.835294 0.862745 0.835294
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
 newmtl Local_Verde__base
 Ka 0 0 0
-Kd 0.278431 0.450980 0.392157
-Ks 0.0200 0.0200 0.0200
-Ns 1.0000
+Kd 0.533333 0.709804 0.611765
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Vidrio_Turquesa__glazing
+newmtl Edificio_A_Pastel
 Ka 0 0 0
-Kd 0.300000 0.340000 0.380000
-Ks 0.3000 0.3000 0.3000
-Ns 53.4017
+Kd 0.749019607843 0.843137254902 0.921568627451
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Vidrio_Torre_A__glazing
+newmtl Edificio_B_Pastel
 Ka 0 0 0
-Kd 0.192157 0.345098 0.368627
-Ks 0.2500 0.2500 0.2500
-Ns 30.0000
+Kd 0.905882352941 0.725490196078 0.733333333333
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
 
-newmtl Vidrio_Taller__glazing
+newmtl Edificio_C_Pastel
 Ka 0 0 0
-Kd 0.411765 0.486275 0.478431
-Ks 0.1800 0.1800 0.1800
-Ns 20.2222
+Kd 0.772549019608 0.850980392157 0.749019607843
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Edificio_D_Pastel
+Ka 0 0 0
+Kd 0.835294117647 0.776470588235 0.901960784314
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Edificio_E_Pastel
+Ka 0 0 0
+Kd 0.941176470588 0.827450980392 0.666666666667
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Edificio_F_Pastel
+Ka 0 0 0
+Kd 0.733333333333 0.874509803922 0.878431372549
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Edificio_G_Pastel
+Ka 0 0 0
+Kd 0.901960784314 0.772549019608 0.654901960784
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Edificio_H_Pastel
+Ka 0 0 0
+Kd 0.898039215686 0.847058823529 0.647058823529
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Edificio_J_Pastel
+Ka 0 0 0
+Kd 0.780392156863 0.803921568627 0.913725490196
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Edificio_L_Pastel
+Ka 0 0 0
+Kd 0.843137254902 0.760784313725 0.792156862745
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Edificio_L_Anexo_Pastel
+Ka 0 0 0
+Kd 0.764705882353 0.866666666667 0.81568627451
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Suelo_Blanco_Roto
+Ka 0 0 0
+Kd 0.894117647059 0.894117647059 0.874509803922
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Borde_Jardin_Gris
+Ka 0 0 0
+Kd 0.580392156863 0.607843137255 0.619607843137
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Pasamanos_Negro
+Ka 0 0 0
+Kd 0.125490196078 0.141176470588 0.149019607843
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Rotulo_Techo_Negro
+Ka 0 0 0
+Kd 0.0901960784314 0.105882352941 0.113725490196
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
+
+newmtl Minga_Cubierta_Pastel
+Ka 0 0 0
+Kd 0.850980392157 0.76862745098 0.694117647059
+Ks 0.03 0.03 0.03
+Ns 8
 d 1
 illum 2
