@@ -1,4 +1,5 @@
 const edificioRepository = require('../../infrastructure/repositories/FirestoreEdificioRepository');
+const EdificioDocumentMapper = require('../../infrastructure/mappers/EdificioDocumentMapper');
 
 class ObtenerEdificioPorIdUseCase {
   constructor(repo = edificioRepository) {
@@ -6,7 +7,8 @@ class ObtenerEdificioPorIdUseCase {
   }
 
   async execute(id) {
-    return this.repo.obtenerPorId(id);
+    const edificio = await this.repo.obtenerPorId(id);
+    return EdificioDocumentMapper.toResponseDto(edificio);
   }
 }
 

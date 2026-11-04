@@ -68,18 +68,29 @@ Back_y_front/                          ← Raíz del monorepo
 ├── backEnd/                           ← Aplicación backend (Node.js + Express)
 │   ├── package.json                   ← Dependencias y scripts del backend
 │   ├── server.js                      ← Entry point: carga .env e inicia Express en PORT
-│   ├── .env                           ← Copia local de variables de entorno
+│   ├── .env                           ← Variables de entorno locales
+│   ├── tests/                         ← Suites de pruebas de integración y arquitectura
+│   │   ├── test_auth_endpoints.js
+│   │   ├── test_crud_edificios.js
+│   │   └── test_hexagonal_endpoints.js
+│   ├── scripts/                       ← Scripts administrativos y utilidades de Firestore
+│   │   ├── crear_token_firestore.js
+│   │   ├── debug_paths.js
+│   │   └── ver_tokens.js
 │   └── src/
 │       ├── app.js                     ← Configura Express, registra rutas y middlewares
 │       ├── modules/
 │       │   ├── api/                   ← Capa de adaptación HTTP
 │       │   │   ├── infrastructure/
 │       │   │   │   ├── controllers/
+│       │   │   │   │   ├── EdificiosController.js
+│       │   │   │   │   ├── LocacionesController.js
 │       │   │   │   │   └── NavegacionController.js   ← Controlador de rutas y navegación
 │       │   │   │   ├── middlewares/
 │       │   │   │   │   ├── authMiddleware.js          ← Validación de Bearer Token
 │       │   │   │   │   ├── corsConfig.js              ← Configuración CORS multi-origen
-│       │   │   │   │   └── errorHandler.js            ← 404 y errores globales
+│       │   │   │   │   ├── errorHandler.js            ← 404 y errores globales
+│       │   │   │   │   └── validateRequest.js         ← Validación de parámetros de entrada
 │       │   │   │   └── routes/
 │       │   │   │       ├── navegacion.routes.js       ← /navegacion/ruta
 │       │   │   │       ├── edificios.routes.js        ← /edificios y sub-rutas
@@ -138,7 +149,7 @@ Back_y_front/                          ← Raíz del monorepo
 │       │   ├── visualizacion_mapa/    ← Módulo de preparación de rutas para el frontend
 │       │   │   ├── application/
 │       │   │   │   ├── dtos/
-│       │   │   │   │   └── VisualizacionRuta.dto.js     ← DTO con flechas y waypoints
+│       │   │   │   │   └── VisualizacionRutaResponse.dto.js ← DTO con flechas y waypoints
 │       │   │   │   └── use-cases/
 │       │   │   │       └── GenerarVisualizacionRutaUseCase.js ← Genera polilínea y orientación
 │       │   │   ├── domain/
@@ -151,7 +162,7 @@ Back_y_front/                          ← Raíz del monorepo
 │       │   │   │       └── PolylineSmoother.js         ← Suaviza polilíneas de ruta
 │       │   │   └── infrastructure/
 │       │   │       └── transformers/
-│       │   │           └── MapCoordinateTransformer.js ← Transforma coordenadas para el mapa
+│       │   │           └── MapCoordinatesTransformer.js ← Transforma coordenadas para el mapa
 │       │   │
 │       │   └── shared/                ← Utilidades transversales a todos los módulos
 │       │       ├── domain/
@@ -164,6 +175,8 @@ Back_y_front/                          ← Raíz del monorepo
 │       │       │       ├── Point3D.js   ← Value object: punto 3D con método distanceTo()
 │       │       │       └── Vector2D.js  ← Value object: vector 2D con operaciones básicas
 │       │       └── infrastructure/
+│       │           ├── di/
+│       │           │   └── container.js         ← Inyección de Dependencias (Composition Root)
 │       │           ├── cache/
 │       │           │   └── MemoryCacheAdapter.js  ← Caché en memoria con TTL configurable
 │       │           └── firebase/
@@ -176,6 +189,8 @@ Back_y_front/                          ← Raíz del monorepo
     ├── Dockerfile                     ← Build multi-etapa: Angular → Nginx
     ├── nginx.conf                     ← Configuración de Nginx para SPA
     ├── .env.example                   ← Plantilla de variables de entorno del frontend
+    ├── scripts/
+    │   └── inspect_obj.js             ← Inspección de geometría y mallas de modelos OBJ
     └── src/
         ├── index.html                 ← Punto de entrada HTML
         ├── main.ts                    ← Bootstrap de Angular
@@ -185,6 +200,10 @@ Back_y_front/                          ← Raíz del monorepo
             ├── app.component.ts       ← Componente raíz
             ├── app.component.html     ← Template raíz
             ├── app.component.scss     ← Estilos raíz
+            ├── admin/                 ← Panel de administración
+            │   ├── admin-panel.component.html
+            │   ├── admin-panel.component.scss
+            │   └── admin-panel.component.ts
             ├── core/
             │   ├── config/
             │   │   └── api.config.ts          ← URL base de la API
@@ -219,11 +238,10 @@ Back_y_front/                          ← Raíz del monorepo
             │   ├── Edificio A/       ← Piso 1, 2, 3 en formato OBJ + MTL
             │   ├── Edificio B/       ← Piso 1, 2, 3 en formato OBJ + MTL
             │   ├── Edificio C/       ← Piso 1 y 2 en formato OBJ + MTL
-            │   └── sede/             ← Modelo completo del campus (INSTITUTO EN 3D.obj)
+            │   ├── Edificio D/       ← Piso 1 y 2 en formato OBJ
+            │   └── sede/             ← Modelo completo del campus (Instituto3D-color.obj)
             ├── icons/                ← Iconos de la interfaz
             ├── images/               ← Imágenes de la interfaz
-            ├── js/
-            │   └── cuerpo23-browser-overlay.js  ← Script de overlay de sala específica
             └── styles/
                 ├── _mixins.scss      ← Mixins SCSS reutilizables
                 ├── _variables.scss   ← Variables de colores, fuentes y tamaños
@@ -342,8 +360,9 @@ Responde a la pregunta: **¿qué espacios existen en el campus?**
 | **Rutas HTTP** | `edificios.routes.js`, `locaciones.routes.js` |
 | **Controladores** | `EdificiosController.js`, `LocacionesController.js` |
 | **Casos de uso** | `ListarEdificiosUseCase` — `execute()`, `executeById()`, `executeByNombre()` |
+| | `ObtenerEdificioPorIdUseCase` |
+| | `CrearEdificioUseCase`, `ActualizarEdificioUseCase`, `EliminarEdificioUseCase` |
 | | `BuscarLocacionUseCase` — `executePorEdificio()`, `executePorPiso()`, `executePorTipo()`, `executeGlobal()`, `executeGlobalPorCuerpo()` |
-| | `ObtenerEdificioUseCase` |
 | **DTOs** | `EdificioResponse.dto.js`, `LocacionResponse.dto.js` |
 | **Entidades** | `Edificio`, `Locacion`, `Piso` |
 | **Puertos** | `IEdificioRepository`, `ILocacionRepository` |
@@ -408,11 +427,11 @@ Este slice no tiene endpoints propios: es invocado **internamente por el Slice 2
 |---|---|
 | **Invocación** | `NavegacionController.calcularRuta()` llama a este slice tras calcular la ruta |
 | **Caso de uso** | `GenerarVisualizacionRutaUseCase.execute(coordinates, options)` |
-| **DTO** | `VisualizacionRuta.dto.js` — waypoints, segmentos, orientaciones de flechas |
+| **DTO** | `VisualizacionRutaResponse.dto.js` — waypoints, segmentos, orientaciones de flechas |
 | **Entidades** | `ArrowOrientation`, `PathSegment`, `Waypoint` |
 | **Servicios de dominio** | `ArrowDirectionCalculator` — calcula el ángulo de cada flecha |
 | | `PolylineSmoother` — suaviza la polilínea de la ruta |
-| **Transformer** | `MapCoordinateTransformer` — adapta coordenadas al sistema del mapa |
+| **Transformer** | `MapCoordinatesTransformer` — adapta coordenadas al sistema del mapa |
 | **Frontend** | `BabylonSceneService.drawAnimatedRoute()`, `GuideArrowService` |
 
 ---
@@ -901,7 +920,7 @@ npm start       # Angular DevServer → http://localhost:4200
 ```bash
 npm start             # inicia con node (producción)
 npm run dev           # inicia con nodemon (desarrollo, recarga automática)
-npm run test:backend  # ejecuta los tests manuales de los endpoints
+npm run test:backend  # ejecuta la suite de tests de endpoints (tests/test_hexagonal_endpoints.js)
 ```
 
 **Frontend (`frontend/`):**

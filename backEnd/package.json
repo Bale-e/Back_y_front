@@ -1,7 +1,7 @@
 {
-  "name": "inago-monorepo",
+  "name": "inago-backend",
   "version": "2.0.0",
-  "description": "Monorepo Hexagonal Backend Express + Frontend Angular 3D para InaGo",
+  "description": "Backend Hexagonal Express para InaGo",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,7 +10,7 @@
     "dev:frontend": "npm --prefix ../frontend start",
     "build:frontend": "npm --prefix ../frontend run build",
     "build": "npm run build:frontend",
-    "test:backend": "node scratch/test_hexagonal_endpoints.js"
+    "test:backend": "node tests/test_hexagonal_endpoints.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

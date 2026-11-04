@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, Output } from '@angular/core';
 import { BuildingId } from '../../../core/models/navegacion.model';
 
 @Component({
@@ -13,6 +13,20 @@ export class FloorSelectorComponent {
   @Output() buildingSelected = new EventEmitter<BuildingId>();
 
   isDialogVisible = false;
+  private ignoreNextDocClick = false;
+
+  constructor(private elementRef: ElementRef) {}
+
+  /** Cierra el menú al hacer clic en cualquier lugar fuera de este componente */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.ignoreNextDocClick) {
+      return;
+    }
+    if (this.isDialogVisible && !this.elementRef.nativeElement.contains(event.target)) {
+      this.isDialogVisible = false;
+    }
+  }
 
   get floorActionIcon(): string {
     if (this.currentBuilding === 'S') return '🏢';
@@ -21,10 +35,20 @@ export class FloorSelectorComponent {
 
   toggleDialog(): void {
     this.isDialogVisible = !this.isDialogVisible;
+    if (this.isDialogVisible) {
+      this.ignoreNextDocClick = true;
+      setTimeout(() => {
+        this.ignoreNextDocClick = false;
+      }, 100);
+    }
   }
 
   openDialog(): void {
     this.isDialogVisible = true;
+    this.ignoreNextDocClick = true;
+    setTimeout(() => {
+      this.ignoreNextDocClick = false;
+    }, 100);
   }
 
   closeDialog(): void {

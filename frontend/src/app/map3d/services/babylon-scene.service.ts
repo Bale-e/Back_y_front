@@ -38,6 +38,13 @@ export class BabylonSceneService implements OnDestroy {
   private baseRadius = 210;
   private zoomTime = 0;
 
+  // Zoom in y enfoque de edificios en la Sede
+  private buildingFocusAnimId = 0;
+  private currentFocusedBuilding: BuildingId | null = null;
+  private readonly defaultSedeTarget = new BABYLON.Vector3(0, 0, 0);
+  private readonly defaultSedeRadius = 210;
+  private readonly buildingFocusRadius = 140;
+
   // Iluminación y destacado de grupos en el modelo Sede
   private highlightLayer: BABYLON.HighlightLayer | null = null;
   private highlightedBuildingMeshes: BABYLON.AbstractMesh[] = [];
@@ -81,18 +88,22 @@ export class BabylonSceneService implements OnDestroy {
     this.setupUrbanContext();
 
     this.scene.onPointerDown = (evt, pickResult) => {
-      this.registerUserInteraction();
       if (evt.button === 0 && pickResult.hit && pickResult.pickedMesh) {
         const picked = pickResult.pickedMesh;
         const building = this.identifyBuildingFromMesh(picked.name, picked);
         if (building) {
+          // Si se hace click en un edificio de la Sede, no consideramos esto interacción manual que detenga el giro
+          this.cancelUserInteraction();
           console.log(`[Click Sede] Malla seleccionada: ${building} (${picked.name}) | Coordenadas:`, pickResult.pickedPoint);
         } else {
+          this.registerUserInteraction();
           console.log('Mesh seleccionado:', picked.name, 'Coordenadas:', pickResult.pickedPoint);
         }
         if (onMeshClicked) {
           onMeshClicked(pickResult.pickedMesh.name, pickResult);
         }
+      } else {
+        this.registerUserInteraction();
       }
     };
 
@@ -165,6 +176,21 @@ export class BabylonSceneService implements OnDestroy {
     }, 2500);
   }
 
+  public cancelUserInteraction(): void {
+    this.isUserInteracting = false;
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+    if (this.camera) {
+      this.camera.inertialAlphaOffset = 0;
+      this.camera.inertialBetaOffset = 0;
+      this.camera.inertialRadiusOffset = 0;
+      this.camera.inertialPanningX = 0;
+      this.camera.inertialPanningY = 0;
+    }
+  }
+
   private handleAutoRotation(): void {
     if (!this.camera || !this.isAutoRotateEnabled) return;
 
@@ -182,7 +208,8 @@ export class BabylonSceneService implements OnDestroy {
       Math.abs(this.camera.inertialPanningX) > 0.0001 ||
       Math.abs(this.camera.inertialPanningY) > 0.0001;
 
-    if (this.isUserInteracting || hasInertia || this.highlightedBuildingMeshes.length > 0) {
+    // Solo pausar rotación automática si el usuario está manipulando activamente la cámara
+    if (this.isUserInteracting || hasInertia) {
       this.baseRadius = this.camera.radius;
       return;
     }
@@ -816,12 +843,31 @@ export class BabylonSceneService implements OnDestroy {
   }
 
   /**
-   * Ilumina y destaca con resplandor y contorno el grupo de mallas de un edificio en la Sede.
-   * Si building es null, remueve cualquier iluminación previa.
+   * Ilumina y destaca con resplandor y contorno el grupo de mallas de un edificio en la Sede,
+   * y realiza un zoom in suave hacia el edificio sin detener el giro continuo del escenario.
+   * Si building es null, remueve cualquier iluminación y opcionalmente restaura la cámara a la vista general.
    */
-  public highlightBuildingInSede(building: BuildingId | null): void {
+  public highlightBuildingInSede(building: BuildingId | null, restoreCamera = true): void {
+    this.cancelUserInteraction();
+
+    if (!building) {
+      this.currentFocusedBuilding = null;
+      this.clearBuildingHighlight();
+      if (restoreCamera) {
+        this.animateFocusOnBuildingInSede(null);
+      } else {
+        this.buildingFocusAnimId++;
+      }
+      return;
+    }
+
+    if (this.currentFocusedBuilding === building && this.highlightedBuildingMeshes.length > 0) {
+      return;
+    }
+
+    this.currentFocusedBuilding = building;
     this.clearBuildingHighlight();
-    if (!building || !this.modelRoot || !this.scene) return;
+    if (!this.modelRoot || !this.scene) return;
 
     const meshes = this.getBuildingMeshesInSede(building);
     if (meshes.length === 0) return;
@@ -870,6 +916,57 @@ export class BabylonSceneService implements OnDestroy {
         m.overlayAlpha = dynamicAlpha;
       }
     });
+
+    // Pequeño zoom in suave hacia el lugar seleccionado mientras el escenario sigue girando
+    this.animateFocusOnBuildingInSede(building);
+  }
+
+  /**
+   * Realiza una transición suave hacia el edificio seleccionado (zoom in)
+   * o restaura la vista general de la Sede (zoom out), manteniendo siempre
+   * activa la rotación panorámica continua sin saltos ni cortes.
+   */
+  private animateFocusOnBuildingInSede(building: BuildingId | null, durationMs = 1000): void {
+    if (!this.camera || !this.scene) return;
+
+    const animId = ++this.buildingFocusAnimId;
+
+    const startTarget = this.camera.target.clone();
+    const startRadius = this.baseRadius;
+
+    let endTarget: BABYLON.Vector3;
+    let endRadius: number;
+
+    if (building) {
+      const center = this.getBuildingCenterInSede(this.modelRoot, building);
+      endTarget = center.clone();
+      endRadius = this.buildingFocusRadius;
+    } else {
+      endTarget = this.defaultSedeTarget.clone();
+      endRadius = this.defaultSedeRadius;
+    }
+
+    const startTime = performance.now();
+
+    const step = () => {
+      if (animId !== this.buildingFocusAnimId || !this.camera) return;
+
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(elapsed / durationMs, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+
+      this.camera.target = BABYLON.Vector3.Lerp(startTarget, endTarget, eased);
+      this.baseRadius = startRadius + (endRadius - startRadius) * eased;
+
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        this.camera.target = endTarget.clone();
+        this.baseRadius = endRadius;
+      }
+    };
+
+    requestAnimationFrame(step);
   }
 
   /**
@@ -892,7 +989,7 @@ export class BabylonSceneService implements OnDestroy {
     }
   }
 
-  private getBuildingCenterInSede(sedeRoot: BABYLON.TransformNode, building: BuildingId): BABYLON.Vector3 {
+  private getBuildingCenterInSede(sedeRoot: BABYLON.TransformNode | null = null, building: BuildingId): BABYLON.Vector3 {
     const regex = building === 'A'
       ? /^(?:a(?=[_\-\s]|_mm|$)|edificio[\s_\-]*a(?=[_\-\s]|$))|mesh121|group67|group66|edificioa|a1/i
       : building === 'B'
@@ -903,7 +1000,7 @@ export class BabylonSceneService implements OnDestroy {
             ? /^(?:d(?=[_\-\s]|_mm|$)|edificio[\s_\-]*d(?=[_\-\s]|$))|mesh65|group37|group36|group35|edificiod|d1/i
             : /^$/;
 
-    const bMeshes = this.getBuildingMeshesInSede(building, sedeRoot);
+    const bMeshes = this.getBuildingMeshesInSede(building, sedeRoot || undefined);
     if (bMeshes.length > 0) {
       let bMin = new BABYLON.Vector3(Infinity, Infinity, Infinity);
       let bMax = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
@@ -926,6 +1023,9 @@ export class BabylonSceneService implements OnDestroy {
     incomingRoot: BABYLON.TransformNode,
     originBuilding: BuildingId
   ): Promise<void> {
+    this.buildingFocusAnimId++;
+    this.currentFocusedBuilding = null;
+    this.clearBuildingHighlight();
     if (!this.camera || !this.scene) {
       outgoingRoot?.dispose(false, true);
       return;
@@ -1007,6 +1107,9 @@ export class BabylonSceneService implements OnDestroy {
     incomingRoot: BABYLON.TransformNode,
     targetBuilding: BuildingId
   ): Promise<void> {
+    this.buildingFocusAnimId++;
+    this.currentFocusedBuilding = null;
+    this.clearBuildingHighlight();
     if (!this.camera || !this.scene) {
       outgoingRoot?.dispose(false, true);
       return;
@@ -1332,6 +1435,12 @@ export class BabylonSceneService implements OnDestroy {
     const isSameModel = modelName === this.currentFloorModel && buildingId === this.currentBuilding && this.modelRoot !== null;
     if (isSameModel) return;
 
+    // Capturar el estado ANTERIOR antes de sobrescribir
+    const prevBuilding = this.currentBuilding;
+    const prevFloor    = this.currentFloorModel;
+    const isSede  = this.isSedeModelName(modelName, buildingId);
+    const wasSede = this.isSedeModelName(prevFloor, prevBuilding);
+
     this.currentFloorModel = modelName;
     this.currentBuilding   = buildingId;
     this.clearBuildingHighlight();
@@ -1355,25 +1464,17 @@ export class BabylonSceneService implements OnDestroy {
     }
     this.modelRoot = incomingRoot;
 
-    const prevBuilding = this.currentBuilding;
-    const prevFloor = this.currentFloorModel;
-    const isSede = this.isSedeModelName(modelName, buildingId);
-    const wasSede = this.isSedeModelName(prevFloor, prevBuilding);
+    // ── Ocultar el escenario urbano al entrar a pisos interiores ──
+    this.setUrbanContextVisible(isSede);
 
     // ── Transición especial hacia la SEDE (Zoom-out desde el edificio de origen) ──
     if (isSede && !wasSede && (prevBuilding === 'A' || prevBuilding === 'B' || prevBuilding === 'C' || prevBuilding === 'D')) {
-      this.currentFloorModel = modelName;
-      this.currentBuilding   = buildingId;
-    this.clearBuildingHighlight();
       await this.animateTransitionToSede(outgoingRoot, incomingRoot, prevBuilding);
       return;
     }
 
     // ── Transición especial desde la SEDE hacia un edificio (Zoom-in hacia el pasillo) ──
     if (wasSede && !isSede && (buildingId === 'A' || buildingId === 'B' || buildingId === 'C' || buildingId === 'D')) {
-      this.currentFloorModel = modelName;
-      this.currentBuilding   = buildingId;
-    this.clearBuildingHighlight();
       await this.animateTransitionFromSede(outgoingRoot, incomingRoot, buildingId);
       return;
     }
@@ -1506,11 +1607,22 @@ export class BabylonSceneService implements OnDestroy {
       requestAnimationFrame(step);
     });
 
-    // ── Respetar la perspectiva activa del usuario ─────────────────────────
-    // NO forzar camera.setTarget, alpha, beta ni radius en cambios de piso o mapa.
-    // La vista se mantiene fluida y continua exactamente donde el usuario la tenía.
+    // ── Recentrar cámara al modelo de piso interior tras la animación ────────
     if (this.camera) {
-      this.baseRadius = this.camera.radius;
+      if (isSede) {
+        this.camera.setTarget(BABYLON.Vector3.Zero());
+        this.camera.radius = 210;
+        this.camera.alpha  = -Math.PI / 2;
+        this.camera.beta   = 1.18;
+        this.baseRadius    = 210;
+        this.zoomTime      = 0;
+      } else {
+        this.camera.setTarget(BABYLON.Vector3.Zero());
+        this.camera.radius = 36.4;
+        this.camera.alpha  = Math.PI / 4;
+        this.camera.beta   = Math.PI / 3;
+        this.baseRadius    = 36.4;
+      }
     }
   }
 
@@ -1947,6 +2059,9 @@ export class BabylonSceneService implements OnDestroy {
 
   public resetCamera(): void {
     if (!this.camera) return;
+    this.buildingFocusAnimId++;
+    this.currentFocusedBuilding = null;
+    this.clearBuildingHighlight();
     this.camera.target = new BABYLON.Vector3(0, 0, 0);
     this.camera.alpha = Math.PI / 4;
     this.camera.beta = Math.PI / 3;
@@ -2071,6 +2186,8 @@ export class BabylonSceneService implements OnDestroy {
   }
 
   public dispose(): void {
+    this.buildingFocusAnimId++;
+    this.currentFocusedBuilding = null;
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
       this.idleTimer = null;

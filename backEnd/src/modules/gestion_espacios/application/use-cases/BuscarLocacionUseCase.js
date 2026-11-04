@@ -1,40 +1,57 @@
-const locacionRepository = require('../../infrastructure/repositories/FirestoreLocacionRepository');
+const defaultLocacionRepository = require('../../infrastructure/repositories/FirestoreLocacionRepository');
+const LocacionDocumentMapper = require('../../infrastructure/mappers/LocacionDocumentMapper');
 
 class BuscarLocacionUseCase {
-  constructor(repo = locacionRepository) {
+  constructor(repo = defaultLocacionRepository) {
     this.repo = repo;
   }
 
+  _toDto(loc) {
+    return LocacionDocumentMapper.toResponseDto(loc);
+  }
+
+  _toDtoList(list = []) {
+    return list.map((item) => LocacionDocumentMapper.toResponseDto(item)).filter(Boolean);
+  }
+
   async executePorEdificio(edificioId) {
-    return this.repo.obtenerPorEdificio(edificioId);
+    const list = await this.repo.obtenerPorEdificio(edificioId);
+    return this._toDtoList(list);
   }
 
   async executePorPiso(edificioId, piso) {
-    return this.repo.obtenerPorEdificioYPiso(edificioId, piso);
+    const list = await this.repo.obtenerPorEdificioYPiso(edificioId, piso);
+    return this._toDtoList(list);
   }
 
   async executePorTipo(edificioId, tipo) {
-    return this.repo.obtenerPorEdificioYTipo(edificioId, tipo);
+    const list = await this.repo.obtenerPorEdificioYTipo(edificioId, tipo);
+    return this._toDtoList(list);
   }
 
   async executePorNombreEnEdificio(edificioId, nombre) {
-    return this.repo.obtenerPorNombreEnEdificio(edificioId, nombre);
+    const loc = await this.repo.obtenerPorNombreEnEdificio(edificioId, nombre);
+    return this._toDto(loc);
   }
 
   async executeGlobal(nombre) {
-    return this.repo.buscarGlobalPorNombre(nombre);
+    const loc = await this.repo.buscarGlobalPorNombre(nombre);
+    return this._toDto(loc);
   }
 
   async executeGlobalPorPiso(piso) {
-    return this.repo.buscarGlobalPorPiso(piso);
+    const list = await this.repo.buscarGlobalPorPiso(piso);
+    return this._toDtoList(list);
   }
 
   async executeGlobalPorTipo(tipo) {
-    return this.repo.buscarGlobalPorTipo(tipo);
+    const list = await this.repo.buscarGlobalPorTipo(tipo);
+    return this._toDtoList(list);
   }
 
   async executeGlobalPorCuerpo(cuerpo) {
-    return this.repo.buscarGlobalPorCuerpo(cuerpo);
+    const loc = await this.repo.buscarGlobalPorCuerpo(cuerpo);
+    return this._toDto(loc);
   }
 }
 

@@ -1,143 +1,19 @@
-const navigationRepository = require('../../infrastructure/repositories/FirestoreNavigationRepository');
-const locacionRepository = require('../../../gestion_espacios/infrastructure/repositories/FirestoreLocacionRepository');
+const defaultNavRepo = require('../../infrastructure/repositories/FirestoreNavigationRepository');
+const defaultLocRepo = require('../../../gestion_espacios/infrastructure/repositories/FirestoreLocacionRepository');
+const defaultAStar = require('../../domain/services/AStarAlgorithm');
 const ICalcularRutaUseCase = require('../ports/ICalcularRutaUseCase');
 const RutaCalculadaResponseDto = require('../dtos/RutaCalculadaResponse.dto');
 const NavigationPathDocumentMapper = require('../../infrastructure/mappers/NavigationPathDocumentMapper');
-const aStarAlgorithm = require('../../domain/services/AStarAlgorithm');
 const { getFieldCI } = require('../../../gestion_espacios/infrastructure/helpers/firestoreHelpers');
-const Point3D = require('../../../../shared/domain/value-objects/Point3D');
-
-function extractVec3Point(obj) {
-  if (!obj) return null;
-  let x, y, z;
-  if (Array.isArray(obj) && obj.length >= 3) {
-    x = Number(obj[0]);
-    y = Number(obj[1]);
-    z = Number(obj[2]);
-  } else if (typeof obj === 'object') {
-    const src = obj.Coordenadas3D || obj['Coordenadas 3D'] || obj.Coordenadas || obj.coordenadas || obj;
-    const getVal = (field) => {
-      const key = Object.keys(src || {}).find(k => k.toLowerCase() === field.toLowerCase());
-      return key !== undefined ? Number(src[key]) : NaN;
-    };
-    x = getVal('x');
-    y = getVal('y');
-    z = getVal('z');
-  }
-  if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-    return { x, y, z };
-  }
-  return null;
-}
-
-function extractNavPathPoints(doc) {
-  const accesos = {};
-  const giros = [];
-  const conexiones = {};
-
-  if (!doc || typeof doc !== 'object') {
-    return { accesos, giros, conexiones };
-  }
-
-  // 1. Accesos
-  const accesosData = doc.Accesos || doc.accesos;
-  if (accesosData && typeof accesosData === 'object') {
-    if (Array.isArray(accesosData)) {
-      accesosData.forEach((item, index) => {
-        const v = extractVec3Point(item);
-        if (v) accesos[`Acceso${index + 1}`] = v;
-      });
-    } else {
-      Object.entries(accesosData).forEach(([key, val]) => {
-        const v = extractVec3Point(val);
-        if (v) accesos[key] = v;
-      });
-    }
-  }
-
-  // 2. Giros
-  const girosData = doc.Giros || doc.giros || doc.Turns || doc.turns;
-  if (girosData) {
-    const items = Array.isArray(girosData) ? girosData : Object.values(girosData);
-    for (const item of items) {
-      const v = extractVec3Point(item);
-      if (v) giros.push(v);
-    }
-  }
-
-  // Si es un path del Edificio A y solo tiene 1 giro (extremo este en x > 8),
-  // asegurar el giro del extremo oeste del pasillo para que cubra todas las salas del piso (A201-A218, A301-A318)
-  const isEdificioA = (doc.id || '').includes('EdificioA') || (doc.Edificio || doc.edificio || '').toString().includes('A');
-  if (isEdificioA && giros.length === 1 && giros[0].x > 5) {
-    const floorY = giros[0].y;
-    giros.push({ x: -9.21, y: floorY, z: -0.44 });
-  }
-
-  // 3. Conexiones (POIs)
-  const conexionesData = doc.Conexiones || doc.conexiones || doc.POIs || doc.pois;
-  if (conexionesData && typeof conexionesData === 'object') {
-    if (Array.isArray(conexionesData)) {
-      conexionesData.forEach((item, index) => {
-        const v = extractVec3Point(item);
-        if (v) conexiones[`Conexion${index + 1}`] = v;
-      });
-    } else {
-      Object.entries(conexionesData).forEach(([key, val]) => {
-        const v = extractVec3Point(val);
-        if (v) conexiones[key] = v;
-      });
-    }
-  }
-
-  return { accesos, giros, conexiones };
-}
-
-function findDestinationInPaths(paths, destinationName) {
-  if (!Array.isArray(paths) || paths.length === 0 || !destinationName) return null;
-  const targetLower = destinationName.trim().toLowerCase();
-
-  for (const path of paths) {
-    const { accesos, conexiones } = extractNavPathPoints(path);
-
-    for (const [name, pos] of Object.entries(conexiones)) {
-      if (name.trim().toLowerCase() === targetLower || name.trim().toLowerCase().includes(targetLower)) {
-        return { path, pointName: name, position: pos };
-      }
-    }
-
-    for (const [name, pos] of Object.entries(accesos)) {
-      if (name.trim().toLowerCase() === targetLower || name.trim().toLowerCase().includes(targetLower)) {
-        return { path, pointName: name, position: pos };
-      }
-    }
-  }
-
-  return null;
-}
 
 /**
  * Calcula el punto exacto de inflexión en 90° sobre el camino del pasillo.
- *
- * Para cada segmento del camino (startPos → G0 → G1 → … → Gn), proyecta
- * el destino perpendicularmente sobre el segmento. El segmento con menor
- * distancia perpendicular es el tramo del pasillo que corre al lado de la sala.
- * El punto de inflexión es la proyección interpolada sobre ese segmento
- * (no necesariamente un giro existente), lo que garantiza el giro exacto en
- * 90° sin importar dónde estén los giros del pasillo.
- *
- * @param {object}   startPos - Punto de inicio del camino {x,y,z}
- * @param {object[]} giros    - Array ordenado de giros del pasillo
- * @param {object}   destPos  - Posición del destino {x,y,z}
- * @returns {{ turnPoint: object, girosToInclude: number }}
- *   turnPoint      – punto exacto en el pasillo desde el que se gira al destino
- *   girosToInclude – cuántos giros incluir antes del turnPoint (slice(0, N))
  */
 function findTurnPointOnPath(startPos, giros, destPos) {
   if (!giros || giros.length === 0) {
     return { turnPoint: { ...destPos }, girosToInclude: 0 };
   }
 
-  // pathPoints = [startPos, giros[0], giros[1], ..., giros[n-1]]
   const pathPoints = [startPos, ...giros];
   let bestSegIdx = 0;
   let bestT = 0;
@@ -154,15 +30,15 @@ function findTurnPointOnPath(startPos, giros, destPos) {
     let dist;
 
     if (abLen2 < 1e-10) {
-      // Segmento degenerado: distancia al punto A
       const dx = destPos.x - A.x, dy = destPos.y - A.y, dz = destPos.z - A.z;
       dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
     } else {
-      // Proyección del destino sobre el segmento AB, clampada en [0,1]
-      const adx = destPos.x - A.x, ady = destPos.y - A.y, adz = destPos.z - A.z;
-      t = Math.max(0, Math.min(1, (adx * abx + ady * aby + adz * abz) / abLen2));
-      const cx = A.x + t * abx, cy = A.y + t * aby, cz = A.z + t * abz;
-      const dx = destPos.x - cx, dy = destPos.y - cy, dz = destPos.z - cz;
+      const apx = destPos.x - A.x, apy = destPos.y - A.y, apz = destPos.z - A.z;
+      t = Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / abLen2));
+      const projX = A.x + t * abx;
+      const projY = A.y + t * aby;
+      const projZ = A.z + t * abz;
+      const dx = destPos.x - projX, dy = destPos.y - projY, dz = destPos.z - projZ;
       dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
@@ -173,24 +49,24 @@ function findTurnPointOnPath(startPos, giros, destPos) {
     }
   }
 
-  // Interpolar el punto exacto de inflexión sobre el segmento más cercano
   const A = pathPoints[bestSegIdx];
   const B = pathPoints[bestSegIdx + 1];
   const turnPoint = {
-    x: A.x + bestT * (B.x - A.x),
-    y: A.y + bestT * (B.y - A.y),
-    z: A.z + bestT * (B.z - A.z),
+    x: Number((A.x + bestT * (B.x - A.x)).toFixed(3)),
+    y: Number((A.y + bestT * (B.y - A.y)).toFixed(3)),
+    z: Number((A.z + bestT * (B.z - A.z)).toFixed(3)),
   };
 
-  // Incluir giros[0 .. bestSegIdx-1]: los que están antes del segmento de inflexión.
-  // bestSegIdx 0 → segmento (startPos → giros[0]) → incluir 0 giros
-  // bestSegIdx k → segmento (giros[k-1] → giros[k]) → incluir k giros
   return { turnPoint, girosToInclude: bestSegIdx };
 }
 
-function cleanDuplicatePoints(points, thresholdSq = 0.0001) {
+function cleanDuplicatePoints(points, threshold = 0.05) {
+  if (!points || points.length === 0) return [];
+  const thresholdSq = threshold * threshold;
   const result = [];
-  for (const pt of points) {
+
+  for (let i = 0; i < points.length; i++) {
+    const pt = points[i];
     if (result.length === 0) {
       result.push(pt);
     } else {
@@ -208,7 +84,7 @@ function cleanDuplicatePoints(points, thresholdSq = 0.0001) {
 }
 
 class CalcularRutaUseCase extends ICalcularRutaUseCase {
-  constructor(navRepo = navigationRepository, locRepo = locacionRepository, pathfinder = aStarAlgorithm) {
+  constructor(navRepo = defaultNavRepo, locRepo = defaultLocRepo, pathfinder = defaultAStar) {
     super();
     this.navRepo = navRepo;
     this.locRepo = locRepo;
@@ -234,8 +110,6 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
     const startName = options.startName || 'MainEntrance';
     const allPaths = await this.navRepo.obtenerTodosLosPaths();
 
-    // 1. Filtrar paths por edificio / piso si se especifica en options.
-    // Se eliminan los espacios antes de comparar para que "Piso 2" y "Piso2" coincidan.
     const normPiso = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, '');
     const normEd = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, '');
 
@@ -262,8 +136,8 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
       return str;
     };
 
-    // 1. Buscar destino primero en navigation-paths
-    let destMatch = findDestinationInPaths(allPaths, destino);
+    // 1. Buscar destino primero en navigation-paths (delegado al Mapper)
+    let destMatch = NavigationPathDocumentMapper.findDestinationInPaths(allPaths, destino);
     let destPos = destMatch ? destMatch.position : null;
     let endPath = destMatch ? destMatch.path : null;
 
@@ -274,11 +148,9 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
       const loc = await this.locRepo.buscarGlobalPorNombre(destino);
       if (loc && loc.coordenadas) {
         destLocPiso = getLocFloor(loc);
-        destLocEdificio = normEd(getFieldCI(loc, 'edificio') || loc.Edificio || loc._edificioNombre || loc._edificioId || '');
+        destLocEdificio = normEd(getFieldCI(loc, 'edificio') || loc.Edificio || loc.edificioNombre || loc.edificioId || '');
 
         let coords = { ...loc.coordenadas };
-        // Las locaciones del Piso 1 en Firestore están en el sistema local del OBJ (x > 7 o y > 4).
-        // Se normalizan al sistema de coordenadas mundo que usan los navigation-paths y Babylon.
         const isEdA = !destLocEdificio || destLocEdificio.includes('edificioa') || destLocEdificio === 'a';
         if (isEdA && (destLocPiso.includes('piso1') || destLocPiso === '1') && (coords.x > 7 || coords.y > 4)) {
           const xMundo = (coords.x - 22.74) * 0.51;
@@ -324,14 +196,14 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
             piso: `Piso ${floorNum}`,
             Accesos: {
               ConectorEdificioA: { x: -0.50, y: targetY, z: -0.78 },
-              Escalera: { x: -0.49, y: targetY, z: -11.40 }
+              Escalera: { x: -0.49, y: targetY, z: -11.40 },
             },
             Giros: [
               { x: -0.50, y: targetY, z: -11.40 },
               { x: -0.50, y: targetY, z: -3.15 },
               { x: -0.50, y: targetY, z: -0.78 },
-              { x: -0.50, y: targetY, z: 8.00 }
-            ]
+              { x: -0.50, y: targetY, z: 8.00 },
+            ],
           };
         } else if (targetEdificio === 'c' || targetEdificio.includes('c')) {
           const floorNum = targetFloor.replace(/\D/g, '') || '1';
@@ -342,14 +214,14 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
             piso: `Piso ${floorNum}`,
             Accesos: {
               EntradaPrincipal: { x: 0.30, y: targetY, z: 9.68 },
-              Escalera: { x: 0.30, y: targetY, z: 8.00 }
+              Escalera: { x: 0.30, y: targetY, z: 8.00 },
             },
             Giros: [
               { x: 0.30, y: targetY, z: 11.00 },
               { x: 0.30, y: targetY, z: 8.00 },
               { x: 0.30, y: targetY, z: 0.00 },
-              { x: 0.30, y: targetY, z: -7.00 }
-            ]
+              { x: 0.30, y: targetY, z: -7.00 },
+            ],
           };
         } else {
           endPath = allPaths[0];
@@ -358,14 +230,13 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
     }
 
     // 5. Identificar path de inicio y punto de acceso inicial
-    // Por defecto, empezar en el mismo piso del destino (a menos que se especifique origen en otro lugar)
     let startPath = endPath;
     let startPos = null;
     let selectedStartName = startName;
 
     if (startName && startName !== 'MainEntrance') {
       for (const path of allPaths) {
-        const { accesos } = extractNavPathPoints(path);
+        const { accesos } = NavigationPathDocumentMapper.extractNavPathPoints(path);
         const acc = Object.entries(accesos).find(
           ([k]) => k.trim().toLowerCase() === startName.trim().toLowerCase()
         );
@@ -379,7 +250,7 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
     }
 
     if (!startPos) {
-      const { accesos: startAccesos } = extractNavPathPoints(startPath);
+      const { accesos: startAccesos } = NavigationPathDocumentMapper.extractNavPathPoints(startPath);
       const firstAccKey = Object.keys(startAccesos)[0];
       if (firstAccKey) {
         startPos = startAccesos[firstAccKey];
@@ -389,24 +260,21 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
       }
     }
 
-    // 4. Trazar ruta con punto de inflexión exacto
-    // Para cada destino se calcula la proyección perpendicular sobre el camino
-    // del pasillo. Ese punto interpolado (que puede estar entre dos giros) es
-    // donde se realiza el giro en 90° hacia la sala, sin retroceder.
+    // 6. Trazar ruta con punto de inflexión exacto
     const rawRoute = [{ ...startPos }];
 
     let commonAcc = null;
     let commonAccKey = null;
 
     if (startPath === endPath) {
-      const { giros } = extractNavPathPoints(startPath);
+      const { giros } = NavigationPathDocumentMapper.extractNavPathPoints(startPath);
       const { turnPoint, girosToInclude } = findTurnPointOnPath(startPos, giros, destPos);
       giros.slice(0, girosToInclude).forEach((g) => rawRoute.push({ ...g }));
       rawRoute.push(turnPoint);
       rawRoute.push({ ...destPos });
     } else {
-      const { giros: startGiros, accesos: startAccesos } = extractNavPathPoints(startPath);
-      const { giros: endGiros, accesos: endAccesos } = extractNavPathPoints(endPath);
+      const { giros: startGiros, accesos: startAccesos } = NavigationPathDocumentMapper.extractNavPathPoints(startPath);
+      const { giros: endGiros, accesos: endAccesos } = NavigationPathDocumentMapper.extractNavPathPoints(endPath);
 
       startGiros.forEach((g) => rawRoute.push({ ...g }));
 
@@ -449,17 +317,27 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
       totalDist += Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
-    return {
+    const coordinates = cleaned.map((p) => [
+      Number(p.x.toFixed(2)),
+      Number((p.y !== undefined ? p.y : 0.05).toFixed(2)),
+      Number(p.z.toFixed(2)),
+    ]);
+
+    const result = {
       startName: selectedStartName,
       endName: destino,
-      startPathId: startPath?.id || null,
-      endPathId: endPath?.id || startPath?.id || null,
-      coordinates: cleaned.map((p) => [p.x, p.y, p.z]),
+      startPathId: startPath ? startPath.id : 'default',
+      endPathId: endPath ? endPath.id : 'default',
+      coordinates,
       distance: Number(totalDist.toFixed(2)),
-      // New fields for inter‑building handling
-      connectionName: commonAcc ? commonAccKey : null,
-      interBuilding: !!commonAcc && (normEd(getFieldCI(startPath, 'edificio')) !== normEd(getFieldCI(endPath, 'edificio'))),
     };
+
+    if (commonAcc) {
+      result.connectionName = commonAccKey;
+      result.interBuilding = true;
+    }
+
+    return result;
   }
 }
 

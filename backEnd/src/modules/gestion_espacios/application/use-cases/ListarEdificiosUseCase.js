@@ -1,4 +1,5 @@
 const edificioRepository = require('../../infrastructure/repositories/FirestoreEdificioRepository');
+const EdificioDocumentMapper = require('../../infrastructure/mappers/EdificioDocumentMapper');
 
 class ListarEdificiosUseCase {
   constructor(repo = edificioRepository) {
@@ -6,23 +7,28 @@ class ListarEdificiosUseCase {
   }
 
   async execute() {
-    return this.repo.obtenerTodos();
+    const edificios = await this.repo.obtenerTodos();
+    return edificios.map((e) => EdificioDocumentMapper.toResponseDto(e));
   }
 
   async executeById(id) {
-    return this.repo.obtenerPorId(id);
+    const edificio = await this.repo.obtenerPorId(id);
+    return EdificioDocumentMapper.toResponseDto(edificio);
   }
 
   async executeByNombre(nombre) {
-    return this.repo.obtenerPorNombre(nombre);
+    const edificio = await this.repo.obtenerPorNombre(nombre);
+    return EdificioDocumentMapper.toResponseDto(edificio);
   }
 
   async crear(datos) {
-    return this.repo.crear(datos);
+    const creado = await this.repo.crear(datos);
+    return EdificioDocumentMapper.toResponseDto(creado);
   }
 
   async actualizar(id, datos) {
-    return this.repo.actualizar(id, datos);
+    const actualizado = await this.repo.actualizar(id, datos);
+    return EdificioDocumentMapper.toResponseDto(actualizado);
   }
 
   async eliminar(id) {

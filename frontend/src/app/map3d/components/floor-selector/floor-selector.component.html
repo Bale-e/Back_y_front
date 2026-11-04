@@ -1,4 +1,4 @@
-<div class="floor-action">
+<div class="floor-action" (click)="$event.stopPropagation()">
   <button class="floor-action__button" type="button" (click)="toggleDialog()" aria-label="Seleccionar piso u edificio">
     <span class="floor-action__ring"></span>
     <span class="floor-action__icon">{{ floorActionIcon }}</span>

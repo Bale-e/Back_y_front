@@ -21,6 +21,91 @@ class NavigationPathDocumentMapper {
     return null;
   }
 
+  static extractNavPathPoints(doc) {
+    const accesos = {};
+    const giros = [];
+    const conexiones = {};
+
+    if (!doc || typeof doc !== 'object') {
+      return { accesos, giros, conexiones };
+    }
+
+    // 1. Accesos
+    const accesosData = doc.Accesos || doc.accesos;
+    if (accesosData && typeof accesosData === 'object') {
+      if (Array.isArray(accesosData)) {
+        accesosData.forEach((item, index) => {
+          const pt = this.extractPoint(item);
+          if (pt) accesos[`Acceso${index + 1}`] = pt.toJSON();
+        });
+      } else {
+        Object.entries(accesosData).forEach(([key, val]) => {
+          const pt = this.extractPoint(val);
+          if (pt) accesos[key] = pt.toJSON();
+        });
+      }
+    }
+
+    // 2. Giros
+    const girosData = doc.Giros || doc.giros || doc.Turns || doc.turns;
+    if (girosData) {
+      const items = Array.isArray(girosData) ? girosData : Object.values(girosData);
+      for (const item of items) {
+        const pt = this.extractPoint(item);
+        if (pt) giros.push(pt.toJSON());
+      }
+    }
+
+    // Si es un path del Edificio A y solo tiene 1 giro (extremo este en x > 8),
+    // asegurar el giro del extremo oeste del pasillo para que cubra todas las salas del piso (A201-A218, A301-A318)
+    const isEdificioA = (doc.id || '').includes('EdificioA') || (doc.Edificio || doc.edificio || '').toString().includes('A');
+    if (isEdificioA && giros.length === 1 && giros[0].x > 5) {
+      const floorY = giros[0].y;
+      giros.push({ x: -9.21, y: floorY, z: -0.44 });
+    }
+
+    // 3. Conexiones (POIs)
+    const conexionesData = doc.Conexiones || doc.conexiones || doc.POIs || doc.pois;
+    if (conexionesData && typeof conexionesData === 'object') {
+      if (Array.isArray(conexionesData)) {
+        conexionesData.forEach((item, index) => {
+          const pt = this.extractPoint(item);
+          if (pt) conexiones[`Conexion${index + 1}`] = pt.toJSON();
+        });
+      } else {
+        Object.entries(conexionesData).forEach(([key, val]) => {
+          const pt = this.extractPoint(val);
+          if (pt) conexiones[key] = pt.toJSON();
+        });
+      }
+    }
+
+    return { accesos, giros, conexiones };
+  }
+
+  static findDestinationInPaths(paths, destinationName) {
+    if (!Array.isArray(paths) || paths.length === 0 || !destinationName) return null;
+    const targetLower = destinationName.trim().toLowerCase();
+
+    for (const path of paths) {
+      const { accesos, conexiones } = this.extractNavPathPoints(path);
+
+      for (const [name, pos] of Object.entries(conexiones)) {
+        if (name.trim().toLowerCase() === targetLower || name.trim().toLowerCase().includes(targetLower)) {
+          return { path, pointName: name, position: pos };
+        }
+      }
+
+      for (const [name, pos] of Object.entries(accesos)) {
+        if (name.trim().toLowerCase() === targetLower || name.trim().toLowerCase().includes(targetLower)) {
+          return { path, pointName: name, position: pos };
+        }
+      }
+    }
+
+    return null;
+  }
+
   static toGraph(navigationPathDocs) {
     const graph = new Graph();
     if (!Array.isArray(navigationPathDocs)) return graph;

@@ -1,12 +1,12 @@
 const calcularRutaUseCase = require('../../../sistema_navegacion/application/use-cases/CalcularRutaUseCase');
 const generarVisualizacionRutaUseCase = require('../../../visualizacion_mapa/application/use-cases/GenerarVisualizacionRutaUseCase');
-const ApiResponse = require('../../presentation/view-models/ApiResponse');
+const navigationRepository = require('../../../sistema_navegacion/infrastructure/repositories/FirestoreNavigationRepository');
 
 class NavegacionController {
   /**
    * Endpoint: GET /navegacion/ruta?origen=...&destino=...&piso=...&edificio=...
    */
-  static async calcularRuta(req, res) {
+  static async calcularRuta(req, res, next) {
     try {
       const { origen, destino, piso, edificio } = req.query;
 
@@ -37,14 +37,14 @@ class NavegacionController {
         visualizacion,
       });
     } catch (error) {
-      res.status(500).json({ error: 'Error al calcular la ruta de navegación: ' + error.message });
+      next(error);
     }
   }
 
   /**
    * Retrocompatibilidad con GET /ruta/:destino
    */
-  static async obtenerRutaHaciaDestino(req, res) {
+  static async obtenerRutaHaciaDestino(req, res, next) {
     try {
       const destino = req.params.destino;
       const { origen, startName, edificio, piso } = req.query;
@@ -61,7 +61,46 @@ class NavegacionController {
 
       res.json(ruta);
     } catch (error) {
-      res.status(500).json({ error: 'Error al calcular la ruta: ' + error.message });
+      next(error);
+    }
+  }
+
+  /**
+   * Endpoint: GET /navigation-paths
+   */
+  static async listarNavigationPaths(req, res, next) {
+    try {
+      const paths = await navigationRepository.obtenerTodosLosPaths();
+      res.json(paths);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Endpoint: GET /navigation-paths/piso/:piso
+   */
+  static async obtenerNavigationPathPorPiso(req, res, next) {
+    try {
+      const path = await navigationRepository.obtenerPathPorPiso(req.params.piso);
+      if (!path) {
+        return res.status(404).json({ error: 'No hay navigation-path para ese piso' });
+      }
+      res.json(path);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Endpoint: GET /rutas
+   */
+  static async listarRutasAntiguas(req, res, next) {
+    try {
+      const rutas = await navigationRepository.obtenerRutasAntiguas();
+      res.json(rutas);
+    } catch (error) {
+      next(error);
     }
   }
 }

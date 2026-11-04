@@ -1,13 +1,15 @@
 const { db } = require('../../../../shared/infrastructure/firebase/firebaseAdmin');
 const { withCache, invalidate } = require('../../../../shared/infrastructure/cache/MemoryCacheAdapter');
-const { getFieldCI } = require('../helpers/firestoreHelpers');
 const IEdificioRepository = require('../../domain/ports/IEdificioRepository');
+const EdificioDocumentMapper = require('../mappers/EdificioDocumentMapper');
 
 class FirestoreEdificioRepository extends IEdificioRepository {
   async obtenerTodos() {
     return withCache('edificios:todos', async () => {
       const snapshot = await db.collection('Edificios').get();
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs
+        .map((doc) => EdificioDocumentMapper.toDomain({ id: doc.id, ...doc.data() }))
+        .filter(Boolean);
     });
   }
 
@@ -17,26 +19,24 @@ class FirestoreEdificioRepository extends IEdificioRepository {
   }
 
   async obtenerPorNombre(nombre) {
+    if (!nombre) return null;
     const todos = await this.obtenerTodos();
     const nombreBuscado = nombre.trim().toLowerCase();
     return (
-      todos.find((e) => {
-        const n = getFieldCI(e, 'nombre');
-        return (n ?? '').toString().trim().toLowerCase() === nombreBuscado;
-      }) || null
+      todos.find((e) => (e.nombre || '').trim().toLowerCase() === nombreBuscado) || null
     );
   }
 
   async crear(datos) {
     const docRef = await db.collection('Edificios').add(datos);
     invalidate('edificios:todos');
-    return { id: docRef.id, ...datos };
+    return EdificioDocumentMapper.toDomain({ id: docRef.id, ...datos });
   }
 
   async actualizar(id, datos) {
     await db.collection('Edificios').doc(id).set(datos, { merge: true });
     invalidate('edificios:todos');
-    return { id, ...datos };
+    return EdificioDocumentMapper.toDomain({ id, ...datos });
   }
 
   async eliminar(id) {

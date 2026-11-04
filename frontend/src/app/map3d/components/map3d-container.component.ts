@@ -665,7 +665,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   async onDestinationSelected(destinationName: string): Promise<void> {
-    this.closeBuildingPrompt();
+    this.closeBuildingPrompt(false);
     this.selectedDestination = destinationName;
     this.clearNavSteps();
     const result = await this.mapNavService.calculateRoute(
@@ -1007,6 +1007,13 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
             this.navSteps = this.navSteps.map(s => ({ ...s, done: true, active: false }));
             this.cd.detectChanges();
           }, 400);
+          // Ocultar tarjetas, flechas y marcador tras mostrar brevemente el mensaje de llegada
+          setTimeout(() => {
+            this.clearNavSteps();
+            this.babylonSceneService.clearGuideArrows();
+            this.babylonSceneService.clearDestinationMarker();
+            this.cd.detectChanges();
+          }, 3500);
         }
       }
 
@@ -1338,7 +1345,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   public confirmEnterBuilding(): void {
     if (!this.pendingBuildingPrompt) return;
     const building = this.pendingBuildingPrompt.buildingId;
-    this.closeBuildingPrompt();
+    this.closeBuildingPrompt(false);
 
     if (building === 'A') {
       this.goToBuildingAFirstFloor();
@@ -1351,15 +1358,15 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     }
   }
 
-  public closeBuildingPrompt(): void {
+  public closeBuildingPrompt(restoreCamera = true): void {
     if (!this.pendingBuildingPrompt) return;
     this.pendingBuildingPrompt = null;
-    this.babylonSceneService.highlightBuildingInSede(null);
+    this.babylonSceneService.highlightBuildingInSede(null, restoreCamera);
     this.cd.detectChanges();
   }
 
   public selectBuilding(building: BuildingId): void {
-    this.closeBuildingPrompt();
+    this.closeBuildingPrompt(false);
     this.floorDialogVisible = false;
     if (building === 'A') {
       this.goToBuildingAFirstFloor();
@@ -2030,7 +2037,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   onBuildingSelected(building: BuildingId): void {
-    this.closeBuildingPrompt();
+    this.closeBuildingPrompt(false);
     if (building === 'B') {
       this.goToBuildingBFirstFloor();
     } else if (building === 'C') {

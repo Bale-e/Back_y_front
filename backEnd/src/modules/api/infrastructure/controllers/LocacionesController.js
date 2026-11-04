@@ -1,93 +1,83 @@
 const buscarLocacionUseCase = require('../../../gestion_espacios/application/use-cases/BuscarLocacionUseCase');
-const LocacionDocumentMapper = require('../../../gestion_espacios/infrastructure/mappers/LocacionDocumentMapper');
 
-// Normaliza un documento crudo (o un array de ellos) al DTO de respuesta
-function toDto(data) {
-  if (data == null) return null;
-  if (Array.isArray(data)) {
-    return data.map((item) => LocacionDocumentMapper.toResponseDto(LocacionDocumentMapper.toDomain(item)));
-  }
-  return LocacionDocumentMapper.toResponseDto(LocacionDocumentMapper.toDomain(data));
-}
-
-async function listarLocacionesDeEdificio(req, res) {
+async function listarLocacionesDeEdificio(req, res, next) {
   try {
     const data = await buscarLocacionUseCase.executePorEdificio(req.params.id);
-    res.json(toDto(data));
+    res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener locaciones: ' + error.message });
+    next(error);
   }
 }
 
-async function listarLocacionesPorPiso(req, res) {
+async function listarLocacionesPorPiso(req, res, next) {
   try {
     const data = await buscarLocacionUseCase.executePorPiso(req.params.id, req.params.piso);
-    res.json(toDto(data));
+    res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Error al filtrar por piso: ' + error.message });
+    next(error);
   }
 }
 
-async function listarLocacionesPorTipo(req, res) {
+async function listarLocacionesPorTipo(req, res, next) {
   try {
     const data = await buscarLocacionUseCase.executePorTipo(req.params.id, req.params.tipo);
-    res.json(toDto(data));
+    res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Error al filtrar por tipo: ' + error.message });
+    next(error);
   }
 }
 
-async function obtenerLocacionPorNombreEnEdificio(req, res) {
+async function obtenerLocacionPorNombreEnEdificio(req, res, next) {
   try {
     const encontrada = await buscarLocacionUseCase.executePorNombreEnEdificio(req.params.id, req.params.nombre);
     if (!encontrada) {
       return res.status(404).json({ error: 'Locación no encontrada' });
     }
-    res.json(toDto(encontrada));
+    res.json(encontrada);
   } catch (error) {
-    res.status(500).json({ error: 'Error al buscar locación: ' + error.message });
+    next(error);
   }
 }
 
-async function buscarLocacionGlobal(req, res) {
+async function buscarLocacionGlobal(req, res, next) {
   try {
     const encontrada = await buscarLocacionUseCase.executeGlobal(req.params.nombre);
     if (!encontrada) {
-      return res.status(404).json({ error: 'Locación no encontrada en ningún edificio' });
+      return res.status(404).json({ error: `Locación '${req.params.nombre}' no encontrada` });
     }
-    res.json(toDto(encontrada));
+    res.json(encontrada);
   } catch (error) {
-    res.status(500).json({ error: 'Error al buscar locación por nombre: ' + error.message });
+    next(error);
   }
 }
 
-async function buscarLocacionesGlobalPorPiso(req, res) {
+async function buscarLocacionesGlobalPorPiso(req, res, next) {
   try {
     const data = await buscarLocacionUseCase.executeGlobalPorPiso(req.params.piso);
-    res.json(toDto(data));
+    res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Error al buscar locaciones por piso: ' + error.message });
+    next(error);
   }
 }
 
-async function buscarLocacionesGlobalPorTipo(req, res) {
+async function buscarLocacionesGlobalPorTipo(req, res, next) {
   try {
     const data = await buscarLocacionUseCase.executeGlobalPorTipo(req.params.tipo);
-    res.json(toDto(data));
+    res.json(data);
   } catch (error) {
-    res.status(500).json({ error: 'Error al buscar locaciones por tipo: ' + error.message });
+    next(error);
   }
 }
 
-async function buscarLocacionesGlobalPorCuerpo(req, res) {
+async function buscarLocacionesGlobalPorCuerpo(req, res, next) {
   try {
     const encontrada = await buscarLocacionUseCase.executeGlobalPorCuerpo(req.params.cuerpo);
     if (!encontrada) {
-      return res.status(404).json({ error: 'Locación no encontrada para el cuerpo especificado' });
+      return res.status(404).json({ error: `No se encontró locación para el cuerpo '${req.params.cuerpo}'` });
     }
-    res.json(toDto(encontrada));   // 👈 fix aplicado aquí
+    res.json(encontrada);
   } catch (error) {
-    res.status(500).json({ error: 'Error al buscar locación por cuerpo: ' + error.message });
+    next(error);
   }
 }
 
