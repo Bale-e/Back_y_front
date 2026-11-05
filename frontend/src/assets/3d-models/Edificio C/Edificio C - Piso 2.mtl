@@ -1,9 +1,8 @@
-#
-## Alias OBJ Material File
-# Exported from SketchUp, (c) 2000-2012 Trimble Navigation Limited
-
-newmtl FrontColor
-Ka 0.000000 0.000000 0.000000
-Kd 1.000000 1.000000 1.000000
-Ks 0.330000 0.330000 0.330000
-
+# Entire floor: Verde
+newmtl Piso_2_Verde
+Ka 0 0 0
+Kd 0.549019607843 0.741176470588 0.521568627451
+Ks 0.03 0.03 0.03
+Ns 8
+d 1
+illum 2
