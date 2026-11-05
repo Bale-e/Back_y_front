@@ -1,5 +1,6 @@
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output } from '@angular/core';
-import { BuildingId } from '../../../core/models/navegacion.model';
+import { BuildingDefinition, BuildingId, FloorDefinition } from '../../../core/models/navegacion.model';
+import { BuildingRegistryService } from '../../../core/services/building-registry.service';
 
 @Component({
   selector: 'app-floor-selector',
@@ -15,21 +16,20 @@ export class FloorSelectorComponent {
   isDialogVisible = false;
   private ignoreNextDocClick = false;
 
-  constructor(private elementRef: ElementRef) {}
+  constructor(
+    private elementRef: ElementRef,
+    public buildingRegistry: BuildingRegistryService
+  ) {}
 
-  /** Cierra el menú al hacer clic en cualquier lugar fuera de este componente */
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    if (this.ignoreNextDocClick) {
-      return;
-    }
-    if (this.isDialogVisible && !this.elementRef.nativeElement.contains(event.target)) {
-      this.isDialogVisible = false;
-    }
+  get availableFloors(): FloorDefinition[] {
+    return this.buildingRegistry.getFloorsForBuilding(this.currentBuilding);
+  }
+
+  get availableBuildings(): BuildingDefinition[] {
+    return this.buildingRegistry.getNavigableBuildings();
   }
 
   get floorActionIcon(): string {
-    if (this.currentBuilding === 'S') return '🏢';
     return '🏢';
   }
 
@@ -55,13 +55,29 @@ export class FloorSelectorComponent {
     this.isDialogVisible = false;
   }
 
-  selectFloor(floorKey: 'first' | 'second' | 'third'): void {
+  selectFloor(floorKey: string): void {
     this.floorSelected.emit(floorKey);
+    this.closeDialog();
+  }
+
+  selectFloorNumber(floorNumber: number): void {
+    const key = floorNumber === 1 ? 'first' : (floorNumber === 2 ? 'second' : (floorNumber === 3 ? 'third' : `floor_${floorNumber}`));
+    this.floorSelected.emit(key);
     this.closeDialog();
   }
 
   selectBuilding(building: BuildingId): void {
     this.buildingSelected.emit(building);
     this.closeDialog();
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.ignoreNextDocClick) {
+      return;
+    }
+    if (this.isDialogVisible && !this.elementRef.nativeElement.contains(event.target)) {
+      this.isDialogVisible = false;
+    }
   }
 }

@@ -80,6 +80,43 @@ class NavigationPathDocumentMapper {
       }
     }
 
+    // 4. Compatibilidad con documentos con estructura plana de waypoints (Edificios B, C, D)
+    if (Object.keys(accesos).length === 0 && giros.length === 0) {
+      const excludedKeys = ['id', 'edificio', 'piso', '_coleccion', '_edificioid', '_edificionombre'];
+      const flatPoints = [];
+
+      for (const [key, val] of Object.entries(doc)) {
+        if (excludedKeys.includes(key.toLowerCase()) || !val || typeof val !== 'object') continue;
+        const pt = this.extractPoint(val);
+        if (pt) {
+          const ptJson = pt.toJSON();
+          flatPoints.push({ name: key, point: ptJson });
+          if (/entrada|acceso|conector|salida|inicio/i.test(key)) {
+            accesos[key] = ptJson;
+          } else {
+            conexiones[key] = ptJson;
+          }
+        }
+      }
+
+      if (flatPoints.length > 0) {
+        if (Object.keys(accesos).length === 0) {
+          accesos[flatPoints[0].name] = flatPoints[0].point;
+        }
+
+        // Ordenamiento genérico del pasillo según su eje dominante (Z o X)
+        const zSpread = Math.max(...flatPoints.map(p => p.point.z)) - Math.min(...flatPoints.map(p => p.point.z));
+        const xSpread = Math.max(...flatPoints.map(p => p.point.x)) - Math.min(...flatPoints.map(p => p.point.x));
+        if (zSpread >= xSpread) {
+          flatPoints.sort((a, b) => b.point.z - a.point.z);
+        } else {
+          flatPoints.sort((a, b) => a.point.x - b.point.x);
+        }
+
+        flatPoints.forEach(fp => giros.push(fp.point));
+      }
+    }
+
     return { accesos, giros, conexiones };
   }
 

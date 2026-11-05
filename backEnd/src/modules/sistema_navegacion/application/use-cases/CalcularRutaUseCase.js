@@ -125,6 +125,20 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
       return '';
     };
 
+    const getPathEdificio = (p) => {
+      if (!p) return '';
+      const raw = getFieldCI(p, 'edificio') || p.edificio || p.Edificio || '';
+      const str = raw.toString().trim().toLowerCase().replace(/\s+/g, '');
+      if (str) return str;
+      const idLower = (p.id || '').toLowerCase();
+      if (idLower.includes('edificioa') || idLower.includes('-a')) return 'a';
+      if (idLower.includes('edificiob') || idLower.includes('-b')) return 'b';
+      if (idLower.includes('edificioc') || idLower.includes('-c')) return 'c';
+      if (idLower.includes('edificiod') || idLower.includes('-d')) return 'd';
+      if (idLower.includes('edificioe') || idLower.includes('-e')) return 'e';
+      return '';
+    };
+
     const getLocFloor = (l) => {
       if (!l) return '';
       const raw = getFieldCI(l, 'piso') || l['Piso '] || l.Piso || l.piso || l._coleccion || '';
@@ -162,6 +176,12 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
     }
 
     if (!destPos) {
+      console.warn(`[CalcularRutaUseCase Diagnostic] ⚠️ DATOS FALTANTES EN FIRESTORE:
+  • Destino: '${destino}'
+  • Edificio: ${targetEdificio || 'Desconocido'} | Piso: ${targetFloor || 'Desconocido'}
+  • Causa: No se encontraron coordenadas 3D para esta sala en Firestore (aparecen vacías o null).
+  • Dónde agregarlo: En la colección 'Edificios/${targetEdificio || 'ID_EDIFICIO'}/Locaciones' (o la subcolección correspondiente del piso), agregar el campo 'Coordenadas 3D' con { x: number, y: number, z: number }.
+  • Efecto: No se puede calcular la ruta hasta que la sala tenga coordenadas asignadas.`);
       return null;
     }
 
@@ -174,7 +194,7 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
       if (targetFloor) {
         endPath = allPaths.find((path) => {
           const pf = getPathFloor(path);
-          const ed = normEd(getFieldCI(path, 'edificio'));
+          const ed = getPathEdificio(path);
           const pisoMatch = pf && targetFloor && (pf.includes(targetFloor) || targetFloor.includes(pf));
           const edMatch = !targetEdificio || !ed || ed.includes(targetEdificio) || targetEdificio.includes(ed);
           return pisoMatch && edMatch;
@@ -182,11 +202,20 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
       }
       if (!endPath && targetEdificio) {
         endPath = allPaths.find((path) => {
-          const ed = normEd(getFieldCI(path, 'edificio'));
+          const ed = getPathEdificio(path);
           return ed && (ed.includes(targetEdificio) || targetEdificio.includes(ed));
         });
       }
       if (!endPath) {
+        console.warn(`[CalcularRutaUseCase Diagnostic] ⚠️ DATOS FALTANTES EN FIRESTORE:
+  • Documento no encontrado: 'navigation-paths/NavPathEdificio${(targetEdificio || 'X').toUpperCase()}-${targetFloor || 'Piso1'}'
+  • Causa: No existe el documento de navegación para el piso solicitado en la colección 'navigation-paths' de Firestore.
+  • Dónde agregarlo: Crear el documento 'NavPathEdificio${(targetEdificio || 'X').toUpperCase()}-${targetFloor || 'Piso1'}' con:
+      - Edificio: '${(targetEdificio || '').toUpperCase()}'
+      - Piso: '${targetFloor || 'Piso 1'}'
+      - Accesos: { EntradaPrincipal: { x, y, z }, Escalera: { x, y, z } }
+      - Giros: [ { x, y, z }, ... ] (coordenadas de la línea central del pasillo)
+  • Fallback: Se aplicó estimación de pasillo predeterminado.`);
         if (targetEdificio === 'b' || targetEdificio.includes('b')) {
           const floorNum = targetFloor.replace(/\D/g, '') || '1';
           const targetY = floorNum === '3' ? 0.86 : (floorNum === '2' ? 0.41 : 0.05);
@@ -213,14 +242,33 @@ class CalcularRutaUseCase extends ICalcularRutaUseCase {
             edificio: 'C',
             piso: `Piso ${floorNum}`,
             Accesos: {
-              EntradaPrincipal: { x: 0.30, y: targetY, z: 9.68 },
-              Escalera: { x: 0.30, y: targetY, z: 8.00 },
+              EntradaPrincipal: { x: 4.60, y: targetY, z: 10.00 },
+              Escalera: { x: -2.20, y: targetY, z: 9.70 },
             },
             Giros: [
-              { x: 0.30, y: targetY, z: 11.00 },
-              { x: 0.30, y: targetY, z: 8.00 },
-              { x: 0.30, y: targetY, z: 0.00 },
-              { x: 0.30, y: targetY, z: -7.00 },
+              { x: 4.60, y: targetY, z: 10.00 },
+              { x: 1.30, y: targetY, z: 9.90 },
+              { x: -2.20, y: targetY, z: 9.70 },
+              { x: -2.40, y: targetY, z: 6.30 },
+              { x: -2.40, y: targetY, z: -2.20 },
+            ],
+          };
+        } else if (targetEdificio === 'd' || targetEdificio.includes('d')) {
+          const floorNum = targetFloor.replace(/\D/g, '') || '1';
+          const targetY = floorNum === '2' ? 0.41 : 0.05;
+          endPath = {
+            id: `NavPathEdificioD-Piso${floorNum}`,
+            edificio: 'D',
+            piso: `Piso ${floorNum}`,
+            Accesos: {
+              InicioPasilloD: { x: -0.10, y: targetY, z: 11.10 },
+              Escalera: { x: -1.00, y: targetY, z: 7.30 },
+            },
+            Giros: [
+              { x: -0.10, y: targetY, z: 11.10 },
+              { x: -0.05, y: targetY, z: 7.30 },
+              { x: -0.03, y: targetY, z: 0.40 },
+              { x: -0.02, y: targetY, z: -11.20 },
             ],
           };
         } else {

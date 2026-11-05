@@ -3,6 +3,7 @@ import * as BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
 import { dibujarFlechaGuia } from './guide-arrow.service';
 import { BuildingId } from '../../core/models/navegacion.model';
+import { BuildingRegistryService } from '../../core/services/building-registry.service';
 
 export interface ScreenMarker {
   id: string;
@@ -10,7 +11,7 @@ export interface ScreenMarker {
   x: number;
   y: number;
   visible: boolean;
-  type: 'building-b' | 'building-a' | 'building-c' | 'building-d' | 'sede';
+  type: string;
   data?: any;
 }
 
@@ -55,7 +56,7 @@ export class BabylonSceneService implements OnDestroy {
   private cartoGround: BABYLON.Mesh | null = null;
   private cartoTexture: BABYLON.DynamicTexture | null = null;
 
-  constructor(private ngZone: NgZone) {}
+  constructor(private ngZone: NgZone, private buildingRegistry: BuildingRegistryService) {}
 
   public initScene(
     canvasContainer: HTMLDivElement,
@@ -296,9 +297,9 @@ export class BabylonSceneService implements OnDestroy {
 
     const groundMat = new BABYLON.StandardMaterial('cartoGroundMat', this.scene);
     groundMat.diffuseTexture = dt;
-    groundMat.specularColor = new BABYLON.Color3(0, 0, 0);
+    groundMat.specularColor = new BABYLON.Color3(0.02, 0.02, 0.02);
     groundMat.emissiveColor = new BABYLON.Color3(0, 0, 0);
-    groundMat.ambientColor = new BABYLON.Color3(0, 0, 0);
+    groundMat.ambientColor = new BABYLON.Color3(0.06, 0.06, 0.06);
     groundMat.backFaceCulling = false;
 
     ground.material = groundMat;
@@ -377,13 +378,13 @@ export class BabylonSceneService implements OnDestroy {
    * Dibuja la planimetría urbana vectorial sobre el DynamicTexture con estilo arquitectónico / tótem.
    */
   private drawCartographicMap(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-    // ── 1. Fondo base de suelo: Pavimento arquitectónico urbano templado (#545b67) ──
-    ctx.fillStyle = '#545b67';
+    // ── 1. Fondo base de suelo: Mismo gris del suelo del modelo de la sede (#70757d / Color3(0.44, 0.46, 0.49)) ──
+    ctx.fillStyle = '#70757d';
     ctx.fillRect(0, 0, w, h);
 
     // Losas y paños alternados de pavimento / adoquines de hormigón urbano gris
     const slabWidth = 64;
-    ctx.fillStyle = '#4d535f';
+    ctx.fillStyle = '#686d75';
     for (let x = 0; x < w; x += slabWidth * 2) {
       ctx.fillRect(x, 0, slabWidth, h);
     }
@@ -736,6 +737,7 @@ export class BabylonSceneService implements OnDestroy {
     B: new BABYLON.Vector3(31.9, 6.4, 46.1),
     C: new BABYLON.Vector3(-16.3, 5.1, 54.1),
     D: new BABYLON.Vector3(-41.8, 3.1, 61.5),
+    E: new BABYLON.Vector3(-55.0, 3.1, 30.0),
     S: new BABYLON.Vector3(0, 0, 0)
   };
 
@@ -749,6 +751,7 @@ export class BabylonSceneService implements OnDestroy {
       if (/^B$/i.test(buildingGroup)) return 'B';
       if (/^C$/i.test(buildingGroup)) return 'C';
       if (/^D$/i.test(buildingGroup)) return 'D';
+      if (/^E$/i.test(buildingGroup)) return 'E';
     }
     if (!meshName) return null;
     const normalized = meshName.replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -816,6 +819,17 @@ export class BabylonSceneService implements OnDestroy {
       return 'D';
     }
 
+    // Edificio E
+    if (
+      /^(?:e(?=[_\-\s]|_mm|$)|edificio[\s_\-]*e(?=[_\-\s]|$))/i.test(meshName) ||
+      normalized === 'e' ||
+      normalized.startsWith('emm') ||
+      normalized.includes('edificioe') ||
+      normalized.includes('e1')
+    ) {
+      return 'E';
+    }
+
     return null;
   }
 
@@ -833,7 +847,9 @@ export class BabylonSceneService implements OnDestroy {
           ? /^(?:c(?=[_\-\s]|_mm|$)|edificio[\s_\-]*c(?=[_\-\s]|$))|mesh168|group82|group81|group80|edificioc|c1/i
           : building === 'D'
             ? /^(?:d(?=[_\-\s]|_mm|$)|edificio[\s_\-]*d(?=[_\-\s]|$))|mesh65|group37|group36|group35|edificiod|d1/i
-            : /^$/;
+            : building === 'E'
+              ? /^(?:e(?=[_\-\s]|_mm|$)|edificio[\s_\-]*e(?=[_\-\s]|$))|edificioe|e1/i
+              : /^$/;
 
     return parentNode.getChildMeshes(false).filter(m => {
       const meta = (m.metadata as any)?.buildingGroup;
@@ -881,7 +897,9 @@ export class BabylonSceneService implements OnDestroy {
         ? new BABYLON.Color3(0.08, 0.75, 1.0) // Cian tecnológico
         : building === 'D'
           ? new BABYLON.Color3(0.85, 0.25, 0.85) // Violeta
-          : new BABYLON.Color3(0.15, 0.88, 0.45); // Verde esmeralda
+          : building === 'E'
+            ? new BABYLON.Color3(0.95, 0.75, 0.10) // Ámbar / Dorado
+            : new BABYLON.Color3(0.15, 0.88, 0.45); // Verde esmeralda
 
     // Capa de resplandor (HighlightLayer)
     if (!this.highlightLayer && this.scene) {
@@ -998,7 +1016,9 @@ export class BabylonSceneService implements OnDestroy {
           ? /^(?:c(?=[_\-\s]|_mm|$)|edificio[\s_\-]*c(?=[_\-\s]|$))|mesh168|group82|group81|group80|edificioc|c1/i
           : building === 'D'
             ? /^(?:d(?=[_\-\s]|_mm|$)|edificio[\s_\-]*d(?=[_\-\s]|$))|mesh65|group37|group36|group35|edificiod|d1/i
-            : /^$/;
+            : building === 'E'
+              ? /^(?:e(?=[_\-\s]|_mm|$)|edificio[\s_\-]*e(?=[_\-\s]|$))|edificioe|e1/i
+              : /^$/;
 
     const bMeshes = this.getBuildingMeshesInSede(building, sedeRoot || undefined);
     if (bMeshes.length > 0) {
@@ -1260,20 +1280,14 @@ export class BabylonSceneService implements OnDestroy {
   private async buildModelRoot(modelName: string, buildingId: BuildingId): Promise<BABYLON.TransformNode | null> {
     if (!this.scene) return null;
 
-    const isSede      = this.isSedeModelName(modelName, buildingId);
-    const isBuildingB = buildingId === 'B' || modelName.includes('Edificio B');
-    const isBuildingC = buildingId === 'C' || modelName.includes('Edificio C');
-    const isBuildingD = buildingId === 'D' || modelName.includes('Edificio D');
+    const isSede = this.isSedeModelName(modelName, buildingId);
+    const bldDef = this.buildingRegistry.getBuilding(buildingId);
+    const floorDef = this.buildingRegistry.getFloor(buildingId, modelName);
 
-    const rootUrl = isSede
-      ? '/assets/3d-models/sede/'
-      : isBuildingB
-        ? '/assets/3d-models/Edificio B/'
-        : isBuildingC
-          ? '/assets/3d-models/Edificio C/'
-          : isBuildingD
-            ? '/assets/3d-models/Edificio D/'
-            : '/assets/3d-models/Edificio A/';
+    let rootUrl = floorDef?.modelDir;
+    if (!rootUrl || rootUrl === '/assets/3d-models/') {
+      rootUrl = isSede ? '/assets/3d-models/sede/' : `/assets/3d-models/Edificio ${buildingId}/`;
+    }
 
     let result: BABYLON.ISceneLoaderAsyncResult;
     try {
@@ -1292,12 +1306,15 @@ export class BabylonSceneService implements OnDestroy {
 
     const allNodes = new BABYLON.TransformNode('modelRoot', this.scene);
 
-    allNodes.rotation = (isSede || isBuildingC || isBuildingD)
-      ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
-      : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
-
-    if (isBuildingB) {
-      allNodes.scaling = new BABYLON.Vector3(1.2, 1.2, 1.2);
+    if (bldDef) {
+      allNodes.rotation = new BABYLON.Vector3(bldDef.rotation.x, bldDef.rotation.y, bldDef.rotation.z);
+      if (bldDef.scale) {
+        allNodes.scaling = new BABYLON.Vector3(bldDef.scale.x, bldDef.scale.y, bldDef.scale.z);
+      }
+    } else {
+      allNodes.rotation = isSede
+        ? new BABYLON.Vector3(0, -Math.PI / 2, 0)
+        : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
     }
 
     let currentGroupName = '';
@@ -1366,8 +1383,8 @@ export class BabylonSceneService implements OnDestroy {
       if (material) {
         const matName = (material.name || '').toLowerCase();
         // Garantizar que todo el suelo del nivel 1 (interiores, exteriores, canchas y patios) sea gris pavimento diurno equilibrado
-        if (isSede && (matName.includes('piso_interior') || matName.includes('pavimento_exterior') || matName.includes('hormigon'))) {
-          material.diffuseColor = new BABYLON.Color3(0.46, 0.48, 0.51); // Gris pavimento nivel 1
+        if (isSede && (matName.includes('piso') || matName.includes('suelo') || matName.includes('pavimento') || matName.includes('hormigon'))) {
+          material.diffuseColor = new BABYLON.Color3(0.44, 0.46, 0.49); // Mismo gris pavimento sede
         }
         if (isSede && (matName.includes('cancha_azul') || matName.includes('cancha_coral'))) {
           material.diffuseColor = new BABYLON.Color3(0.40, 0.42, 0.45); // Gris pavimento deportivo
@@ -1468,13 +1485,13 @@ export class BabylonSceneService implements OnDestroy {
     this.setUrbanContextVisible(isSede);
 
     // ── Transición especial hacia la SEDE (Zoom-out desde el edificio de origen) ──
-    if (isSede && !wasSede && (prevBuilding === 'A' || prevBuilding === 'B' || prevBuilding === 'C' || prevBuilding === 'D')) {
+    if (isSede && !wasSede && (prevBuilding === 'A' || prevBuilding === 'B' || prevBuilding === 'C' || prevBuilding === 'D' || prevBuilding === 'E')) {
       await this.animateTransitionToSede(outgoingRoot, incomingRoot, prevBuilding);
       return;
     }
 
     // ── Transición especial desde la SEDE hacia un edificio (Zoom-in hacia el pasillo) ──
-    if (wasSede && !isSede && (buildingId === 'A' || buildingId === 'B' || buildingId === 'C' || buildingId === 'D')) {
+    if (wasSede && !isSede && (buildingId === 'A' || buildingId === 'B' || buildingId === 'C' || buildingId === 'D' || buildingId === 'E')) {
       await this.animateTransitionFromSede(outgoingRoot, incomingRoot, buildingId);
       return;
     }
@@ -1782,6 +1799,19 @@ export class BabylonSceneService implements OnDestroy {
           type: 'building-d'
         });
       }
+    }
+
+    // Marcador Sede (desde Edificio E)
+    if (this.currentBuilding === 'E') {
+      const proj = projectWorldPointOnGround(0, 0);
+      markers.push({
+        id: 'marker-sede',
+        label: '→ al mapa principal',
+        x: proj.x,
+        y: proj.y,
+        visible: proj.visible,
+        type: 'sede'
+      });
     }
 
     // Marcador Sede y Edificio C (desde Edificio D)

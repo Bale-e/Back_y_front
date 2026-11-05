@@ -8,19 +8,18 @@
     <ng-container *ngIf="currentBuilding !== 'S'; else selectBuildingTpl">
       <p class="dialog-title">¿A qué piso quieres ir?</p>
       <div class="floor-action__dialog-buttons">
-        <button type="button" (click)="selectFloor('first')">Primer piso</button>
-        <button type="button" (click)="selectFloor('second')">Segundo piso</button>
-        <button *ngIf="currentBuilding !== 'C' && currentBuilding !== 'D'" type="button" (click)="selectFloor('third')">Tercer piso</button>
+        <button *ngFor="let floor of availableFloors" type="button" (click)="selectFloorNumber(floor.number)">
+          {{ floor.label }}
+        </button>
         <button type="button" (click)="selectBuilding('S')">🏛️ Mapa principal</button>
       </div>
     </ng-container>
     <ng-template #selectBuildingTpl>
       <p class="dialog-title">Seleccionar Edificio</p>
       <div class="floor-action__dialog-buttons">
-        <button type="button" (click)="selectBuilding('A')">Edificio A</button>
-        <button type="button" (click)="selectBuilding('B')">Edificio B</button>
-        <button type="button" (click)="selectBuilding('C')">Edificio C</button>
-        <button type="button" (click)="selectBuilding('D')">Edificio D</button>
+        <button *ngFor="let bld of availableBuildings" type="button" (click)="selectBuilding(bld.id)">
+          {{ bld.name }}
+        </button>
       </div>
     </ng-template>
     <button class="floor-action__dialog-close" type="button" (click)="closeDialog()">Cancelar</button>
