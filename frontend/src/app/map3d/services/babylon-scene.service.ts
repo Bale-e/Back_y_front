@@ -1769,11 +1769,24 @@ export class BabylonSceneService implements OnDestroy {
         visible: proj.visible,
         type: 'sede'
       });
+
+      // Marcador Edificio D (desde Edificio C Piso 1)
+      if (this.currentFloorModel.includes('Piso 1')) {
+        const projD = projectWorldPointOnGround(-3.0816219995085463, -5.523080245355527);
+        markers.push({
+          id: 'marker-building-d',
+          label: '→ Ir al Edificio D',
+          x: projD.x,
+          y: projD.y,
+          visible: projD.visible,
+          type: 'building-d'
+        });
+      }
     }
 
-    // Marcador Sede (desde Edificio D)
+    // Marcador Sede y Edificio C (desde Edificio D)
     if (this.currentBuilding === 'D') {
-      const proj = projectWorldPointOnGround(0, 0);
+      const proj = projectWorldPointOnGround(-0.11450809982627064, -11.112192515863468);
       markers.push({
         id: 'marker-sede',
         label: '→ al mapa principal',
@@ -1782,6 +1795,19 @@ export class BabylonSceneService implements OnDestroy {
         visible: proj.visible,
         type: 'sede'
       });
+
+      // Marcador Edificio C (desde Edificio D Piso 1)
+      if (/piso\s*1/i.test(this.currentFloorModel)) {
+        const projC = projectWorldPointOnGround(-0.11572859910553213, 10.9685030423099);
+        markers.push({
+          id: 'marker-building-c',
+          label: '→ Ir al Edificio C',
+          x: projC.x,
+          y: projC.y,
+          visible: projC.visible,
+          type: 'building-c'
+        });
+      }
     }
 
     this.onMarkersUpdatedCb(markers);
