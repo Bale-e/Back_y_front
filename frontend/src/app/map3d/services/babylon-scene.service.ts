@@ -2,6 +2,7 @@ import { Injectable, NgZone, OnDestroy } from '@angular/core';
 import * as BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
 import { dibujarFlechaGuia } from './guide-arrow.service';
+import { InacapitoGuideService } from './inacapito-guide.service';
 import { BuildingId } from '../../core/models/navegacion.model';
 import { BuildingRegistryService } from '../../core/services/building-registry.service';
 
@@ -56,7 +57,11 @@ export class BabylonSceneService implements OnDestroy {
   private cartoGround: BABYLON.Mesh | null = null;
   private cartoTexture: BABYLON.DynamicTexture | null = null;
 
-  constructor(private ngZone: NgZone, private buildingRegistry: BuildingRegistryService) {}
+  constructor(
+    private ngZone: NgZone,
+    private buildingRegistry: BuildingRegistryService,
+    private inacapitoGuide: InacapitoGuideService
+  ) {}
 
   public initScene(
     canvasContainer: HTMLDivElement,
@@ -87,6 +92,7 @@ export class BabylonSceneService implements OnDestroy {
     this.setupLights();
     this.setupSkybox();
     this.setupUrbanContext();
+    this.inacapitoGuide.preloadModel(this.scene);
 
     this.scene.onPointerDown = (evt, pickResult) => {
       if (evt.button === 0 && pickResult.hit && pickResult.pickedMesh) {
@@ -1904,10 +1910,8 @@ export class BabylonSceneService implements OnDestroy {
   }
 
   /**
-   * Dibuja todos los segmentos de la ruta de una vez (sin animación automática).
-   * Los meshes de cada segmento se almacenan en routeSegmentMeshes para que
-   * showRouteStep() pueda mostrar/ocultar cada uno individualmente.
-   * El primer segmento se muestra visible; los demás comienzan ocultos.
+   * Configura la ruta de navegación en el mapa 3D y posiciona a Inacapito caminando.
+   * Reemplaza las flechas estáticas por el modelo 3D animado de Inacapito.
    * Llama a onSegmentDrawn con i=0 para activar la primera tarjeta de navegación.
    */
   private routeSegmentMeshes: BABYLON.AbstractMesh[][] = [];
@@ -1922,7 +1926,7 @@ export class BabylonSceneService implements OnDestroy {
       isLast: boolean
     ) => void
   ): Promise<void> {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>(async (resolve) => {
       if (!this.scene || points.length < 2) {
         resolve();
         return;
@@ -1933,7 +1937,6 @@ export class BabylonSceneService implements OnDestroy {
       }
 
       ++this.currentRouteAnimId;
-      const color = new BABYLON.Color3(0.95, 0.08, 0.08);
 
       // Nivelar altura Y al suelo del pasillo
       const corridorY = points[0].y;
@@ -1945,17 +1948,9 @@ export class BabylonSceneService implements OnDestroy {
       const worldPoints = this.insertElbowPoint(leveledPoints);
       const totalSegments = worldPoints.length - 1;
 
-      // Dibujar todos los segmentos de una vez, empezando solo el primero visible
-      for (let i = 0; i < totalSegments; i++) {
-        const worldFrom = worldPoints[i];
-        const worldTo   = worldPoints[i + 1];
-        const meshes = dibujarFlechaGuia(this.scene, worldFrom, worldTo, color);
-        this.routeSegmentMeshes.push(meshes);
-        this.guideArrowMeshes.push(...meshes);
-
-        // Ocultar todos; luego showRouteStep(0) mostrará el primero
-        meshes.forEach(m => { m.isVisible = false; });
-      }
+      // Configurar a Inacapito y la línea de ruta en el piso
+      const meshes = await this.inacapitoGuide.setupRoute(this.scene, worldPoints);
+      this.guideArrowMeshes.push(...meshes);
 
       // Mostrar el primer segmento y notificar callback
       this.showRouteStep(0, totalSegments, onSegmentDrawn);
@@ -1965,7 +1960,7 @@ export class BabylonSceneService implements OnDestroy {
   }
 
   /**
-   * Muestra únicamente el segmento indicado (por índice) y oculta los demás.
+   * Muestra el segmento indicado y anima a Inacapito caminando a lo largo de él.
    * Llama al callback de navegación para sincronizar la tarjeta activa.
    */
   public showRouteStep(
@@ -1978,33 +1973,13 @@ export class BabylonSceneService implements OnDestroy {
       isLast: boolean
     ) => void
   ): void {
-    const total = totalSegments ?? this.routeSegmentMeshes.length;
-    const clampedIdx = Math.max(0, Math.min(stepIndex, this.routeSegmentMeshes.length - 1));
-
-    this.routeSegmentMeshes.forEach((meshes, i) => {
-      meshes.forEach(m => { m.isVisible = (i === clampedIdx); });
-    });
-
-    if (onSegmentDrawn && this.routeSegmentMeshes.length > 0) {
-      const meshes = this.routeSegmentMeshes[clampedIdx];
-      if (meshes && meshes.length > 0) {
-        // Calcular midpoint del segmento activo
-        const pos0 = meshes[0].position;
-        const posLast = meshes[meshes.length - 1].position;
-        const midpoint = new BABYLON.Vector3(
-          (pos0.x + posLast.x) / 2,
-          (pos0.y + posLast.y) / 2,
-          (pos0.z + posLast.z) / 2
-        );
-        const isLast = clampedIdx + 1 >= total;
-        onSegmentDrawn(clampedIdx, total, midpoint, isLast);
-      }
-    }
+    const total = totalSegments ?? this.inacapitoGuide.getSegmentCount();
+    this.inacapitoGuide.goToStep(stepIndex, total, onSegmentDrawn);
   }
 
   /** Retorna el número de segmentos de la ruta actualmente cargada. */
   public getRouteSegmentCount(): number {
-    return this.routeSegmentMeshes.length;
+    return this.inacapitoGuide.getSegmentCount();
   }
 
   /**
@@ -2056,7 +2031,10 @@ export class BabylonSceneService implements OnDestroy {
   }
 
   public clearGuideArrows(): void {
-    this.guideArrowMeshes.forEach(mesh => mesh.dispose());
+    this.inacapitoGuide.clear();
+    this.guideArrowMeshes.forEach(mesh => {
+      if (!mesh.isDisposed()) mesh.dispose();
+    });
     this.guideArrowMeshes = [];
     this.routeSegmentMeshes = [];
   }
