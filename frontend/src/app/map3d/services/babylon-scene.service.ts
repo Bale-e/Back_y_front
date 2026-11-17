@@ -1510,7 +1510,9 @@ export class BabylonSceneService implements OnDestroy {
   public async loadModelWithTransition(
     modelName: string,
     building: BuildingId | boolean = 'A',
-    direction: 'up' | 'down' | 'left' | 'right' | 'lateral-right' | 'lateral-left' = 'up'
+    direction: 'up' | 'down' | 'left' | 'right' | 'lateral-right' | 'lateral-left' = 'up',
+    connectorOut?: { x: number; y: number; z: number },
+    connectorIn?: { x: number; y: number; z: number }
   ): Promise<void> {
     if (!this.scene) return;
 
@@ -1564,21 +1566,11 @@ export class BabylonSceneService implements OnDestroy {
       return;
     }
 
-    // ── Preparar animación en 3 etapas con proximidad clara ───────────────────
+    // ── Preparar animación: Unión por Punto de Conexión o Elevador Vertical ──
     const isLateral = direction === 'left' || direction === 'right' || direction === 'lateral-right' || direction === 'lateral-left';
-    const isSlideRight = direction === 'right' || direction === 'lateral-right';
 
     const OFFSET_Y = 26;
     const GAP_Y    = 4.2;
-
-    // Vector horizontal en pantalla (tangente XZ respecto a la rotación alpha de la cámara)
-    // Permite que la transición sea 100% horizontal en la perspectiva del usuario
-    const camAlpha = this.camera ? this.camera.alpha : Math.PI / 4;
-    const tangentX = Math.sin(camAlpha);
-    const tangentZ = -Math.cos(camAlpha);
-
-    const OFFSET_LAT = 36.0;
-    const GAP_LAT    = 5.5;
 
     const incomingBaseY = incomingRoot.position.y;
     const outgoingBaseY = outgoingRoot ? outgoingRoot.position.y : 0;
@@ -1587,37 +1579,64 @@ export class BabylonSceneService implements OnDestroy {
     const incomingBaseZ = incomingRoot.position.z;
     const outgoingBaseZ = outgoingRoot ? outgoingRoot.position.z : 0;
 
-    let incomingStartY: number, meetY: number, outgoingExitY: number;
-    let incomingStartX: number, meetX: number, outgoingExitX: number;
-    let incomingStartZ: number, meetZ: number, outgoingExitZ: number;
+    // Dirección física entre los edificios basada en el registro del campus
+    let dirX = 1;
+    let dirZ = 0;
 
     if (isLateral) {
-      incomingStartY = incomingBaseY;
-      meetY          = incomingBaseY;
-      outgoingExitY  = outgoingBaseY;
+      const bldPrev = this.buildingRegistry.getBuilding(prevBuilding);
+      const bldNext = this.buildingRegistry.getBuilding(buildingId);
 
-      const sign = isSlideRight ? 1 : -1;
+      if (bldPrev && bldNext && prevBuilding !== buildingId) {
+        const rawDx = bldNext.center.x - bldPrev.center.x;
+        const rawDz = bldNext.center.z - bldPrev.center.z;
+        const rawDist = Math.hypot(rawDx, rawDz);
+        if (rawDist > 1.0) {
+          dirX = rawDx / rawDist;
+          dirZ = rawDz / rawDist;
+        }
+      } else if (connectorOut && connectorIn) {
+        const rawDx = connectorOut.x - connectorIn.x;
+        const rawDz = connectorOut.z - connectorIn.z;
+        const rawDist = Math.hypot(rawDx, rawDz);
+        if (rawDist > 0.1) {
+          dirX = rawDx / rawDist;
+          dirZ = rawDz / rawDist;
+        }
+      } else {
+        const sign = (direction === 'right' || direction === 'lateral-right') ? 1 : -1;
+        dirX = sign;
+        dirZ = 0;
+      }
+    }
 
-      incomingStartX = incomingBaseX + sign * OFFSET_LAT * tangentX;
-      incomingStartZ = incomingBaseZ + sign * OFFSET_LAT * tangentZ;
+    // Separación física estricta entre centros de edificios para evitar cualquier solapamiento
+    // Cada edificio tiene un radio envolvente de ~13-14 unidades; con 36 unidades de separación
+    // los volúmenes 3D nunca se intersectan y se alinean limpiamente lado a lado.
+    const TARGET_SEPARATION = 36.0;
+    const EXTRA_APPROACH    = 24.0;
 
-      meetX          = outgoingBaseX + sign * GAP_LAT * tangentX;
-      meetZ          = outgoingBaseZ + sign * GAP_LAT * tangentZ;
+    // Posición acoplada al lado del edificio actual (sin superposición)
+    const dockX = incomingBaseX + dirX * TARGET_SEPARATION;
+    const dockZ = incomingBaseZ + dirZ * TARGET_SEPARATION;
 
-      outgoingExitX  = outgoingBaseX - sign * OFFSET_LAT * tangentX;
-      outgoingExitZ  = outgoingBaseZ - sign * OFFSET_LAT * tangentZ;
+    // Posición inicial exterior desde donde se desplaza el nuevo mapa hacia adentro
+    const startX = dockX + dirX * EXTRA_APPROACH;
+    const startZ = dockZ + dirZ * EXTRA_APPROACH;
 
-      incomingRoot.position.x = incomingStartX;
-      incomingRoot.position.z = incomingStartZ;
+    // Destino exterior hacia donde el nuevo modelo empuja al edificio saliente
+    const exitX = outgoingBaseX - dirX * (TARGET_SEPARATION + EXTRA_APPROACH);
+    const exitZ = outgoingBaseZ - dirZ * (TARGET_SEPARATION + EXTRA_APPROACH);
+
+    let incomingStartY = incomingBaseY;
+    let meetY = incomingBaseY;
+    let outgoingExitY = outgoingBaseY;
+
+    if (isLateral) {
+      incomingRoot.position.x = startX;
+      incomingRoot.position.z = startZ;
       incomingRoot.position.y = incomingBaseY;
     } else {
-      incomingStartX = incomingBaseX;
-      incomingStartZ = incomingBaseZ;
-      meetX          = incomingBaseX;
-      meetZ          = incomingBaseZ;
-      outgoingExitX  = outgoingBaseX;
-      outgoingExitZ  = outgoingBaseZ;
-
       incomingStartY = direction === 'up' ? incomingBaseY + OFFSET_Y : incomingBaseY - OFFSET_Y;
       meetY          = direction === 'up' ? outgoingBaseY + GAP_Y   : outgoingBaseY - GAP_Y;
       outgoingExitY  = direction === 'up' ? outgoingBaseY - OFFSET_Y : outgoingBaseY + OFFSET_Y;
@@ -1633,10 +1652,10 @@ export class BabylonSceneService implements OnDestroy {
 
     incomingMeshes.forEach(m => { m.visibility = 0; });
 
-    // ── Animación en 3 etapas (~2200ms total) ──────────────────────────────────
-    const DURATION_MS = 2200;
-    const P1 = 0.44; // fin de etapa 1 (~968ms)
-    const P2 = 0.64; // fin de etapa 2 (~1408ms, pausa de proximidad de ~440ms)
+    // ── Animación en 3 etapas: Deslizar desde fuera -> Encajar -> Desplazar modelo anterior ──
+    const DURATION_MS = 2400;
+    const P1 = 0.40; // fin de etapa 1 (~960ms): Deslizarse desde fuera y acoplarse lado a lado
+    const P2 = 0.48; // fin de etapa 2 (~1152ms, micro-pausa de contacto en el umbral)
 
     const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
     const easeInOutQuad = (t: number): number =>
@@ -1658,37 +1677,78 @@ export class BabylonSceneService implements OnDestroy {
         let incomingAlpha: number;
         let outgoingAlpha: number;
 
-        if (raw <= P1) {
-          const t = easeOutCubic(raw / P1);
-          incomingX     = isLateral ? incomingStartX + (meetX - incomingStartX) * t : incomingBaseX;
-          incomingZ     = isLateral ? incomingStartZ + (meetZ - incomingStartZ) * t : incomingBaseZ;
-          incomingY     = isLateral ? incomingBaseY : incomingStartY + (meetY - incomingStartY) * t;
-          outgoingX     = outgoingBaseX;
-          outgoingZ     = outgoingBaseZ;
-          outgoingY     = outgoingBaseY;
-          incomingAlpha = Math.min(1, t * 1.25);
-          outgoingAlpha = 1;
-        } else if (raw <= P2) {
-          incomingX     = isLateral ? meetX : incomingBaseX;
-          incomingZ     = isLateral ? meetZ : incomingBaseZ;
-          incomingY     = isLateral ? incomingBaseY : meetY;
-          outgoingX     = outgoingBaseX;
-          outgoingZ     = outgoingBaseZ;
-          outgoingY     = outgoingBaseY;
-          incomingAlpha = 1;
-          outgoingAlpha = 1;
-        } else {
-          const localProgress = (raw - P2) / (1 - P2);
-          const tExit         = easeInOutQuad(localProgress);
+        if (isLateral) {
+          if (raw <= P1) {
+            // Fase 1: Desplazarse desde fuera hacia el punto de conexión hasta encajar
+            const t = easeOutCubic(raw / P1);
+            incomingX     = startX + (dockX - startX) * t;
+            incomingZ     = startZ + (dockZ - startZ) * t;
+            incomingY     = incomingBaseY;
+            outgoingX     = outgoingBaseX;
+            outgoingZ     = outgoingBaseZ;
+            outgoingY     = outgoingBaseY;
+            incomingAlpha = Math.min(1, t * 2.2);
+            outgoingAlpha = 1;
+          } else if (raw <= P2) {
+            // Fase 2: Micro-pausa de encaje en el umbral
+            incomingX     = dockX;
+            incomingZ     = dockZ;
+            incomingY     = incomingBaseY;
+            outgoingX     = outgoingBaseX;
+            outgoingZ     = outgoingBaseZ;
+            outgoingY     = outgoingBaseY;
+            incomingAlpha = 1;
+            outgoingAlpha = 1;
+          } else {
+            // Fase 3: Desplazamiento simultáneo (el nuevo avanza al centro y empuja al anterior hacia afuera)
+            const localProgress = (raw - P2) / (1 - P2);
+            const tDisplace     = easeInOutQuad(localProgress);
 
-          incomingX     = isLateral ? meetX + (incomingBaseX - meetX) * localProgress : incomingBaseX;
-          incomingZ     = isLateral ? meetZ + (incomingBaseZ - meetZ) * localProgress : incomingBaseZ;
-          incomingY     = isLateral ? incomingBaseY : meetY + (incomingBaseY - meetY) * localProgress;
-          outgoingX     = isLateral ? outgoingBaseX + (outgoingExitX - outgoingBaseX) * tExit : outgoingBaseX;
-          outgoingZ     = isLateral ? outgoingBaseZ + (outgoingExitZ - outgoingBaseZ) * tExit : outgoingBaseZ;
-          outgoingY     = isLateral ? outgoingBaseY : outgoingBaseY + (outgoingExitY - outgoingBaseY) * tExit;
-          incomingAlpha = 1;
-          outgoingAlpha = Math.max(0, 1 - localProgress);
+            incomingX     = dockX + (incomingBaseX - dockX) * tDisplace;
+            incomingZ     = dockZ + (incomingBaseZ - dockZ) * tDisplace;
+            incomingY     = incomingBaseY;
+
+            outgoingX     = outgoingBaseX + (exitX - outgoingBaseX) * tDisplace;
+            outgoingZ     = outgoingBaseZ + (exitZ - outgoingBaseZ) * tDisplace;
+            outgoingY     = outgoingBaseY;
+
+            incomingAlpha = 1;
+            outgoingAlpha = Math.max(0, 1 - localProgress * 1.35);
+          }
+        } else {
+          // Transición vertical de pisos (mismo edificio)
+          if (raw <= P1) {
+            const t = easeOutCubic(raw / P1);
+            incomingX     = incomingBaseX;
+            incomingZ     = incomingBaseZ;
+            incomingY     = incomingStartY + (meetY - incomingStartY) * t;
+            outgoingX     = outgoingBaseX;
+            outgoingZ     = outgoingBaseZ;
+            outgoingY     = outgoingBaseY;
+            incomingAlpha = Math.min(1, t * 1.25);
+            outgoingAlpha = 1;
+          } else if (raw <= P2) {
+            incomingX     = incomingBaseX;
+            incomingZ     = incomingBaseZ;
+            incomingY     = meetY;
+            outgoingX     = outgoingBaseX;
+            outgoingZ     = outgoingBaseZ;
+            outgoingY     = outgoingBaseY;
+            incomingAlpha = 1;
+            outgoingAlpha = 1;
+          } else {
+            const localProgress = (raw - P2) / (1 - P2);
+            const tExit         = easeInOutQuad(localProgress);
+
+            incomingX     = incomingBaseX;
+            incomingZ     = incomingBaseZ;
+            incomingY     = meetY + (incomingBaseY - meetY) * localProgress;
+            outgoingX     = outgoingBaseX;
+            outgoingZ     = outgoingBaseZ;
+            outgoingY     = outgoingBaseY + (outgoingExitY - outgoingBaseY) * tExit;
+            incomingAlpha = 1;
+            outgoingAlpha = Math.max(0, 1 - localProgress);
+          }
         }
 
         if (incomingRoot && !incomingRoot.isDisposed()) {

@@ -10,10 +10,20 @@
       (searchCleared)="onSearchCleared()"
     ></app-map-search>
 
-    <!-- Cinta de trayectoria / Breadcrumb inter-edificio y multi-piso (Punto 2) -->
-    <div class="route-breadcrumb-ribbon" *ngIf="activeRouteBreadcrumb" (click)="$event.stopPropagation()">
-      <span class="breadcrumb-icon">🧭</span>
-      <span class="breadcrumb-text">{{ activeRouteBreadcrumb }}</span>
+    <!-- Indicador de Edificio y Piso actual (con color representativo de cada edificio) -->
+    <div
+      class="current-location-badge"
+      [ngClass]="'location-badge--' + currentBuilding.toLowerCase()"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="location-badge__building">
+        <span class="location-badge__icon">{{ getBuildingIcon() }}</span>
+        <span class="location-badge__name">{{ getBuildingDisplayName() }}</span>
+      </div>
+      <div class="location-badge__divider" *ngIf="currentBuilding !== 'S'"></div>
+      <div class="location-badge__floor" *ngIf="currentBuilding !== 'S'">
+        <span class="location-badge__floor-text">{{ getCurrentFloorLabel() }}</span>
+      </div>
     </div>
 
     <!-- Canvas para la escena BabylonJS -->

@@ -80,34 +80,56 @@ export class InacapitoGuideService {
 
     const createdMeshes: BABYLON.AbstractMesh[] = [];
 
-    // 1. Crear líneas del camino en el piso (tubos delgados y elegantes, sin conos gigantes)
+    // 1. Crear línea punteada y brillante del camino en el piso (guía visual destacada)
     const totalSegments = worldPoints.length - 1;
     for (let i = 0; i < totalSegments; i++) {
       const from = worldPoints[i];
       const to   = worldPoints[i + 1];
+      const segDist = BABYLON.Vector3.Distance(from, to);
+      if (segDist <= 0.05) continue;
 
-      const segmentPath = [from, to];
-      const tube = BABYLON.MeshBuilder.CreateTube(`inacapitoRouteTube_${i}`, {
-        path: segmentPath,
-        radius: 0.04,
-        tessellation: 8,
-        cap: BABYLON.Mesh.CAP_ALL,
-        updatable: false
-      }, scene);
+      const segDir = to.subtract(from).normalize();
+      const dashLength = 0.22;
+      const gapLength  = 0.14;
+      const stepDist   = dashLength + gapLength;
 
       const mat = new BABYLON.StandardMaterial(`inacapitoRouteMat_${i}`, scene);
-      mat.diffuseColor = ROUTE_LINE_COLOR;
-      mat.emissiveColor = ROUTE_LINE_COLOR;
-      mat.specularColor = BABYLON.Color3.Black();
-      mat.alpha = 0.85;
+      mat.diffuseColor  = new BABYLON.Color3(1.0, 0.15, 0.15); // Rojo INACAP
+      mat.emissiveColor = new BABYLON.Color3(1.0, 0.40, 0.40); // Resplandor brillante neón
+      mat.specularColor = new BABYLON.Color3(1.0, 0.85, 0.85);
+      mat.alpha = 0.95;
 
-      tube.material = mat;
-      tube.isPickable = false;
-      tube.checkCollisions = false;
-      tube.renderingGroupId = 1;
+      let currentDist = 0;
+      let dashIndex = 0;
 
-      this.groundLineMeshes.push(tube);
-      createdMeshes.push(tube);
+      while (currentDist < segDist) {
+        const dStart = currentDist;
+        const dEnd   = Math.min(currentDist + dashLength, segDist);
+
+        if (dEnd - dStart > 0.03) {
+          const p1 = from.add(segDir.scale(dStart));
+          const p2 = from.add(segDir.scale(dEnd));
+
+          const tube = BABYLON.MeshBuilder.CreateTube(`inacapitoRouteDash_${i}_${dashIndex}`, {
+            path: [p1, p2],
+            radius: 0.045, // grosor nítido y visible
+            tessellation: 8,
+            cap: BABYLON.Mesh.CAP_ALL,
+            updatable: false
+          }, scene);
+
+          tube.material = mat;
+          tube.isPickable = false;
+          tube.checkCollisions = false;
+          tube.renderingGroupId = 1;
+          tube.metadata = { segmentIndex: i };
+
+          this.groundLineMeshes.push(tube);
+          createdMeshes.push(tube);
+          dashIndex++;
+        }
+        currentDist += stepDist;
+      }
     }
 
     // 2. Cargar o instanciar a Inacapito
@@ -150,25 +172,45 @@ export class InacapitoGuideService {
       const scale = INACAPITO_DEFAULT_SCALE;
       rootNode.scaling = new BABYLON.Vector3(scale, scale, scale);
 
-      // Sombra/resplandor en los pies para que se vea perfectamente apoyado en el piso
-      const shadow = BABYLON.MeshBuilder.CreateDisc('inacapitoShadow', {
-        radius: 0.22,
-        tessellation: 24
+      // Círculo/aura guía rojo en los pies (proporcional al tamaño humano en la maqueta)
+      // Como rootNode tiene scaling = (22, 22, 22), 0.015 en local equivale a 0.33 unidades en mundo (diámetro 0.66)
+      const beacon = BABYLON.MeshBuilder.CreateDisc('inacapitoRedBeacon', {
+        radius: 0.015,
+        tessellation: 32
       }, scene);
-      shadow.rotation.x = Math.PI / 2;
-      shadow.position.y = 0.01;
-      shadow.parent = rootNode;
+      beacon.rotation.x = Math.PI / 2;
+      beacon.position.y = 0.0005;
+      beacon.parent = rootNode;
 
-      const shadowMat = new BABYLON.StandardMaterial('inacapitoShadowMat', scene);
-      shadowMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.12);
-      shadowMat.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.08);
-      shadowMat.specularColor = BABYLON.Color3.Black();
-      shadowMat.alpha = 0.45;
-      shadow.material = shadowMat;
-      shadow.isPickable = false;
-      shadow.renderingGroupId = 1;
-      this.shadowDisc = shadow;
-      createdMeshes.push(shadow);
+      const beaconMat = new BABYLON.StandardMaterial('inacapitoRedBeaconMat', scene);
+      beaconMat.diffuseColor  = new BABYLON.Color3(1.0, 0.12, 0.12);
+      beaconMat.emissiveColor = new BABYLON.Color3(0.95, 0.22, 0.22); // Rojo brillante
+      beaconMat.specularColor = new BABYLON.Color3(1.0, 0.7, 0.7);
+      beaconMat.alpha = 0.70;
+      beacon.material = beaconMat;
+      beacon.isPickable = false;
+      beacon.renderingGroupId = 1;
+      this.shadowDisc = beacon;
+      createdMeshes.push(beacon);
+
+      // Anillo exterior brillante que delimita el círculo rojo (diámetro 0.66 unidades en mundo)
+      const outerRing = BABYLON.MeshBuilder.CreateTorus('inacapitoOuterRing', {
+        diameter: 0.030,
+        thickness: 0.002,
+        tessellation: 32
+      }, scene);
+      outerRing.rotation.x = Math.PI / 2;
+      outerRing.position.y = 0.0006;
+      outerRing.parent = rootNode;
+
+      const ringMat = new BABYLON.StandardMaterial('inacapitoRingMat', scene);
+      ringMat.diffuseColor  = new BABYLON.Color3(1.0, 0.3, 0.3);
+      ringMat.emissiveColor = new BABYLON.Color3(1.0, 0.5, 0.5);
+      ringMat.alpha = 0.95;
+      outerRing.material = ringMat;
+      outerRing.isPickable = false;
+      outerRing.renderingGroupId = 1;
+      createdMeshes.push(outerRing);
 
       // Configurar animación de caminar
       if (entries.animationGroups.length > 0) {
@@ -216,10 +258,11 @@ export class InacapitoGuideService {
     const clampedIdx = Math.max(0, Math.min(stepIndex, this.currentWorldPoints.length - 2));
     const isLast = (stepIndex + 1) >= totalSegments;
 
-    // Resaltar el segmento activo en la línea del suelo
-    this.groundLineMeshes.forEach((mesh, idx) => {
+    // Resaltar el segmento activo en la línea del suelo punteada y brillante
+    this.groundLineMeshes.forEach((mesh) => {
+      const segIdx = (mesh.metadata as any)?.segmentIndex;
       if (mesh.material && mesh.material instanceof BABYLON.StandardMaterial) {
-        mesh.material.alpha = (idx === clampedIdx) ? 1.0 : 0.35;
+        mesh.material.alpha = (segIdx === clampedIdx) ? 1.0 : 0.38;
       }
     });
 

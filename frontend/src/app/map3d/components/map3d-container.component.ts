@@ -325,6 +325,8 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
           const isSede = currentBld === 'S' || floorModel.includes('Instituto3D') || floorModel === 'Instituto3D-color.obj';
 
           let direction: 'up' | 'down' | 'left' | 'right' | 'lateral-right' | 'lateral-left' = 'up';
+          let connectorOut: { x: number; y: number; z: number } | undefined;
+          let connectorIn: { x: number; y: number; z: number } | undefined;
 
           if (wasSede || isSede) {
             // Sede -> Edificio o Edificio -> Sede
@@ -337,12 +339,22 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
               currentBld,
               prevNum
             );
+            try {
+              const cOut = await this.mapNavService.findConnectorToBuilding(previousLoadedBuilding, currentBld, `Piso ${prevNum}`);
+              const cIn = await this.mapNavService.findConnectorToBuilding(currentBld, previousLoadedBuilding, `Piso ${nextNum}`);
+              if (cOut?.position && cIn?.position) {
+                connectorOut = { x: cOut.position.x, y: cOut.position.y, z: cOut.position.z };
+                connectorIn = { x: cIn.position.x, y: cIn.position.y, z: cIn.position.z };
+              }
+            } catch {
+              // Fallback automático integrado en babylonSceneService
+            }
           } else {
             // Mismo edificio, diferente piso: TRANSICIÓN VERTICAL
             direction = nextNum >= prevNum ? 'up' : 'down';
           }
 
-          await this.babylonSceneService.loadModelWithTransition(floorModel, currentBld, direction);
+          await this.babylonSceneService.loadModelWithTransition(floorModel, currentBld, direction, connectorOut, connectorIn);
         }
 
         this.cd.detectChanges();
@@ -365,6 +377,32 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
         this.goToBuildingSameFloor(match[1].toUpperCase() as BuildingId);
       }
     }
+  }
+
+  public getBuildingDisplayName(): string {
+    if (this.currentBuilding === 'S') return 'Sede Central INACAP';
+    const bld = this.buildingRegistry.getBuilding(this.currentBuilding);
+    return bld ? bld.name : `Edificio ${this.currentBuilding}`;
+  }
+
+  public getBuildingIcon(): string {
+    switch (this.currentBuilding) {
+      case 'A': return '🏛️';
+      case 'B': return '🏢';
+      case 'C': return '🔬';
+      case 'D': return '💻';
+      case 'E': return '📐';
+      case 'S': return '🎓';
+      default: return '📍';
+    }
+  }
+
+  public getCurrentFloorLabel(): string {
+    if (this.currentBuilding === 'S') return 'Campus General';
+    const floorDef = this.buildingRegistry.getFloor(this.currentBuilding, this.currentFloor);
+    if (floorDef?.label) return floorDef.label;
+    const m = (this.currentFloor || '').match(/piso\s*(\d)/i);
+    return m ? `Piso ${m[1]}` : 'Piso 1';
   }
 
   private getCurrentFloorNumber(): 'first' | 'second' | 'third' {
@@ -685,10 +723,17 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         this.mapNavService.setFloor(interFloorModel);
         this.cd.detectChanges();
 
+        const lastP = result.leg1Points[result.leg1Points.length - 1];
+        const firstP = result.leg2Points[0];
+        const connectorOut = lastP ? { x: lastP.x, y: lastP.y, z: lastP.z } : undefined;
+        const connectorIn = firstP ? { x: firstP.x, y: firstP.y, z: firstP.z } : undefined;
+
         await this.babylonSceneService.loadModelWithTransition(
           interFloorModel,
           interBuilding,
-          result.lateralDirection || 'right'
+          result.lateralDirection || 'right',
+          connectorOut,
+          connectorIn
         );
 
         if (result.needsFloorChangeInTarget && result.leg3Points) {
