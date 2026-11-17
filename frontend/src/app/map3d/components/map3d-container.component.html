@@ -10,6 +10,12 @@
       (searchCleared)="onSearchCleared()"
     ></app-map-search>
 
+    <!-- Cinta de trayectoria / Breadcrumb inter-edificio y multi-piso (Punto 2) -->
+    <div class="route-breadcrumb-ribbon" *ngIf="activeRouteBreadcrumb" (click)="$event.stopPropagation()">
+      <span class="breadcrumb-icon">🧭</span>
+      <span class="breadcrumb-text">{{ activeRouteBreadcrumb }}</span>
+    </div>
+
     <!-- Canvas para la escena BabylonJS -->
     <div #renderCanvas class="render-canvas"></div>
 
@@ -30,6 +36,22 @@
 
     <!-- Panel de tarjetas de navegación apiladas a la izquierda -->
     <div class="nav-steps-panel" *ngIf="navStepsVisible && navSteps.length > 0">
+      <!-- Stepper multi-tramo (Punto 2) -->
+      <div class="nav-route-stepper" *ngIf="multiLegStepperVisible && stepperSteps.length > 0">
+        <div class="stepper-track">
+          <ng-container *ngFor="let s of stepperSteps; let i = index; let last = last">
+            <div class="stepper-item" [class.is-active]="s.active" [class.is-done]="s.done">
+              <div class="stepper-dot">
+                <span *ngIf="!s.done">{{ s.number }}</span>
+                <span *ngIf="s.done" class="stepper-check">✓</span>
+              </div>
+              <span class="stepper-label">{{ s.label }}</span>
+            </div>
+            <div class="stepper-line" *ngIf="!last" [class.is-done]="s.done"></div>
+          </ng-container>
+        </div>
+      </div>
+
       <div class="nav-steps-header">
         <span class="nav-steps-title">🗺️ Indicaciones</span>
       </div>
@@ -83,6 +105,27 @@
       (floorSelected)="onFloorSelected($event)"
       (buildingSelected)="onBuildingSelected($event)"
     ></app-floor-selector>
+
+    <!-- Brújula interactiva / Compass HUD (Punto 2) -->
+    <div
+      class="compass-hud"
+      (click)="onCompassClick()"
+      title="Alinear vista al Norte"
+      aria-label="Brújula interactiva: Clic para alinear vista al Norte"
+    >
+      <div class="compass-dial" [style.transform]="'rotate(' + compassRotation + 'deg)'">
+        <span class="cardinal north">N</span>
+        <span class="cardinal east">E</span>
+        <span class="cardinal south">S</span>
+        <span class="cardinal west">O</span>
+        <div class="compass-needle">
+          <div class="needle-north"></div>
+          <div class="needle-south"></div>
+          <div class="needle-pivot"></div>
+        </div>
+      </div>
+      <span class="compass-badge">Norte</span>
+    </div>
 
     <!-- Controles flotantes de Zoom y Cámara -->
     <app-map-controls

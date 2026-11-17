@@ -26,6 +26,8 @@ export class BabylonSceneService implements OnDestroy {
   private modelRoot: BABYLON.TransformNode | null = null;
   private destinationMarker: BABYLON.TransformNode | BABYLON.Mesh | null = null;
   private guideArrowMeshes: BABYLON.AbstractMesh[] = [];
+  private portalMeshes: BABYLON.AbstractMesh[] = [];
+  private portalAnimObserver: BABYLON.Observer<BABYLON.Scene> | null = null;
   private currentRouteAnimId = 0;
 
   private currentBuilding: BuildingId = 'S';
@@ -875,6 +877,7 @@ export class BabylonSceneService implements OnDestroy {
     if (!building) {
       this.currentFocusedBuilding = null;
       this.clearBuildingHighlight();
+    this.clearAccessPortals();
       if (restoreCamera) {
         this.animateFocusOnBuildingInSede(null);
       } else {
@@ -889,6 +892,7 @@ export class BabylonSceneService implements OnDestroy {
 
     this.currentFocusedBuilding = building;
     this.clearBuildingHighlight();
+    this.clearAccessPortals();
     if (!this.modelRoot || !this.scene) return;
 
     const meshes = this.getBuildingMeshesInSede(building);
@@ -1052,6 +1056,7 @@ export class BabylonSceneService implements OnDestroy {
     this.buildingFocusAnimId++;
     this.currentFocusedBuilding = null;
     this.clearBuildingHighlight();
+    this.clearAccessPortals();
     if (!this.camera || !this.scene) {
       outgoingRoot?.dispose(false, true);
       return;
@@ -1136,6 +1141,7 @@ export class BabylonSceneService implements OnDestroy {
     this.buildingFocusAnimId++;
     this.currentFocusedBuilding = null;
     this.clearBuildingHighlight();
+    this.clearAccessPortals();
     if (!this.camera || !this.scene) {
       outgoingRoot?.dispose(false, true);
       return;
@@ -1145,53 +1151,102 @@ export class BabylonSceneService implements OnDestroy {
       ? this.getBuildingCenterInSede(outgoingRoot, targetBuilding)
       : (this.buildingCentersInSede[targetBuilding] || new BABYLON.Vector3(31.2, 11.6, 25.5));
 
+    const bldDef = this.buildingRegistry.getBuilding(targetBuilding);
+
     const incomingMeshes = incomingRoot.getChildMeshes(false);
     const outgoingMeshes = outgoingRoot ? outgoingRoot.getChildMeshes(false) : [];
 
+    // Ocultar mallas del nuevo piso al inicio
     incomingMeshes.forEach(m => { m.visibility = 0; });
     outgoingMeshes.forEach(m => { m.visibility = 1; });
-    this.setUrbanContextVisible(false);
+
+    // Destacar el edificio seleccionado en la maqueta de la Sede durante el vuelo de aproximación
+    const targetBuildingMeshes = this.getBuildingMeshesInSede(targetBuilding, outgoingRoot);
+    targetBuildingMeshes.forEach(m => {
+      m.renderOverlay = true;
+      m.overlayColor = new BABYLON.Color3(0.95, 0.45, 0.10);
+      m.overlayAlpha = 0.35;
+    });
 
     const startTarget = this.camera.target.clone();
+    const diveTarget  = buildingCenter.clone();
+    diveTarget.y      = Math.max(diveTarget.y, 2.0);
     const endTarget   = BABYLON.Vector3.Zero();
 
     const startRadius = this.camera.radius;
+    const diveRadius  = 26.0;
     const endRadius   = 36.4;
 
     const startAlpha = this.camera.alpha;
     const startBeta  = this.camera.beta;
-    const endAlpha   = Math.PI / 4;
+    const endAlpha   = bldDef?.cameraBaseAlpha ?? (Math.PI / 4);
     const endBeta    = Math.PI / 3;
+    const diveBeta   = Math.PI / 3.6;
 
-    const duration = 1200;
+    const incomingBaseScale = incomingRoot.scaling.clone();
+    const baseIncomingY = incomingRoot.position.y;
+
+    const duration = 1600;
+    const P_DIVE = 0.50; // Momento de llegada al edificio exterior e inicio de revelación interior
     const startTime = performance.now();
+
+    const easeInOutCubic = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const easeInOutQuad = (t: number) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
     await new Promise<void>(resolve => {
       const step = () => {
         const elapsed = performance.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
 
-        const eased = progress < 0.5
-          ? 4 * progress * progress * progress
-          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+        if (progress <= P_DIVE) {
+          // ── Fase 1: Vuelo aéreo directo hacia el edificio seleccionado en la Sede ──
+          const t = easeInOutCubic(progress / P_DIVE);
+          if (this.camera) {
+            this.camera.target = BABYLON.Vector3.Lerp(startTarget, diveTarget, t);
+            this.camera.radius = startRadius + (diveRadius - startRadius) * t;
+            this.camera.alpha  = startAlpha + (endAlpha - startAlpha) * t;
+            this.camera.beta   = startBeta + (diveBeta - startBeta) * t;
+            this.baseRadius    = this.camera.radius;
+          }
+          outgoingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = 1; });
+          incomingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = 0; });
+        } else {
+          // ── Fase 2: Inmersión en el edificio — la maqueta exterior se disuelve y revela el piso interior ──
+          const t = easeInOutQuad((progress - P_DIVE) / (1 - P_DIVE));
+          if (this.camera) {
+            this.camera.target = BABYLON.Vector3.Lerp(diveTarget, endTarget, t);
+            this.camera.radius = diveRadius + (endRadius - diveRadius) * t;
+            this.camera.beta   = diveBeta + (endBeta - diveBeta) * t;
+            this.baseRadius    = this.camera.radius;
+          }
 
-        if (this.camera) {
-          this.camera.target = BABYLON.Vector3.Lerp(startTarget, endTarget, eased);
-          this.camera.radius = startRadius + (endRadius - startRadius) * eased;
-          this.camera.alpha  = startAlpha + (endAlpha - startAlpha) * eased;
-          this.camera.beta   = startBeta + (endBeta - startBeta) * eased;
-          this.baseRadius    = this.camera.radius;
+          const outVis = Math.max(0, 1 - t * 1.35);
+          const inVis  = Math.min(1, t * 1.35);
+
+          outgoingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = outVis; });
+          incomingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = inVis; });
+
+          // Expansión suave del piso interior (0.88 -> 1.0) para dar la sensación física de entrar a él
+          const scaleFactor = 0.88 + 0.12 * t;
+          if (incomingRoot && !incomingRoot.isDisposed()) {
+            incomingRoot.scaling = new BABYLON.Vector3(
+              incomingBaseScale.x * scaleFactor,
+              incomingBaseScale.y * scaleFactor,
+              incomingBaseScale.z * scaleFactor
+            );
+          }
         }
-
-        const outVis = Math.max(0, 1 - progress * 1.5);
-        const inVis  = Math.min(1, progress * 1.3);
-        outgoingMeshes.forEach(m => { m.visibility = outVis; });
-        incomingMeshes.forEach(m => { m.visibility = inVis; });
 
         if (progress < 1) {
           requestAnimationFrame(step);
         } else {
-          incomingMeshes.forEach(m => { m.visibility = 1; });
+          targetBuildingMeshes.forEach(m => { if (!m.isDisposed()) m.renderOverlay = false; });
+          incomingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = 1; });
+          if (incomingRoot && !incomingRoot.isDisposed()) {
+            incomingRoot.scaling = incomingBaseScale.clone();
+            incomingRoot.position.y = baseIncomingY;
+          }
+          this.setUrbanContextVisible(false);
           outgoingRoot?.dispose(false, true);
           this.clearGuideArrows();
           if (this.camera) {
@@ -1223,6 +1278,7 @@ export class BabylonSceneService implements OnDestroy {
     this.currentFloorModel = modelName;
     this.currentBuilding = buildingId;
     this.clearBuildingHighlight();
+    this.clearAccessPortals();
 
     if (this.modelRoot) {
       this.modelRoot.dispose(false, true);
@@ -1263,6 +1319,11 @@ export class BabylonSceneService implements OnDestroy {
       } else {
         this.baseRadius = this.camera.radius;
       }
+    }
+
+    this.clearAccessPortals();
+    if (!isSedeCurrent) {
+      this.renderAccessPortals(buildingId, modelName);
     }
   }
 
@@ -1467,6 +1528,7 @@ export class BabylonSceneService implements OnDestroy {
     this.currentFloorModel = modelName;
     this.currentBuilding   = buildingId;
     this.clearBuildingHighlight();
+    this.clearAccessPortals();
 
     this.clearDestinationMarker();
 
@@ -1508,38 +1570,60 @@ export class BabylonSceneService implements OnDestroy {
 
     const OFFSET_Y = 26;
     const GAP_Y    = 4.2;
-    const OFFSET_X = 35;
-    const GAP_X    = 6.0;
+
+    // Vector horizontal en pantalla (tangente XZ respecto a la rotación alpha de la cámara)
+    // Permite que la transición sea 100% horizontal en la perspectiva del usuario
+    const camAlpha = this.camera ? this.camera.alpha : Math.PI / 4;
+    const tangentX = Math.sin(camAlpha);
+    const tangentZ = -Math.cos(camAlpha);
+
+    const OFFSET_LAT = 36.0;
+    const GAP_LAT    = 5.5;
 
     const incomingBaseY = incomingRoot.position.y;
     const outgoingBaseY = outgoingRoot ? outgoingRoot.position.y : 0;
     const incomingBaseX = incomingRoot.position.x;
     const outgoingBaseX = outgoingRoot ? outgoingRoot.position.x : 0;
+    const incomingBaseZ = incomingRoot.position.z;
+    const outgoingBaseZ = outgoingRoot ? outgoingRoot.position.z : 0;
 
     let incomingStartY: number, meetY: number, outgoingExitY: number;
     let incomingStartX: number, meetX: number, outgoingExitX: number;
+    let incomingStartZ: number, meetZ: number, outgoingExitZ: number;
 
     if (isLateral) {
       incomingStartY = incomingBaseY;
       meetY          = incomingBaseY;
       outgoingExitY  = outgoingBaseY;
 
-      incomingStartX = isSlideRight ? incomingBaseX + OFFSET_X : incomingBaseX - OFFSET_X;
-      meetX          = isSlideRight ? outgoingBaseX + GAP_X   : outgoingBaseX - GAP_X;
-      outgoingExitX  = isSlideRight ? outgoingBaseX - OFFSET_X : outgoingBaseX + OFFSET_X;
+      const sign = isSlideRight ? 1 : -1;
+
+      incomingStartX = incomingBaseX + sign * OFFSET_LAT * tangentX;
+      incomingStartZ = incomingBaseZ + sign * OFFSET_LAT * tangentZ;
+
+      meetX          = outgoingBaseX + sign * GAP_LAT * tangentX;
+      meetZ          = outgoingBaseZ + sign * GAP_LAT * tangentZ;
+
+      outgoingExitX  = outgoingBaseX - sign * OFFSET_LAT * tangentX;
+      outgoingExitZ  = outgoingBaseZ - sign * OFFSET_LAT * tangentZ;
 
       incomingRoot.position.x = incomingStartX;
+      incomingRoot.position.z = incomingStartZ;
       incomingRoot.position.y = incomingBaseY;
     } else {
       incomingStartX = incomingBaseX;
+      incomingStartZ = incomingBaseZ;
       meetX          = incomingBaseX;
+      meetZ          = incomingBaseZ;
       outgoingExitX  = outgoingBaseX;
+      outgoingExitZ  = outgoingBaseZ;
 
       incomingStartY = direction === 'up' ? incomingBaseY + OFFSET_Y : incomingBaseY - OFFSET_Y;
       meetY          = direction === 'up' ? outgoingBaseY + GAP_Y   : outgoingBaseY - GAP_Y;
       outgoingExitY  = direction === 'up' ? outgoingBaseY - OFFSET_Y : outgoingBaseY + OFFSET_Y;
 
       incomingRoot.position.x = incomingBaseX;
+      incomingRoot.position.z = incomingBaseZ;
       incomingRoot.position.y = incomingStartY;
     }
 
@@ -1566,7 +1650,9 @@ export class BabylonSceneService implements OnDestroy {
         const raw     = Math.min(elapsed / DURATION_MS, 1);
 
         let incomingX: number;
+        let incomingZ: number;
         let outgoingX: number;
+        let outgoingZ: number;
         let incomingY: number;
         let outgoingY: number;
         let incomingAlpha: number;
@@ -1575,15 +1661,19 @@ export class BabylonSceneService implements OnDestroy {
         if (raw <= P1) {
           const t = easeOutCubic(raw / P1);
           incomingX     = isLateral ? incomingStartX + (meetX - incomingStartX) * t : incomingBaseX;
+          incomingZ     = isLateral ? incomingStartZ + (meetZ - incomingStartZ) * t : incomingBaseZ;
           incomingY     = isLateral ? incomingBaseY : incomingStartY + (meetY - incomingStartY) * t;
           outgoingX     = outgoingBaseX;
+          outgoingZ     = outgoingBaseZ;
           outgoingY     = outgoingBaseY;
           incomingAlpha = Math.min(1, t * 1.25);
           outgoingAlpha = 1;
         } else if (raw <= P2) {
           incomingX     = isLateral ? meetX : incomingBaseX;
+          incomingZ     = isLateral ? meetZ : incomingBaseZ;
           incomingY     = isLateral ? incomingBaseY : meetY;
           outgoingX     = outgoingBaseX;
+          outgoingZ     = outgoingBaseZ;
           outgoingY     = outgoingBaseY;
           incomingAlpha = 1;
           outgoingAlpha = 1;
@@ -1592,8 +1682,10 @@ export class BabylonSceneService implements OnDestroy {
           const tExit         = easeInOutQuad(localProgress);
 
           incomingX     = isLateral ? meetX + (incomingBaseX - meetX) * localProgress : incomingBaseX;
+          incomingZ     = isLateral ? meetZ + (incomingBaseZ - meetZ) * localProgress : incomingBaseZ;
           incomingY     = isLateral ? incomingBaseY : meetY + (incomingBaseY - meetY) * localProgress;
           outgoingX     = isLateral ? outgoingBaseX + (outgoingExitX - outgoingBaseX) * tExit : outgoingBaseX;
+          outgoingZ     = isLateral ? outgoingBaseZ + (outgoingExitZ - outgoingBaseZ) * tExit : outgoingBaseZ;
           outgoingY     = isLateral ? outgoingBaseY : outgoingBaseY + (outgoingExitY - outgoingBaseY) * tExit;
           incomingAlpha = 1;
           outgoingAlpha = Math.max(0, 1 - localProgress);
@@ -1602,10 +1694,12 @@ export class BabylonSceneService implements OnDestroy {
         if (incomingRoot && !incomingRoot.isDisposed()) {
           incomingRoot.position.x = incomingX;
           incomingRoot.position.y = incomingY;
+          incomingRoot.position.z = incomingZ;
         }
         if (outgoingRoot && !outgoingRoot.isDisposed()) {
           outgoingRoot.position.x = outgoingX;
           outgoingRoot.position.y = outgoingY;
+          outgoingRoot.position.z = outgoingZ;
         }
 
         incomingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = incomingAlpha; });
@@ -1619,6 +1713,7 @@ export class BabylonSceneService implements OnDestroy {
           if (incomingRoot && !incomingRoot.isDisposed()) {
             incomingRoot.position.x = incomingBaseX;
             incomingRoot.position.y = incomingBaseY;
+            incomingRoot.position.z = incomingBaseZ;
             incomingRoot.getChildMeshes(false).forEach(m => { m.visibility = 1; });
           }
           this.clearGuideArrows();
@@ -1646,6 +1741,11 @@ export class BabylonSceneService implements OnDestroy {
         this.camera.beta   = Math.PI / 3;
         this.baseRadius    = 36.4;
       }
+    }
+
+    this.clearAccessPortals();
+    if (!isSede) {
+      this.renderAccessPortals(buildingId, modelName);
     }
   }
 
@@ -1916,6 +2016,192 @@ export class BabylonSceneService implements OnDestroy {
    */
   private routeSegmentMeshes: BABYLON.AbstractMesh[][] = [];
 
+  /**
+   * Suaviza los vértices de la polilínea redondeando esquinas pronunciadas
+   * para que la ruta y el giro de Inacapito se sientan naturales y fluidos.
+   */
+  public smoothWaypoints(points: BABYLON.Vector3[], maxCornerRadius = 0.35): BABYLON.Vector3[] {
+    if (points.length < 3) return points;
+    const result: BABYLON.Vector3[] = [points[0]];
+
+    for (let i = 1; i < points.length - 1; i++) {
+      const pPrev = points[i - 1];
+      const pCurr = points[i];
+      const pNext = points[i + 1];
+
+      const vIn = pCurr.subtract(pPrev);
+      const vOut = pNext.subtract(pCurr);
+      const lenIn = vIn.length();
+      const lenOut = vOut.length();
+
+      if (lenIn < 0.35 || lenOut < 0.35) {
+        result.push(pCurr);
+        continue;
+      }
+
+      const dirIn = vIn.scale(1 / lenIn);
+      const dirOut = vOut.scale(1 / lenOut);
+
+      // Si los vectores son colineales (recta continua), no hace falta redondear
+      const dot = BABYLON.Vector3.Dot(dirIn, dirOut);
+      if (dot > 0.94 || dot < -0.94) {
+        result.push(pCurr);
+        continue;
+      }
+
+      const radius = Math.min(maxCornerRadius, lenIn * 0.35, lenOut * 0.35);
+      const startRound = pCurr.subtract(dirIn.scale(radius));
+      const endRound = pCurr.add(dirOut.scale(radius));
+      const midControl = BABYLON.Vector3.Lerp(startRound, endRound, 0.5);
+      const midRound = BABYLON.Vector3.Lerp(midControl, pCurr, 0.5);
+
+      result.push(startRound, midRound, endRound);
+    }
+
+    result.push(points[points.length - 1]);
+    return result;
+  }
+
+  /**
+   * Limpia y desecha los meshes de los portales tridimensionales de acceso.
+   */
+  public clearAccessPortals(): void {
+    if (this.portalAnimObserver && this.scene) {
+      this.scene.onBeforeRenderObservable.remove(this.portalAnimObserver);
+      this.portalAnimObserver = null;
+    }
+    this.portalMeshes.forEach(m => {
+      if (!m.isDisposed()) m.dispose();
+    });
+    this.portalMeshes = [];
+  }
+
+  /**
+   * Renderiza en el suelo los portales tridimensionales con halo luminoso en los puntos
+   * de acceso oficiales entre edificios (según el piso actual cargado).
+   */
+  public renderAccessPortals(buildingId: BuildingId, floorModel: string): void {
+    if (!this.scene || buildingId === 'S') return;
+    this.clearAccessPortals();
+
+    const pNum = (floorModel || '').replace(/\D/g, '') || '1';
+    const portals: { id: string; name: string; position: { x: number; y: number; z: number }; color: BABYLON.Color3 }[] = [];
+
+    if (buildingId === 'A') {
+      const z = pNum === '3' ? -0.11 : pNum === '2' ? 0.51 : 0.64;
+      const x = pNum === '3' ? 11.55 : pNum === '2' ? 11.60 : 11.65;
+      const y = pNum === '3' ? 0.86 : pNum === '2' ? 0.41 : 0.05;
+      portals.push({
+        id: 'portal-a-b',
+        name: 'Pasarela a Edificio B',
+        position: { x, y, z },
+        color: new BABYLON.Color3(1.0, 0.45, 0.1) // Naranja institucional INACAP
+      });
+    } else if (buildingId === 'B') {
+      const x = pNum === '3' ? -0.10 : pNum === '2' ? -3.50 : -5.20;
+      const z = pNum === '3' ? -8.70 : pNum === '2' ? -2.70 : -1.90;
+      const y = pNum === '3' ? 0.20 : pNum === '2' ? 0.90 : 0.10;
+      portals.push({
+        id: 'portal-b-a',
+        name: 'Conexión a Edificio A',
+        position: { x, y, z },
+        color: new BABYLON.Color3(0.15, 0.75, 1.0) // Cyan resplandeciente
+      });
+    } else if (buildingId === 'C') {
+      portals.push({
+        id: 'portal-c-d',
+        name: 'Conector a Edificio D',
+        position: { x: -2.40, y: 1.17, z: -2.20 },
+        color: new BABYLON.Color3(0.2, 0.8, 0.4) // Verde esmeralda
+      });
+    } else if (buildingId === 'D') {
+      portals.push({
+        id: 'portal-d-c',
+        name: 'Conector a Edificio C',
+        position: { x: -0.05, y: 3.60, z: 11.10 },
+        color: new BABYLON.Color3(0.9, 0.2, 0.6) // Magenta
+      });
+    }
+
+    portals.forEach((p, idx) => {
+      // 1. Anillo exterior en el suelo
+      const ring = BABYLON.MeshBuilder.CreateTorus(`portalRing_${idx}`, {
+        diameter: 1.15,
+        thickness: 0.035,
+        tessellation: 32
+      }, this.scene!);
+      ring.position = new BABYLON.Vector3(p.position.x, p.position.y + 0.02, p.position.z);
+      ring.rotation.x = Math.PI / 2;
+      ring.isPickable = false;
+      ring.renderingGroupId = 1;
+
+      const ringMat = new BABYLON.StandardMaterial(`portalRingMat_${idx}`, this.scene!);
+      ringMat.diffuseColor = p.color;
+      ringMat.emissiveColor = p.color;
+      ringMat.specularColor = BABYLON.Color3.Black();
+      ringMat.alpha = 0.85;
+      ring.material = ringMat;
+      this.portalMeshes.push(ring);
+
+      // 2. Disco interior luminoso suave
+      const disc = BABYLON.MeshBuilder.CreateDisc(`portalDisc_${idx}`, {
+        radius: 0.52,
+        tessellation: 24
+      }, this.scene!);
+      disc.position = new BABYLON.Vector3(p.position.x, p.position.y + 0.015, p.position.z);
+      disc.rotation.x = Math.PI / 2;
+      disc.isPickable = false;
+      disc.renderingGroupId = 1;
+
+      const discMat = new BABYLON.StandardMaterial(`portalDiscMat_${idx}`, this.scene!);
+      discMat.diffuseColor = p.color;
+      discMat.emissiveColor = p.color.scale(0.6);
+      discMat.specularColor = BABYLON.Color3.Black();
+      discMat.alpha = 0.28;
+      disc.material = discMat;
+      this.portalMeshes.push(disc);
+
+      // 3. Haz cilíndrico holográfico vertical
+      const beacon = BABYLON.MeshBuilder.CreateCylinder(`portalBeacon_${idx}`, {
+        height: 1.1,
+        diameterTop: 0.75,
+        diameterBottom: 1.05,
+        tessellation: 16
+      }, this.scene!);
+      beacon.position = new BABYLON.Vector3(p.position.x, p.position.y + 0.55, p.position.z);
+      beacon.isPickable = false;
+      beacon.renderingGroupId = 1;
+
+      const beaconMat = new BABYLON.StandardMaterial(`portalBeaconMat_${idx}`, this.scene!);
+      beaconMat.diffuseColor = p.color;
+      beaconMat.emissiveColor = p.color.scale(0.8);
+      beaconMat.specularColor = BABYLON.Color3.Black();
+      beaconMat.alpha = 0.10;
+      beaconMat.backFaceCulling = false;
+      beacon.material = beaconMat;
+      this.portalMeshes.push(beacon);
+    });
+
+    // Animación continua de respiración/pulso para los portales
+    if (this.portalMeshes.length > 0) {
+      let t = 0;
+      this.portalAnimObserver = this.scene.onBeforeRenderObservable.add(() => {
+        t += 0.04;
+        const pulse = 1.0 + Math.sin(t) * 0.06;
+        for (let i = 0; i < this.portalMeshes.length; i += 3) {
+          const ring = this.portalMeshes[i];
+          const beacon = this.portalMeshes[i + 2];
+          if (ring && !ring.isDisposed()) {
+            ring.scaling.set(pulse, pulse, 1.0);
+          }
+          if (beacon && !beacon.isDisposed() && beacon.material) {
+            (beacon.material as BABYLON.StandardMaterial).alpha = 0.08 + Math.sin(t) * 0.04;
+          }
+        }
+      });
+    }
+  }
+
   public drawAnimatedRoute(
     points: BABYLON.Vector3[],
     clearExisting = true,
@@ -1924,7 +2210,8 @@ export class BabylonSceneService implements OnDestroy {
       totalSegments: number,
       midpoint: BABYLON.Vector3,
       isLast: boolean
-    ) => void
+    ) => void,
+    isEntranceTransition = false
   ): Promise<void> {
     return new Promise<void>(async (resolve) => {
       if (!this.scene || points.length < 2) {
@@ -1944,12 +2231,13 @@ export class BabylonSceneService implements OnDestroy {
         new BABYLON.Vector3(p.x, corridorY + 0.08, p.z)
       );
 
-      // Insertar punto de codo en L si son solo 2 puntos
-      const worldPoints = this.insertElbowPoint(leveledPoints);
+      // Insertar punto de codo en L si son solo 2 puntos y suavizar curvas
+      const elbowPoints = this.insertElbowPoint(leveledPoints);
+      const worldPoints = this.smoothWaypoints(elbowPoints);
       const totalSegments = worldPoints.length - 1;
 
       // Configurar a Inacapito y la línea de ruta en el piso
-      const meshes = await this.inacapitoGuide.setupRoute(this.scene, worldPoints);
+      const meshes = await this.inacapitoGuide.setupRoute(this.scene, worldPoints, isEntranceTransition);
       this.guideArrowMeshes.push(...meshes);
 
       // Mostrar el primer segmento y notificar callback
@@ -2096,6 +2384,7 @@ export class BabylonSceneService implements OnDestroy {
     this.buildingFocusAnimId++;
     this.currentFocusedBuilding = null;
     this.clearBuildingHighlight();
+    this.clearAccessPortals();
     this.camera.target = new BABYLON.Vector3(0, 0, 0);
     this.camera.alpha = Math.PI / 4;
     this.camera.beta = Math.PI / 3;
@@ -2104,6 +2393,66 @@ export class BabylonSceneService implements OnDestroy {
     this.camera.beta = isSede ? 1.18 : Math.PI / 3;
     this.camera.radius = isSede ? 210 : (this.currentBuilding === 'A' ? 52 : 25);
     this.baseRadius = this.camera.radius;
+    this.registerUserInteraction();
+  }
+
+  /**
+   * Obtiene la orientación del Norte respecto a la vista actual de la cámara (en grados).
+   * 0° = Norte hacia arriba en pantalla.
+   */
+  public getCameraAlphaDeg(): number {
+    if (!this.camera) return 0;
+    // North aligns along alpha = -Math.PI / 2
+    const currentAlpha = this.camera.alpha;
+    const needleDeg = -((currentAlpha + Math.PI / 2) * (180 / Math.PI));
+    return ((needleDeg % 360) + 360) % 360;
+  }
+
+  /**
+   * Registra un callback que se invoca en cada frame cuando cambia la rotación de la cámara.
+   * Retorna una función para cancelar la suscripción.
+   */
+  public onCameraAngleChange(callback: (deg: number) => void): () => void {
+    if (!this.scene) return () => {};
+    let lastDeg: number | null = null;
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+      const deg = this.getCameraAlphaDeg();
+      if (lastDeg === null || Math.abs(deg - lastDeg) > 0.05) {
+        lastDeg = deg;
+        callback(deg);
+      }
+    });
+    return () => {
+      this.scene?.onBeforeRenderObservable.remove(obs);
+    };
+  }
+
+  /**
+   * Alinea suavemente la cámara con el Norte (alpha = -PI / 2) tomando la ruta angular más corta.
+   */
+  public resetCameraToNorth(durationMs = 450): void {
+    if (!this.camera) return;
+    this.buildingFocusAnimId++;
+    const startAlpha = this.camera.alpha;
+    const twoPi = Math.PI * 2;
+    const targetNorth = -Math.PI / 2;
+    let diff = (targetNorth - (startAlpha % twoPi)) % twoPi;
+    if (diff > Math.PI) diff -= twoPi;
+    if (diff < -Math.PI) diff += twoPi;
+    const endAlpha = startAlpha + diff;
+
+    const startTime = performance.now();
+    const animateStep = () => {
+      if (!this.camera) return;
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(elapsed / durationMs, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      this.camera.alpha = startAlpha + (endAlpha - startAlpha) * eased;
+      if (t < 1) {
+        requestAnimationFrame(animateStep);
+      }
+    };
+    requestAnimationFrame(animateStep);
     this.registerUserInteraction();
   }
 
@@ -2227,6 +2576,7 @@ export class BabylonSceneService implements OnDestroy {
       this.idleTimer = null;
     }
     this.clearBuildingHighlight();
+    this.clearAccessPortals();
     if (this.cartoTexture) {
       this.cartoTexture.dispose();
       this.cartoTexture = null;

@@ -84,12 +84,22 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
    * por lo que la suscripción puede compararlo con el valor entrante para detectar cambios reales.
    */
   private _lastLoadedFloor = '';
+  /** Último edificio efectivamente cargado en escena */
+  private _lastLoadedBuilding: BuildingId = 'S';
   /**
    * Flag para indicar que se está ejecutando una navegación multi-piso guiada.
    * Evita que la suscripción reactiva a currentFloor$ dispare recargas o transiciones duplicadas.
    */
   private isMultiFloorNavigating = false;
   floorDialogVisible = false;
+
+  // ── Compass HUD & Navigation Stepper (Punto 2) ──────────────────────────
+  public compassRotation = 0;
+  private unsubCameraAngle?: () => void;
+  public activeRouteBreadcrumb: string | null = null;
+  public multiLegStepperVisible = false;
+  public stepperSteps: Array<{ number: number; label: string; done: boolean; active: boolean }> = [];
+
   infoBox: HTMLDivElement | null = null;
   infoData: Record<string, { nombre: string; desc: string }> = {};
   boundaryNameRegExp = /boundary|border/i;
@@ -260,6 +270,12 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
         (meshName, pickResult) => this.onMeshPicked(meshName, pickResult),
         (markers) => this.onMarkersUpdated(markers)
       );
+
+      // Sincronizar el Compass HUD con la rotación de la cámara 3D
+      this.unsubCameraAngle = this.babylonSceneService.onCameraAngleChange((deg) => {
+        this.compassRotation = deg;
+        this.cd.detectChanges();
+      });
     }
 
     this.subscriptions.add(
@@ -277,7 +293,7 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
     );
 
     this.subscriptions.add(
-      this.mapNavService.currentFloor$.subscribe(floorModel => {
+      this.mapNavService.currentFloor$.subscribe(async floorModel => {
         // Si se está ejecutando una navegación multi-piso secuencial, la transición 3D
         // y carga del nuevo modelo la gestiona directamente onDestinationSelected.
         if (this.isMultiFloorNavigating) {
@@ -285,23 +301,48 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
         }
 
         const previousLoadedFloor = this._lastLoadedFloor;
-        this._lastLoadedFloor  = floorModel;
-        this.currentFloorModel = floorModel;
-        this.currentFloor      = floorModel;
+        const previousLoadedBuilding = this._lastLoadedBuilding;
+        const currentBld = this.currentBuilding;
+
+        this._lastLoadedFloor    = floorModel;
+        this._lastLoadedBuilding = currentBld;
+        this.currentFloorModel   = floorModel;
+        this.currentFloor        = floorModel;
 
         const extractFloorNum = (name: string): number => {
           const m = name.match(/piso\s*(\d)/i);
           return m ? parseInt(m[1], 10) : 1;
         };
 
-        // Solo cargar si no había nada cargado (primera carga) o si el piso realmente cambió
+        // Solo cargar si no había nada cargado (primera carga) o si el piso o edificio realmente cambiaron
         if (!previousLoadedFloor) {
-          this.babylonSceneService.loadModel(floorModel, this.currentBuilding);
-        } else if (previousLoadedFloor !== floorModel) {
-          const prevNum   = extractFloorNum(previousLoadedFloor);
-          const nextNum   = extractFloorNum(floorModel);
-          const direction = nextNum >= prevNum ? 'up' : 'down';
-          this.babylonSceneService.loadModelWithTransition(floorModel, this.currentBuilding, direction);
+          await this.babylonSceneService.loadModel(floorModel, currentBld);
+        } else if (previousLoadedFloor !== floorModel || previousLoadedBuilding !== currentBld) {
+          const prevNum = extractFloorNum(previousLoadedFloor);
+          const nextNum = extractFloorNum(floorModel);
+
+          const wasSede = previousLoadedBuilding === 'S' || previousLoadedFloor.includes('Instituto3D') || previousLoadedFloor === 'Instituto3D-color.obj';
+          const isSede = currentBld === 'S' || floorModel.includes('Instituto3D') || floorModel === 'Instituto3D-color.obj';
+
+          let direction: 'up' | 'down' | 'left' | 'right' | 'lateral-right' | 'lateral-left' = 'up';
+
+          if (wasSede || isSede) {
+            // Sede -> Edificio o Edificio -> Sede
+            direction = isSede ? 'down' : 'up';
+          } else if (previousLoadedBuilding !== currentBld) {
+            // Moverse de un edificio a otro (ej. A -> B, B -> A, C -> D, D -> C)
+            // Si está en el mismo piso (o cruzando alas conectadas): TRANSICIÓN HORIZONTAL
+            direction = await this.mapNavService.getInterBuildingLateralDirection(
+              previousLoadedBuilding,
+              currentBld,
+              prevNum
+            );
+          } else {
+            // Mismo edificio, diferente piso: TRANSICIÓN VERTICAL
+            direction = nextNum >= prevNum ? 'up' : 'down';
+          }
+
+          await this.babylonSceneService.loadModelWithTransition(floorModel, currentBld, direction);
         }
 
         this.cd.detectChanges();
@@ -546,18 +587,17 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
   private switchFloorByPisoName(pisoStr: string, edificio?: BuildingId): void {
     const targetBuilding = edificio || this.currentBuilding;
-    if (targetBuilding !== this.currentBuilding) {
-      this.onBuildingSelected(targetBuilding);
+    const pisoLower = pisoStr.toLowerCase().replace(/\s+/g, '');
+    let floorNumber = 1;
+    if (/3/i.test(pisoLower)) {
+      floorNumber = 3;
+    } else if (/2/i.test(pisoLower)) {
+      floorNumber = 2;
+    } else if (/1/i.test(pisoLower)) {
+      floorNumber = 1;
     }
 
-    const pisoLower = pisoStr.toLowerCase().replace(/\s+/g, '');
-    if (/3/i.test(pisoLower)) {
-      this.onFloorSelected('third');
-    } else if (/2/i.test(pisoLower)) {
-      this.onFloorSelected('second');
-    } else if (/1/i.test(pisoLower)) {
-      this.onFloorSelected('first');
-    }
+    this.goToFloor(targetBuilding, floorNumber);
   }
 
   async onDestinationSelected(destinationName: string): Promise<void> {
@@ -586,6 +626,28 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       try {
         this.babylonSceneService.clearDestinationMarker();
 
+        const targetBld = result.targetBuilding || 'B';
+        const sourceBld = this.currentBuilding;
+        const sourceFloor = this.currentFloorModel;
+        const targetFloor = result.targetFloor || result.piso;
+
+        this.activeRouteBreadcrumb = `Edif. ${sourceBld} (${sourceFloor}) ➔ Pasillo de Conexión ➔ Edif. ${targetBld} (${targetFloor})`;
+        this.multiLegStepperVisible = true;
+
+        if (result.needsFloorChangeInTarget && result.leg3Points) {
+          this.stepperSteps = [
+            { number: 1, label: `Salida Edif. ${sourceBld}`, done: false, active: true },
+            { number: 2, label: `Cruce & Escalera ${targetBld}`, done: false, active: false },
+            { number: 3, label: `Destino ${targetFloor}`, done: false, active: false }
+          ];
+        } else {
+          this.stepperSteps = [
+            { number: 1, label: `Salida Edif. ${sourceBld}`, done: false, active: true },
+            { number: 2, label: `Entrada Edif. ${targetBld}`, done: false, active: false },
+            { number: 3, label: `Llegada a Destino`, done: false, active: false }
+          ];
+        }
+
         // Tramo 1: En edificio origen hacia la salida/conector
         this.destinationCoordinatesText = `Dirígete a la salida hacia Edificio ${result.targetBuilding} (${result.connectorName})...`;
         const cb1 = this.buildNavSteps(
@@ -599,6 +661,13 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         // Esperar a que el usuario complete el tramo 1 y confirme el cruce
         await this.waitForFloorTransition(`Cruzar al Edificio ${result.targetBuilding} →`);
 
+        // Avanzar estado del stepper al tramo 2
+        if (this.stepperSteps.length > 1) {
+          this.stepperSteps[0].done = true;
+          this.stepperSteps[0].active = false;
+          this.stepperSteps[1].active = true;
+        }
+
         // Transición LATERAL 3D al nuevo edificio
         this.destinationCoordinatesText = `Cruzando al Edificio ${result.targetBuilding}...`;
         this.cd.detectChanges();
@@ -611,6 +680,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         this.currentFloor = interFloorModel;
         this.currentFloorModel = interFloorModel;
         this._lastLoadedFloor = interFloorModel;
+        this._lastLoadedBuilding = interBuilding;
         this.mapNavService.setBuilding(interBuilding);
         this.mapNavService.setFloor(interFloorModel);
         this.cd.detectChanges();
@@ -630,11 +700,18 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
             `Paso 2: Escalera hacia ${result.targetFloor || result.piso}`
           );
           this.cd.detectChanges();
-          await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true, cb2);
+          await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true, cb2, true);
 
           // Esperar confirmación de cambio de piso
           const vertAction = result.verticalDirection === 'up' ? 'Subir' : 'Bajar';
           await this.waitForFloorTransition(`${vertAction} a ${result.targetFloor || result.piso} →`);
+
+          // Avanzar estado del stepper al tramo 3
+          if (this.stepperSteps.length > 2) {
+            this.stepperSteps[1].done = true;
+            this.stepperSteps[1].active = false;
+            this.stepperSteps[2].active = true;
+          }
 
           // Transición VERTICAL 3D al piso final del edificio destino
           this.destinationCoordinatesText = `${vertAction === 'Subir' ? 'Subiendo' : 'Bajando'} a ${result.targetFloor || result.piso}...`;
@@ -644,6 +721,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
           this.currentFloor = finalFloorModel;
           this.currentFloorModel = finalFloorModel;
           this._lastLoadedFloor = finalFloorModel;
+          this._lastLoadedBuilding = result.targetBuilding!;
           this.mapNavService.setFloor(finalFloorModel);
           this.cd.detectChanges();
 
@@ -664,6 +742,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
           this.babylonSceneService.setDestinationMarker(result.coord);
           await this.babylonSceneService.drawAnimatedRoute(result.leg3Points, true, cb3);
+          this.stepperSteps.forEach(s => { s.done = true; s.active = false; });
           this.destinationCoordinatesText = result.statusText;
         } else {
           // Tramo 2: Directo a la sala destino en el mismo piso del edificio destino
@@ -676,7 +755,8 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
           this.cd.detectChanges();
 
           this.babylonSceneService.setDestinationMarker(result.coord);
-          await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true, cb2);
+          await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true, cb2, true);
+          this.stepperSteps.forEach(s => { s.done = true; s.active = false; });
           this.destinationCoordinatesText = result.statusText;
         }
       } finally {
@@ -689,6 +769,14 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       this.isMultiFloorNavigating = true;
       try {
         this.babylonSceneService.clearDestinationMarker();
+
+        this.activeRouteBreadcrumb = `Edif. ${result.edificio} (${this.currentFloorModel}) ➔ ${result.chosenStairName} ➔ ${result.piso}`;
+        this.multiLegStepperVisible = true;
+        this.stepperSteps = [
+          { number: 1, label: `Hacia ${result.chosenStairName}`, done: false, active: true },
+          { number: 2, label: `${result.direction === 'up' ? 'Subir' : 'Bajar'} a ${result.piso}`, done: false, active: false },
+          { number: 3, label: `Llegada a Destino`, done: false, active: false }
+        ];
 
         // Tramo 1: Dirigirse a la escalera
         this.destinationCoordinatesText = `Dirígete a la ${result.chosenStairName}...`;
@@ -705,6 +793,12 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         const floorAction = result.direction === 'up' ? 'Subir' : 'Bajar';
         await this.waitForFloorTransition(`${floorAction} a ${result.piso} →`);
 
+        // Avanzar estado del stepper al tramo 2
+        if (this.stepperSteps.length > 1) {
+          this.stepperSteps[0].done = true;
+          this.stepperSteps[0].active = false;
+          this.stepperSteps[1].active = true;
+        }
 
         // Transición de piso
         this.destinationCoordinatesText = `${result.direction === 'up' ? 'Subiendo' : 'Bajando'} a ${result.piso}...`;
@@ -712,6 +806,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
         const targetFloorModel = this.resolveFloorModel(result.edificio, result.piso);
         this._lastLoadedFloor = targetFloorModel;
+        this._lastLoadedBuilding = result.edificio;
         this.currentFloor = targetFloorModel;
         this.currentFloorModel = targetFloorModel;
         this.mapNavService.setFloor(targetFloorModel);
@@ -733,6 +828,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
         this.babylonSceneService.setDestinationMarker(result.coord);
         await this.babylonSceneService.drawAnimatedRoute(result.leg2Points, true, cb2);
+        this.stepperSteps.forEach(s => { s.done = true; s.active = false; });
 
         this.destinationCoordinatesText = result.statusText;
       } finally {
@@ -742,6 +838,10 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       // ══════════════════════════════════════════════════════════════════════
       // RUTA EN EL MISMO PISO (O DIFERENTE EDIFICIO)
       // ══════════════════════════════════════════════════════════════════════
+      this.activeRouteBreadcrumb = `Edif. ${result.edificio} (${result.piso}) ➔ ${destinationName}`;
+      this.multiLegStepperVisible = false;
+      this.stepperSteps = [];
+
       if (result.piso) {
         const targetFloorModel = this.resolveFloorModel(result.edificio, result.piso);
         const alreadyOnCorrectFloor =
@@ -892,6 +992,16 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       this.activeStepIndex = realIdx;
       this.currentRouteSegment = _segmentIndex;
 
+      // Auto-scroll fluido de la tarjeta de navegación activa
+      if (typeof document !== 'undefined') {
+        setTimeout(() => {
+          const activeCard = document.querySelector('.nav-step-card.is-active');
+          if (activeCard) {
+            activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }, 40);
+      }
+
       if (isLast) {
         if (this.pendingFloorResolve) {
           // Hay una transición de piso esperando: activar el botón verde
@@ -997,10 +1107,17 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.activeSegmentCb = undefined;
     this.navPendingFloorTransition = false;
     this.navPendingFloorLabel = '';
+    this.multiLegStepperVisible = false;
+    this.stepperSteps = [];
+    this.activeRouteBreadcrumb = null;
     // Si había una transición pendiente, descartarla
     if (this.pendingFloorResolve) {
       this.pendingFloorResolve = null;
     }
+  }
+
+  public onCompassClick(): void {
+    this.babylonSceneService.resetCameraToNorth();
   }
 
 
@@ -1880,6 +1997,10 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   ngOnDestroy(): void {
+    if (this.unsubCameraAngle) {
+      this.unsubCameraAngle();
+      this.unsubCameraAngle = undefined;
+    }
     this.closeBuildingPrompt();
     this.subscriptions.unsubscribe();
     this.babylonSceneService.dispose();

@@ -54,16 +54,29 @@ export class NavegacionApiService {
 
   async getNavigationPathsByEdificioYPiso(edificio: string, piso: string): Promise<NavigationPath[]> {
     const all = await this.getNavigationPaths();
+    const pisoNum = piso.toString().replace(/\D/g, '');
     const pisoNormalizado = piso.toString().trim().toLowerCase().replace(/\s+/g, '');
-    const edificioNormalizado = edificio ? edificio.trim().toLowerCase() : '';
+    const edificioNormalizado = edificio ? edificio.trim().toLowerCase().replace(/edificio/g, '') : '';
 
     return all.filter((doc: any) => {
+      const docId = (doc.id || '').toLowerCase();
+      // 1. Coincidencia por ID de documento (ej: 'NavPathEdificioB-Piso3')
+      if (docId && edificioNormalizado && pisoNum) {
+        if (
+          docId.includes(`edificio${edificioNormalizado}`) &&
+          (docId.includes(`piso${pisoNum}`) || docId.includes(`piso ${pisoNum}`))
+        ) {
+          return true;
+        }
+      }
+
+      // 2. Coincidencia por campos internos
       const p = (doc.Piso ?? doc['Piso '] ?? doc.piso ?? '').toString().trim().toLowerCase().replace(/\s+/g, '');
       if (pisoNormalizado && p && !p.includes(pisoNormalizado) && !pisoNormalizado.includes(p)) {
         return false;
       }
       if (edificioNormalizado) {
-        const ed = (doc.Edificio ?? doc.edificio ?? '').toString().trim().toLowerCase();
+        const ed = (doc.Edificio ?? doc.edificio ?? '').toString().trim().toLowerCase().replace(/edificio/g, '');
         if (ed && !ed.includes(edificioNormalizado) && !edificioNormalizado.includes(ed)) {
           return false;
         }

@@ -29,6 +29,7 @@ export class InacapitoGuideService {
   // Puntos del recorrido actual
   private currentWorldPoints: BABYLON.Vector3[] = [];
   private activeStepIndex = 0;
+  private isCurrentEntranceTransition = false;
 
   // Control de animación de movimiento
   private walkObserver: BABYLON.Observer<BABYLON.Scene> | null = null;
@@ -61,14 +62,17 @@ export class InacapitoGuideService {
    * Dibuja la ruta y posiciona a Inacapito al inicio.
    * Retorna los meshes generados (líneas de piso + personaje) para que el llamador pueda
    * gestionar visibilidad/fadeouts durante transiciones de piso.
+   * @param isEntranceTransition Si es true, activa una zancada y onda de aparición de portal
    */
   public async setupRoute(
     scene: BABYLON.Scene,
-    worldPoints: BABYLON.Vector3[]
+    worldPoints: BABYLON.Vector3[],
+    isEntranceTransition = false
   ): Promise<BABYLON.AbstractMesh[]> {
     this.clear();
     this.currentScene = scene;
     this.currentWorldPoints = worldPoints.map(p => p.clone());
+    this.isCurrentEntranceTransition = isEntranceTransition;
 
     if (worldPoints.length < 2) {
       return [];
@@ -181,6 +185,10 @@ export class InacapitoGuideService {
         const lookTarget = new BABYLON.Vector3(nextPoint.x, startPoint.y, nextPoint.z);
         rootNode.lookAt(lookTarget);
       }
+
+      if (this.isCurrentEntranceTransition) {
+        this.triggerEntrancePortalEffect(startPoint, scene);
+      }
     } catch (err) {
       console.error('InacapitoGuideService: Error al instanciar Inacapito:', err);
     }
@@ -288,6 +296,13 @@ export class InacapitoGuideService {
       rootNode.position.y = from.y + (to.y - from.y) * progress;
       rootNode.position.z = from.z + (to.z - from.z) * progress;
 
+      // Zancada de entrada natural al aparecer desde el conector inter-edificio
+      if (this.isCurrentEntranceTransition && expectedStepIdx === 0) {
+        const entranceFactor = Math.min(1.0, progress / 0.35);
+        const curScale = INACAPITO_DEFAULT_SCALE * (0.82 + 0.18 * entranceFactor);
+        rootNode.scaling.set(curScale, curScale, curScale);
+      }
+
       if (progress >= 1.0) {
         // Llegó al final del segmento
         this.stopCurrentWalk();
@@ -300,6 +315,47 @@ export class InacapitoGuideService {
         }, 600);
       }
     });
+  }
+
+  /**
+   * Genera un efecto de onda expansiva translúcida en los pies al emerger por el punto de acceso.
+   */
+  private triggerEntrancePortalEffect(point: BABYLON.Vector3, scene: BABYLON.Scene): void {
+    try {
+      const ring = BABYLON.MeshBuilder.CreateTorus('entrancePortalRing', {
+        diameter: 0.6,
+        thickness: 0.04,
+        tessellation: 32
+      }, scene);
+      ring.position = new BABYLON.Vector3(point.x, point.y + 0.04, point.z);
+      ring.rotation.x = Math.PI / 2;
+
+      const ringMat = new BABYLON.StandardMaterial('entrancePortalRingMat', scene);
+      ringMat.diffuseColor = new BABYLON.Color3(0.15, 0.75, 1.0);
+      ringMat.emissiveColor = new BABYLON.Color3(0.2, 0.85, 1.0);
+      ringMat.specularColor = BABYLON.Color3.Black();
+      ringMat.alpha = 0.9;
+      ring.material = ringMat;
+      ring.renderingGroupId = 1;
+      ring.isPickable = false;
+
+      const startTime = performance.now();
+      const duration = 1200;
+      const observer = scene.onBeforeRenderObservable.add(() => {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(1.0, elapsed / duration);
+        const scale = 1.0 + progress * 2.5;
+        ring.scaling.set(scale, scale, 1.0);
+        ringMat.alpha = (1.0 - progress) * 0.9;
+        if (progress >= 1.0) {
+          scene.onBeforeRenderObservable.remove(observer);
+          ring.dispose();
+          ringMat.dispose();
+        }
+      });
+    } catch (err) {
+      console.warn('InacapitoGuideService: Error al generar efecto de portal:', err);
+    }
   }
 
   /**
