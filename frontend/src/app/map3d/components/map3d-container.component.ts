@@ -380,7 +380,7 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   }
 
   public getBuildingDisplayName(): string {
-    if (this.currentBuilding === 'S') return 'Sede Central INACAP';
+    if (this.currentBuilding === 'S') return 'Sede Renca';
     const bld = this.buildingRegistry.getBuilding(this.currentBuilding);
     return bld ? bld.name : `Edificio ${this.currentBuilding}`;
   }

@@ -288,7 +288,7 @@ export class MapNavigationService {
         const piso = nearestLoc.Piso || nearestLoc.piso || 'General';
         return {
           nombre: name,
-          desc: `${tipo} — ${edificio ? 'Edificio ' + edificio : 'Sede Inacap'}${piso ? ', ' + piso : ''}.`,
+          desc: `${tipo} — ${edificio ? 'Edificio ' + edificio : 'Sede Renca'}${piso ? ', ' + piso : ''}.`,
           edificio,
           piso
         };

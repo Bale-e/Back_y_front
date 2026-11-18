@@ -15,7 +15,7 @@ export class BuildingRegistryService {
     // Sede (Vista Global del Campus)
     this.register({
       id: 'S',
-      name: 'Sede INACAP',
+      name: 'Sede Renca',
       center: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: -Math.PI / 2, z: 0 },
       floors: [
@@ -36,6 +36,7 @@ export class BuildingRegistryService {
       center: { x: 0, y: 0, z: 0 },
       rotation: { x: -Math.PI / 2, y: Math.PI, z: 0 },
       cameraBaseAlpha: Math.PI / 2,
+      cameraRadius: 28,
       corridorAxis: 'x',
       corridorFixedCoord: 0.16,
       floors: [
@@ -67,6 +68,7 @@ export class BuildingRegistryService {
       rotation: { x: -Math.PI / 2, y: Math.PI, z: 0 },
       scale: { x: 1.2, y: 1.2, z: 1.2 },
       cameraBaseAlpha: 0,
+      cameraRadius: 36.4,
       corridorAxis: 'z',
       corridorFixedCoord: -0.50,
       floors: [
@@ -91,6 +93,7 @@ export class BuildingRegistryService {
       center: { x: -52.0, y: 3.1, z: -15.0 },
       rotation: { x: 0, y: -Math.PI / 2, z: 0 },
       cameraBaseAlpha: Math.PI,
+      cameraRadius: 28,
       corridorAxis: 'z',
       corridorFixedCoord: -2.40,
       floors: [
@@ -114,6 +117,7 @@ export class BuildingRegistryService {
       center: { x: -54.0, y: 3.1, z: 7.0 },
       rotation: { x: 0, y: -Math.PI / 2, z: 0 },
       cameraBaseAlpha: 0,
+      cameraRadius: 28,
       corridorAxis: 'z',
       corridorFixedCoord: -0.05,
       floors: [
@@ -137,6 +141,7 @@ export class BuildingRegistryService {
       center: { x: -55.0, y: 3.1, z: 30.0 },
       rotation: { x: 0, y: -Math.PI / 2, z: 0 },
       cameraBaseAlpha: 0,
+      cameraRadius: 28,
       corridorAxis: 'z',
       corridorFixedCoord: -0.05,
       floors: [

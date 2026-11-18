@@ -144,10 +144,11 @@ export class BabylonSceneService implements OnDestroy {
   private setupCamera(canvas: HTMLCanvasElement): void {
     if (!this.scene) return;
     const isSede = this.currentBuilding === 'S' || this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
-    const initialRadius = isSede ? 210 : 25;
+    const bldDef = this.buildingRegistry.getBuilding(this.currentBuilding);
+    const initialRadius = isSede ? 210 : (bldDef?.cameraRadius ?? (this.currentBuilding === 'B' ? 36.4 : 28));
     this.camera = new BABYLON.ArcRotateCamera(
       'camera1',
-      isSede ? -Math.PI / 2 : Math.PI / 4,
+      isSede ? -Math.PI / 2 : (bldDef?.cameraBaseAlpha ?? (Math.PI / 4)),
       isSede ? 1.18 : Math.PI / 3,
       initialRadius,
       new BABYLON.Vector3(0, 0, 0),
@@ -1168,26 +1169,28 @@ export class BabylonSceneService implements OnDestroy {
       m.overlayAlpha = 0.35;
     });
 
-    const startTarget = this.camera.target.clone();
-    const diveTarget  = buildingCenter.clone();
-    diveTarget.y      = Math.max(diveTarget.y, 2.0);
-    const endTarget   = BABYLON.Vector3.Zero();
+    const outgoingStartX = outgoingRoot ? outgoingRoot.position.x : 0;
+    const outgoingStartY = outgoingRoot ? outgoingRoot.position.y : 0;
+    const outgoingStartZ = outgoingRoot ? outgoingRoot.position.z : 0;
 
+    const shiftX = buildingCenter.x;
+    const shiftZ = buildingCenter.z;
+
+    const startTarget = this.camera.target.clone();
     const startRadius = this.camera.radius;
-    const diveRadius  = 26.0;
-    const endRadius   = 36.4;
+    const endRadius   = bldDef?.cameraRadius ?? (targetBuilding === 'B' ? 36.4 : 28);
+    const diveRadius  = Math.min(34.0, endRadius + 4.0);
 
     const startAlpha = this.camera.alpha;
     const startBeta  = this.camera.beta;
     const endAlpha   = bldDef?.cameraBaseAlpha ?? (Math.PI / 4);
     const endBeta    = Math.PI / 3;
-    const diveBeta   = Math.PI / 3.6;
 
     const incomingBaseScale = incomingRoot.scaling.clone();
     const baseIncomingY = incomingRoot.position.y;
 
-    const duration = 1600;
-    const P_DIVE = 0.50; // Momento de llegada al edificio exterior e inicio de revelación interior
+    const duration = 1800;
+    const P_DIVE = 0.52; // Momento de llegada al edificio exterior e inicio de revelación interior
     const startTime = performance.now();
 
     const easeInOutCubic = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -1200,23 +1203,38 @@ export class BabylonSceneService implements OnDestroy {
 
         if (progress <= P_DIVE) {
           // ── Fase 1: Vuelo aéreo directo hacia el edificio seleccionado en la Sede ──
+          // La maqueta de la sede se alinea suavemente al centro (0, 0, 0) donde se ubicará el piso interior
           const t = easeInOutCubic(progress / P_DIVE);
+          if (outgoingRoot && !outgoingRoot.isDisposed()) {
+            outgoingRoot.position.x = outgoingStartX - shiftX * t;
+            outgoingRoot.position.z = outgoingStartZ - shiftZ * t;
+          }
           if (this.camera) {
-            this.camera.target = BABYLON.Vector3.Lerp(startTarget, diveTarget, t);
+            // El objetivo de la cámara rastrea el centro del edificio en todo momento
+            const curTargetX = buildingCenter.x * (1 - t);
+            const curTargetZ = buildingCenter.z * (1 - t);
+            this.camera.target = new BABYLON.Vector3(curTargetX, (buildingCenter.y || 0) * (1 - t), curTargetZ);
             this.camera.radius = startRadius + (diveRadius - startRadius) * t;
             this.camera.alpha  = startAlpha + (endAlpha - startAlpha) * t;
-            this.camera.beta   = startBeta + (diveBeta - startBeta) * t;
+            this.camera.beta   = startBeta + (endBeta - startBeta) * t;
             this.baseRadius    = this.camera.radius;
           }
           outgoingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = 1; });
           incomingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = 0; });
         } else {
           // ── Fase 2: Inmersión en el edificio — la maqueta exterior se disuelve y revela el piso interior ──
+          // El edificio está perfectamente en (0, 0, 0) y el piso interior está exactamente en (0, 0, 0).
+          // La cámara permanece anclada al centro (0, 0, 0) frente al modelo, sin desplazarse a espaldas ni lejos.
           const t = easeInOutQuad((progress - P_DIVE) / (1 - P_DIVE));
+          if (outgoingRoot && !outgoingRoot.isDisposed()) {
+            outgoingRoot.position.x = outgoingStartX - shiftX;
+            outgoingRoot.position.z = outgoingStartZ - shiftZ;
+          }
           if (this.camera) {
-            this.camera.target = BABYLON.Vector3.Lerp(diveTarget, endTarget, t);
+            this.camera.target = BABYLON.Vector3.Zero();
             this.camera.radius = diveRadius + (endRadius - diveRadius) * t;
-            this.camera.beta   = diveBeta + (endBeta - diveBeta) * t;
+            this.camera.alpha  = endAlpha;
+            this.camera.beta   = endBeta;
             this.baseRadius    = this.camera.radius;
           }
 
@@ -1226,8 +1244,8 @@ export class BabylonSceneService implements OnDestroy {
           outgoingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = outVis; });
           incomingMeshes.forEach(m => { if (!m.isDisposed()) m.visibility = inVis; });
 
-          // Expansión suave del piso interior (0.88 -> 1.0) para dar la sensación física de entrar a él
-          const scaleFactor = 0.88 + 0.12 * t;
+          // Expansión suave del piso interior (0.94 -> 1.0) para emerger dentro del volumen del edificio
+          const scaleFactor = 0.94 + 0.06 * t;
           if (incomingRoot && !incomingRoot.isDisposed()) {
             incomingRoot.scaling = new BABYLON.Vector3(
               incomingBaseScale.x * scaleFactor,
@@ -1250,7 +1268,7 @@ export class BabylonSceneService implements OnDestroy {
           outgoingRoot?.dispose(false, true);
           this.clearGuideArrows();
           if (this.camera) {
-            this.camera.setTarget(endTarget);
+            this.camera.setTarget(BABYLON.Vector3.Zero());
             this.camera.radius = endRadius;
             this.camera.alpha  = endAlpha;
             this.camera.beta   = endBeta;
@@ -1317,7 +1335,10 @@ export class BabylonSceneService implements OnDestroy {
         this.baseRadius    = 210;
         this.zoomTime      = 0;
       } else {
-        this.baseRadius = this.camera.radius;
+        const bldDef = this.buildingRegistry.getBuilding(buildingId);
+        this.camera.setTarget(BABYLON.Vector3.Zero());
+        this.camera.radius = bldDef?.cameraRadius ?? (buildingId === 'B' ? 36.4 : 28);
+        this.baseRadius    = this.camera.radius;
       }
     }
 
@@ -1485,6 +1506,7 @@ export class BabylonSceneService implements OnDestroy {
       const scaledBounds = allNodes.getHierarchyBoundingVectors(true);
       const centerX = (scaledBounds.min.x + scaledBounds.max.x) / 2;
       const centerZ = (scaledBounds.min.z + scaledBounds.max.z) / 2;
+
       allNodes.position.x = -centerX;
       // En la Sede, el punto más bajo (scaledBounds.min.y) corresponde al subterráneo (Piso -1 / Patio Inferior).
       // El nivel de suelo real de la calle y accesos está en Y=52.4 (raw).
@@ -1795,11 +1817,12 @@ export class BabylonSceneService implements OnDestroy {
         this.baseRadius    = 210;
         this.zoomTime      = 0;
       } else {
+        const bldDef = this.buildingRegistry.getBuilding(buildingId);
         this.camera.setTarget(BABYLON.Vector3.Zero());
-        this.camera.radius = 36.4;
-        this.camera.alpha  = Math.PI / 4;
+        this.camera.radius = bldDef?.cameraRadius ?? (buildingId === 'B' ? 36.4 : 28);
+        this.camera.alpha  = bldDef?.cameraBaseAlpha ?? (Math.PI / 4);
         this.camera.beta   = Math.PI / 3;
-        this.baseRadius    = 36.4;
+        this.baseRadius    = this.camera.radius;
       }
     }
 
@@ -1916,7 +1939,7 @@ export class BabylonSceneService implements OnDestroy {
         const proj2 = projectWorldPointOnGround(-9.697827490499874, -0.2551487650904001);
         markers.push({
           id: 'marker-sede',
-          label: '→ Ir al mapa principal',
+          label: '→ Ir a Sede Renca',
           x: proj2.x,
           y: proj2.y,
           visible: proj2.visible,
@@ -1925,7 +1948,7 @@ export class BabylonSceneService implements OnDestroy {
       }
     }
 
-        // Marcador Edificio A (desde Edificio B)
+    // Marcador Edificio A (desde Edificio B)
     if (this.currentBuilding === 'B') {
       const isBuildingBThirdFloor = this.currentFloorModel === 'Edificio B - Piso 3.obj';
       const proj = isBuildingBThirdFloor
@@ -1946,7 +1969,7 @@ export class BabylonSceneService implements OnDestroy {
       const proj = projectWorldPointOnGround(4.407557547931399, 9.68820615481936);
       markers.push({
         id: 'marker-sede',
-        label: '→ al mapa principal',
+        label: '→ Ir a Sede Renca',
         x: proj.x,
         y: proj.y,
         visible: proj.visible,
@@ -1972,7 +1995,7 @@ export class BabylonSceneService implements OnDestroy {
       const proj = projectWorldPointOnGround(0, 0);
       markers.push({
         id: 'marker-sede',
-        label: '→ al mapa principal',
+        label: '→ Ir a Sede Renca',
         x: proj.x,
         y: proj.y,
         visible: proj.visible,
@@ -1985,7 +2008,7 @@ export class BabylonSceneService implements OnDestroy {
       const proj = projectWorldPointOnGround(-0.11450809982627064, -11.112192515863468);
       markers.push({
         id: 'marker-sede',
-        label: '→ al mapa principal',
+        label: '→ Ir a Sede Renca',
         x: proj.x,
         y: proj.y,
         visible: proj.visible,
@@ -2445,26 +2468,25 @@ export class BabylonSceneService implements OnDestroy {
     this.currentFocusedBuilding = null;
     this.clearBuildingHighlight();
     this.clearAccessPortals();
-    this.camera.target = new BABYLON.Vector3(0, 0, 0);
-    this.camera.alpha = Math.PI / 4;
-    this.camera.beta = Math.PI / 3;
     const isSede = this.currentBuilding === 'S' || this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
-    this.camera.alpha = isSede ? -Math.PI / 2 : Math.PI / 4;
+    const bldDef = this.buildingRegistry.getBuilding(this.currentBuilding);
+    this.camera.target = BABYLON.Vector3.Zero();
+    this.camera.alpha = isSede ? -Math.PI / 2 : (bldDef?.cameraBaseAlpha ?? (Math.PI / 4));
     this.camera.beta = isSede ? 1.18 : Math.PI / 3;
-    this.camera.radius = isSede ? 210 : (this.currentBuilding === 'A' ? 52 : 25);
+    this.camera.radius = isSede ? 210 : (bldDef?.cameraRadius ?? (this.currentBuilding === 'B' ? 36.4 : 28));
     this.baseRadius = this.camera.radius;
     this.registerUserInteraction();
   }
 
   /**
    * Obtiene la orientación del Norte respecto a la vista actual de la cámara (en grados).
-   * 0° = Norte hacia arriba en pantalla.
+   * El Norte real se ubica hacia donde antes apuntaba el sur (actual Este / derecha, alpha = 0).
    */
   public getCameraAlphaDeg(): number {
     if (!this.camera) return 0;
-    // North aligns along alpha = -Math.PI / 2
+    // El Norte real se ubica hacia donde antes apuntaba el sur (alpha = 0, actual Este / derecha)
     const currentAlpha = this.camera.alpha;
-    const needleDeg = -((currentAlpha + Math.PI / 2) * (180 / Math.PI));
+    const needleDeg = -(currentAlpha * (180 / Math.PI));
     return ((needleDeg % 360) + 360) % 360;
   }
 
@@ -2488,14 +2510,14 @@ export class BabylonSceneService implements OnDestroy {
   }
 
   /**
-   * Alinea suavemente la cámara con el Norte (alpha = -PI / 2) tomando la ruta angular más corta.
+   * Alinea suavemente la cámara con el Norte real (alpha = 0, hacia el actual Este) tomando la ruta angular más corta.
    */
   public resetCameraToNorth(durationMs = 450): void {
     if (!this.camera) return;
     this.buildingFocusAnimId++;
     const startAlpha = this.camera.alpha;
     const twoPi = Math.PI * 2;
-    const targetNorth = -Math.PI / 2;
+    const targetNorth = 0; // Norte real hacia el actual Este (donde antes apuntaba el sur)
     let diff = (targetNorth - (startAlpha % twoPi)) % twoPi;
     if (diff > Math.PI) diff -= twoPi;
     if (diff < -Math.PI) diff += twoPi;

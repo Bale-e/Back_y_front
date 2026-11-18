@@ -15,6 +15,7 @@ export interface BuildingDefinition {
   rotation: { x: number; y: number; z: number };
   scale?: { x: number; y: number; z: number };
   cameraBaseAlpha?: number;
+  cameraRadius?: number;
   floors: FloorDefinition[];
   defaultStairs?: {
     nombre: string;
