@@ -8,15 +8,20 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { NavDrawerComponent } from './components/nav-drawer/nav-drawer.component';
 
 @NgModule({
+  declarations: [
+    NavDrawerComponent
+  ],
   imports: [
     CommonModule,
     FormsModule
   ],
   exports: [
     CommonModule,
-    FormsModule
+    FormsModule,
+    NavDrawerComponent
   ]
 })
 export class SharedModule { }

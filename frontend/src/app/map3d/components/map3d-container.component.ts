@@ -44,6 +44,12 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   isDetailPanelOpen = false;
   pendingBuildingPrompt: BuildingPromptData | null = null;
 
+  // Depuración y HUD de Coordenadas F12
+  f12CoordsVisible = false;
+  currentCoordinatesText = '';
+  currentMeshNameText = '';
+  private unsubCoords?: () => void;
+
   // Búsqueda/autocomplete esperado por spec
   searchQuery = '';
   filteredDestinations: string[] = [];
@@ -276,6 +282,15 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
         this.compassRotation = deg;
         this.cd.detectChanges();
       });
+
+      // Sincronizar coordenadas en tiempo real para HUD y F12
+      this.unsubCoords = this.babylonSceneService.onCoordinatesChange((data) => {
+        if (data.coords) {
+          this.currentCoordinatesText = `X: ${data.coords.x.toFixed(2)}, Y: ${data.coords.y.toFixed(2)}, Z: ${data.coords.z.toFixed(2)}`;
+          this.currentMeshNameText = data.meshName;
+          this.cd.detectChanges();
+        }
+      });
     }
 
     this.subscriptions.add(
@@ -426,6 +441,17 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   }
 async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     try {
+      if (pickResult?.pickedPoint) {
+        const pt = pickResult.pickedPoint;
+        console.log('Mesh seleccionado:', meshName, 'Coordenadas:', pt);
+        console.log(
+          `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${meshName}%c | X: ${pt.x.toFixed(2)}, Y: ${pt.y.toFixed(2)}, Z: ${pt.z.toFixed(2)} (Edificio: ${this.currentBuilding})`,
+          'background: #111; color: #00ffaa; font-weight: bold; padding: 3px 8px; border-radius: 4px;',
+          'color: #aaa;',
+          'color: #ffaa00; font-weight: bold;',
+          'color: #ffffff; font-weight: bold;'
+        );
+      }
       const normalizedMeshName = meshName.replace(/[^a-z0-9]/gi, '').toLowerCase();
 
       const isSede =
@@ -895,6 +921,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
         if (!alreadyOnCorrectFloor) {
           this.switchFloorByPisoName(result.piso, result.edificio);
+          await new Promise(r => setTimeout(r, 600));
         }
       }
       this.destinationCoordinatesText = result.statusText;
@@ -921,6 +948,8 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         piso: result.piso,
       };
       this.mapNavService.setSelectedLocation(this.selectedLocationInfo);
+      const targetMeshName = (loc as any).MeshName || (loc as any).meshName || (loc as any).Cuerpo ? `cuerpo${(loc as any).Cuerpo}` : destinationName;
+      setTimeout(() => this.focusOnMeshIfNeeded(targetMeshName), 600);
     }
 
     this.cd.detectChanges();
@@ -1280,11 +1309,124 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.mapNavService.setFloor(this.sedeModel);
   }
 
+  /**
+   * Wrapper público para enfocar un mesh desde el NavDrawerComponent.
+   * Reutiliza la lógica privada existente de focusOnMeshIfNeeded.
+   */
+  public focusOnMeshExternal(meshName: string): void {
+    this.focusOnMeshIfNeeded(meshName);
+  }
+
+  /**
+   * Maneja la selección de una localidad desde el panel lateral (NavDrawerComponent).
+   * Funciona idénticamente a cuando el usuario hace clic sobre un cuerpo 3D en el mapa:
+   * 1. Cambia de edificio y piso si es necesario.
+   * 2. Localiza y enfoca suavemente el cuerpo 3D de la sala/servicio con la cámara.
+   * 3. Abre el panel de información detallada (`app-location-detail-panel`) en pantalla.
+   * 4. Si se solicita autoRoute, calcula y dibuja la ruta hacia el destino.
+   */
+  public async selectLocationFromDrawer(loc: {
+    nombre: string;
+    edificio: BuildingId;
+    piso: string;
+    floorNum?: number;
+    cuerpo?: number | string | null;
+    meshName?: string;
+    tipo?: string;
+    desc?: string;
+    coordenadas?: { x: number; y: number; z: number } | null;
+    autoRoute?: boolean;
+  }): Promise<void> {
+    this.closeBuildingPrompt(false);
+    this.closeDetailPanel();
+
+    const floorNum = loc.floorNum || (loc.piso ? parseInt(loc.piso.replace(/\D/g, ''), 10) || 1 : 1);
+    const buildingId: BuildingId = loc.edificio;
+
+    // Si es escalera, cambiar de piso y abrir diálogo de pisos
+    if (/escalera/i.test(loc.tipo || '') || /escalera/i.test(loc.nombre || '')) {
+      this.goToFloor(buildingId, floorNum);
+      setTimeout(() => {
+        this.floorSelectorComponent?.openDialog();
+      }, 500);
+      return;
+    }
+
+    // 1. Cambiar de piso/edificio si no coincide con el actual
+    const currentFloorDef = this.buildingRegistry.getFloor(this.currentBuilding, this.currentFloor);
+    const currentFloorNum = currentFloorDef?.number || 1;
+    const needsChange = this.currentBuilding !== buildingId || currentFloorNum !== floorNum;
+
+    if (needsChange) {
+      this.goToFloor(buildingId, floorNum);
+      // Esperar a que el modelo .obj cargue en la escena BabylonJS
+      await new Promise(resolve => setTimeout(resolve, 750));
+    }
+
+    // 2. Resolver malla en BabylonJS
+    let targetMeshName = loc.meshName;
+    if (!targetMeshName && loc.cuerpo != null) {
+      targetMeshName = `cuerpo${loc.cuerpo}`;
+    }
+    if (!targetMeshName) {
+      targetMeshName = loc.nombre;
+    }
+
+    // Buscar la malla en la escena (aprovechando el resolver inteligente de getMeshByName)
+    const mesh = this.babylonSceneService.getMeshByName(targetMeshName);
+
+    // 3. Enfocar cámara sobre el cuerpo 3D
+    if (mesh) {
+      this.focusOnMeshIfNeeded(mesh.name);
+    } else if (loc.coordenadas) {
+      const targetVec = new BABYLON.Vector3(loc.coordenadas.x, loc.coordenadas.y, loc.coordenadas.z);
+      this.animateCameraFocus(targetVec, 15);
+    }
+
+    // 4. Establecer información y abrir el panel de detalle de locación
+    const cuerpoStr = loc.cuerpo != null ? `Cuerpo ${loc.cuerpo}, ` : '';
+    const descText = loc.desc || `${loc.tipo || 'Espacio académico'} — ${cuerpoStr}Edificio ${buildingId}, Piso ${floorNum}.`;
+
+    this.selectedLocationInfo = {
+      nombre: loc.nombre,
+      desc: descText,
+      edificio: buildingId,
+      piso: `Piso ${floorNum}`,
+      cuerpo: loc.cuerpo ?? undefined,
+      tipo: loc.tipo || 'Espacio académico',
+      isStair: false,
+    };
+    this.isDetailPanelOpen = true;
+    this.cd.detectChanges();
+
+    // 5. Si se pidió cálculo inmediato de ruta (botón directo de navegación)
+    if (loc.autoRoute) {
+      this.onDestinationSelected(loc.nombre);
+    }
+  }
+
   @HostListener('window:keydown.escape')
   onEscapeKey(): void {
     if (this.pendingBuildingPrompt) {
       this.closeBuildingPrompt();
     }
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onWindowKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'F12' || event.code === 'F12' || event.keyCode === 123) {
+      this.f12CoordsVisible = !this.f12CoordsVisible;
+      this.babylonSceneService.logCurrentCoordinates('F12 Tecla');
+      this.cd.detectChanges();
+    }
+  }
+
+  public toggleF12Coords(): void {
+    this.f12CoordsVisible = !this.f12CoordsVisible;
+    if (this.f12CoordsVisible) {
+      this.babylonSceneService.logCurrentCoordinates('Panel F12');
+    }
+    this.cd.detectChanges();
   }
 
   public getBuildingInfo(building: BuildingId): BuildingPromptData {
@@ -1776,6 +1918,16 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         if (pickResult?.hit) {
           const meshName = pickResult.pickedMesh ? pickResult.pickedMesh.name || 'cuerpo' : 'suelo';
           console.log('MESH CLICKEADO:', meshName);
+          if (pickResult.pickedPoint) {
+            console.log('Mesh seleccionado:', meshName, 'Coordenadas:', pickResult.pickedPoint);
+            console.log(
+              `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${meshName}%c | X: ${pickResult.pickedPoint.x.toFixed(2)}, Y: ${pickResult.pickedPoint.y.toFixed(2)}, Z: ${pickResult.pickedPoint.z.toFixed(2)} (Edificio: ${this.currentBuilding})`,
+              'background: #111; color: #00ffaa; font-weight: bold; padding: 3px 8px; border-radius: 4px;',
+              'color: #aaa;',
+              'color: #ffaa00; font-weight: bold;',
+              'color: #ffffff; font-weight: bold;'
+            );
+          }
           const normalizedMeshName = (meshName || '').replace(/\s+/g, '').toLowerCase();
           const isFloorTrigger = pickResult.pickedMesh && this.isFloorSelectionTrigger(pickResult.pickedMesh.name);
           const isGroundMesh = pickResult.pickedMesh && pickResult.pickedMesh.name === 'ground';
@@ -2042,6 +2194,10 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   }
 
   ngOnDestroy(): void {
+    if (this.unsubCoords) {
+      this.unsubCoords();
+      this.unsubCoords = undefined;
+    }
     if (this.unsubCameraAngle) {
       this.unsubCameraAngle();
       this.unsubCameraAngle = undefined;

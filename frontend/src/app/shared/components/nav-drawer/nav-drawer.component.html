@@ -1,0 +1,503 @@
+<div class="nd-panel" [class.nd-panel--open]="isOpen" role="dialog" aria-modal="true" aria-label="Panel de navegación">
+
+  <!-- ── Overlay ── -->
+  <div class="nd-overlay" *ngIf="isOpen" (click)="onClose()"></div>
+
+  <!-- ── Panel ── -->
+  <aside class="nd-drawer" [class.nd-drawer--open]="isOpen">
+
+    <!-- HEADER -->
+    <header class="nd-header">
+      <button
+        *ngIf="currentView !== 'main'"
+        class="nd-btn-back"
+        type="button"
+        (click)="goBack()"
+        aria-label="Volver al menú">
+        <span class="nd-icon">←</span>
+      </button>
+
+      <div class="nd-header-brand" *ngIf="currentView === 'main'">
+        <span class="nd-logo-dot"></span>
+        <span class="nd-title">MENÚ CAMPUS</span>
+      </div>
+      <div class="nd-header-brand" *ngIf="currentView !== 'main'">
+        <span class="nd-title nd-title--sub">{{ viewTitle }}</span>
+      </div>
+
+      <button class="nd-btn-close" type="button" (click)="onClose()" aria-label="Cerrar panel">
+        <span>✕</span>
+      </button>
+    </header>
+
+    <!-- BODY -->
+    <div class="nd-body">
+
+      <!-- ════════════════ VISTA PRINCIPAL ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'main'">
+
+        <!-- SERVICIOS -->
+        <section class="nd-section">
+          <div class="nd-section-label">
+            <span class="nd-section-line"></span>
+            <span>SERVICIOS</span>
+            <span class="nd-section-line"></span>
+          </div>
+          <div class="nd-grid nd-grid--2">
+
+            <button class="nd-card nd-card--service" type="button" (click)="navigateToView('banos')">
+              <div class="nd-card-icon nd-card-icon--blue">🚻</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Baños</span>
+                <span class="nd-card-sub">12 ubicaciones</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+            <button class="nd-card nd-card--service" type="button" (click)="navigateToView('biblioteca')">
+              <div class="nd-card-icon nd-card-icon--amber">📚</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Biblioteca</span>
+                <span class="nd-card-sub">Edif. B · Piso 2</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+            <button class="nd-card nd-card--service" type="button" (click)="navigateToView('cafeteria')">
+              <div class="nd-card-icon nd-card-icon--green">☕</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Cafetería</span>
+                <span class="nd-card-sub">Edif. A · Casino</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+            <button class="nd-card nd-card--service" type="button" (click)="navigateToView('enfermeria')">
+              <div class="nd-card-icon nd-card-icon--red">🏥</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Enfermería</span>
+                <span class="nd-card-sub">Primeros auxilios</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+            <button class="nd-card nd-card--service" type="button" (click)="navigateToView('recepcion')" style="grid-column: 1 / -1;">
+              <div class="nd-card-icon nd-card-icon--purple">🏛️</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Recepción</span>
+                <span class="nd-card-sub">Hall Central · Edif. A</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+          </div>
+        </section>
+
+        <!-- UBICACIONES -->
+        <section class="nd-section">
+          <div class="nd-section-label">
+            <span class="nd-section-line"></span>
+            <span>UBICACIONES 3D</span>
+            <span class="nd-section-line"></span>
+          </div>
+          <div class="nd-grid nd-grid--2">
+
+            <button class="nd-card nd-card--location" type="button" (click)="navigateToView('salas')">
+              <div class="nd-card-icon nd-card-icon--cyan">🎓</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Salas</span>
+                <span class="nd-card-sub">A, B, C, D, E</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+            <button class="nd-card nd-card--location" type="button" (click)="navigateToView('laboratorios')">
+              <div class="nd-card-icon nd-card-icon--indigo">🔬</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Laboratorios</span>
+                <span class="nd-card-sub">Talleres y TICs</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+            <button class="nd-card nd-card--location" type="button" (click)="navigateToView('oficinas')">
+              <div class="nd-card-icon nd-card-icon--orange">🗂️</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Oficinas</span>
+                <span class="nd-card-sub">Tutorías y Jefatura</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+            <button class="nd-card nd-card--location" type="button" (click)="navigateToView('escaleras')">
+              <div class="nd-card-icon nd-card-icon--teal">🪜</div>
+              <div class="nd-card-info">
+                <span class="nd-card-name">Escaleras</span>
+                <span class="nd-card-sub">Circulación vertical</span>
+              </div>
+              <span class="nd-card-arrow">›</span>
+            </button>
+
+          </div>
+        </section>
+
+      </div><!-- /main view -->
+
+
+      <!-- ════════════════ BAÑOS ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'banos'">
+        <p class="nd-hint">Selecciona un baño para enfocarlo en 3D o trazar la ruta hacia él.</p>
+
+        <div class="nd-accordion" *ngFor="let group of banoGroups; trackBy: trackByNombre">
+          <button class="nd-accordion-header" type="button" (click)="toggleEdificioBano(group)">
+            <span class="nd-acc-icon">🏢</span>
+            <span class="nd-acc-title">{{ group.edificio }}</span>
+            <span class="nd-acc-badge">{{ group.pisos.length }} pisos</span>
+            <span class="nd-acc-chevron" [class.nd-acc-chevron--open]="group.expandido">›</span>
+          </button>
+
+          <div class="nd-accordion-body" [class.nd-accordion-body--open]="group.expandido">
+            <div *ngFor="let pisoGroup of group.pisos">
+              <div class="nd-piso-label">{{ pisoGroup.piso }}</div>
+              <div
+                *ngFor="let bano of pisoGroup.banos"
+                class="nd-list-item nd-list-item--actionable"
+                [class.nd-list-item--selected]="selectedBano?.nombre === bano.nombre"
+                (click)="selectBano(bano, false)">
+                <span class="nd-list-icon">{{ bano.nombre.includes('Damas') ? '🚺' : '🚹' }}</span>
+                <div class="nd-list-body">
+                  <span class="nd-list-label">{{ cleanBanoName(bano.nombre, bano.edificio) }}</span>
+                  <span class="nd-list-loc">Edif. {{ bano.edificio }} · {{ bano.piso }} · <strong *ngIf="bano.cuerpo">Cuerpo {{ bano.cuerpo }}</strong></span>
+                </div>
+                <button
+                  class="nd-item-btn-nav"
+                  type="button"
+                  title="Cómo llegar"
+                  (click)="$event.stopPropagation(); selectBano(bano, true)">
+                  🧭
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /banos -->
+
+
+      <!-- ════════════════ BIBLIOTECA ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'biblioteca'">
+        <div class="nd-info-card nd-info-card--amber">
+          <div class="nd-info-card-icon">📚</div>
+          <div class="nd-info-card-body">
+            <h3 class="nd-info-card-title">Biblioteca INACAP Renca</h3>
+            <p class="nd-info-card-desc">Centro de recursos para el aprendizaje y la investigación académica. Acceso a colecciones bibliográficas físicas y digitales, terminales computacionales y salas de estudio grupal.</p>
+            <div class="nd-info-card-meta">
+              <span>🏢 Edificio B</span>
+              <span>⬆️ Piso 2</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="nd-actions-col">
+          <button class="nd-btn-primary" type="button" (click)="localizarBiblioteca(false)">
+            📍 Ver en mapa 3D
+          </button>
+          <button class="nd-btn-secondary" type="button" (click)="localizarBiblioteca(true)">
+            🧭 Cómo llegar
+          </button>
+        </div>
+      </div><!-- /biblioteca -->
+
+
+      <!-- ════════════════ CAFETERÍA ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'cafeteria'">
+        <div class="nd-info-card nd-info-card--green">
+          <div class="nd-info-card-icon">☕</div>
+          <div class="nd-info-card-body">
+            <h3 class="nd-info-card-title">Cafetería y Casino</h3>
+            <p class="nd-info-card-desc">Servicio de alimentación y descanso para alumnos, docentes y colaboradores. Menús diarios, opciones vegetarianas, cafetería al paso y área de microondas.</p>
+            <div class="nd-info-card-meta">
+              <span>🏢 Edificio A</span>
+              <span>📍 Nivel Casino</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="nd-actions-col">
+          <button class="nd-btn-primary" type="button" (click)="localizarCafeteria(false)">
+            📍 Ver en mapa 3D
+          </button>
+          <button class="nd-btn-secondary" type="button" (click)="localizarCafeteria(true)">
+            🧭 Cómo llegar
+          </button>
+        </div>
+      </div><!-- /cafeteria -->
+
+
+      <!-- ════════════════ ENFERMERÍA ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'enfermeria'">
+        <div class="nd-info-card nd-info-card--red">
+          <div class="nd-info-card-icon">🏥</div>
+          <div class="nd-info-card-body">
+            <h3 class="nd-info-card-title">Enfermería Campus</h3>
+            <p class="nd-info-card-desc">Atención de primeros auxilios y respuesta ante emergencias para toda la comunidad universitaria durante el horario académico.</p>
+            <div class="nd-info-card-meta">
+              <span>🏢 Edificio A</span>
+              <span>📍 Sector Acceso / Piso 1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="nd-actions-col">
+          <button class="nd-btn-primary" type="button" (click)="localizarEnfermeria(false)">
+            📍 Ver en mapa 3D
+          </button>
+          <button class="nd-btn-secondary" type="button" (click)="localizarEnfermeria(true)">
+            🧭 Cómo llegar
+          </button>
+        </div>
+      </div><!-- /enfermeria -->
+
+
+      <!-- ════════════════ RECEPCIÓN ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'recepcion'">
+        <div class="nd-info-card nd-info-card--purple">
+          <div class="nd-info-card-icon">🏛️</div>
+          <div class="nd-info-card-body">
+            <h3 class="nd-info-card-title">Recepción y Hall Central</h3>
+            <p class="nd-info-card-desc">Punto de bienvenida institucional, orientación a visitantes, entrega de certificados y atención a estudiantes.</p>
+            <div class="nd-info-card-meta">
+              <span>🏢 Edificio A</span>
+              <span>📍 Hall Central · Piso 1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="nd-actions-col">
+          <button class="nd-btn-primary" type="button" (click)="localizarRecepcion(false)">
+            📍 Ver en mapa 3D
+          </button>
+          <button class="nd-btn-secondary" type="button" (click)="localizarRecepcion(true)">
+            🧭 Cómo llegar
+          </button>
+        </div>
+      </div><!-- /recepcion -->
+
+
+      <!-- ════════════════ SALAS ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'salas'">
+
+        <!-- Buscador -->
+        <div class="nd-search-wrap">
+          <span class="nd-search-icon">🔍</span>
+          <input
+            class="nd-search-input"
+            type="text"
+            placeholder="Buscar sala (ej: A105, C101, B304...)"
+            [(ngModel)]="salasSearchQuery"
+            (ngModelChange)="onSalasSearch()"
+            (keydown.enter)="onSalasSearchEnter()"
+            autocomplete="off" />
+          <button *ngIf="salasSearchQuery" class="nd-search-clear" type="button" (click)="salasSearchQuery=''; onSalasSearch()">✕</button>
+        </div>
+
+        <!-- Filtros por Edificio -->
+        <div class="nd-filter-chips">
+          <button
+            *ngFor="let opt of buildingFilterOptions"
+            type="button"
+            class="nd-chip"
+            [class.nd-chip--active]="selectedBuildingFilter === opt.id"
+            (click)="setBuildingFilter(opt.id)">
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <!-- Salas Destacadas (si no hay búsqueda) -->
+        <div class="nd-subsection" *ngIf="!salasSearchQuery && filteredSalasDestacadas.length > 0">
+          <div class="nd-subsection-title">⭐ Salas Destacadas</div>
+          <div class="nd-cards-row">
+            <button
+              *ngFor="let s of filteredSalasDestacadas; trackBy: trackByNombre"
+              class="nd-mini-card"
+              [class.nd-mini-card--selected]="selectedSala?.nombre === s.nombre"
+              type="button"
+              (click)="selectSala(s, false)">
+              <div class="nd-mini-card-name">{{ formatRoomName(s.nombre) }}</div>
+              <div class="nd-mini-card-loc">Edif. {{ s.edificio }}</div>
+              <div class="nd-mini-card-piso">{{ s.piso }}</div>
+              <div class="nd-mini-card-cuerpo" *ngIf="s.cuerpo">Cuerpo {{ s.cuerpo }}</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Búsquedas Recientes -->
+        <div class="nd-subsection" *ngIf="filteredSalasRecientes.length > 0 && !salasSearchQuery">
+          <div class="nd-subsection-title">
+            <span>🕐 Búsquedas Recientes</span>
+            <button class="nd-clear-btn" type="button" (click)="clearRecientes()">limpiar</button>
+          </div>
+          <div
+            *ngFor="let s of filteredSalasRecientes; trackBy: trackByNombre"
+            class="nd-list-item nd-list-item--actionable"
+            (click)="selectSala(s, false)">
+            <span class="nd-list-icon">🕐</span>
+            <div class="nd-list-body">
+              <span class="nd-list-label">{{ s.nombre }}</span>
+              <span class="nd-list-loc">Edif. {{ s.edificio }} · {{ s.piso }} · <strong *ngIf="s.cuerpo">Cuerpo {{ s.cuerpo }}</strong></span>
+            </div>
+            <button class="nd-item-btn-nav" type="button" title="Cómo llegar" (click)="$event.stopPropagation(); selectSala(s, true)">🧭</button>
+          </div>
+        </div>
+
+        <!-- Indicador de carga -->
+        <div *ngIf="isLoadingSalas" class="nd-loading">
+          <span class="nd-spinner"></span> Cargando salas...
+        </div>
+
+        <!-- Lista de salas filtradas -->
+        <div class="nd-subsection" *ngIf="salasSearchResultsFiltered.length > 0">
+          <div class="nd-subsection-title">
+            {{ salasSearchQuery ? 'Resultados de búsqueda' : 'Salas de clases' }} ({{ salasSearchResultsFiltered.length }})
+          </div>
+          <div
+            *ngFor="let s of salasSearchResultsFiltered; trackBy: trackByNombre"
+            class="nd-list-item nd-list-item--actionable"
+            [class.nd-list-item--selected]="selectedSala?.nombre === s.nombre"
+            (click)="selectSala(s, false)">
+            <span class="nd-list-icon">🎓</span>
+            <div class="nd-list-body">
+              <span class="nd-list-label">{{ s.nombre }}</span>
+              <span class="nd-list-loc">Edificio {{ s.edificio }} · {{ s.piso }} <strong *ngIf="s.cuerpo">· Cuerpo {{ s.cuerpo }}</strong></span>
+            </div>
+            <button class="nd-item-btn-nav" type="button" title="Cómo llegar" (click)="$event.stopPropagation(); selectSala(s, true)">🧭</button>
+          </div>
+        </div>
+
+        <div *ngIf="!isLoadingSalas && salasSearchResultsFiltered.length === 0" class="nd-empty-state">
+          <span>🎓</span>
+          <p>No se encontraron salas que coincidan con la búsqueda.</p>
+        </div>
+
+      </div><!-- /salas -->
+
+
+      <!-- ════════════════ LABORATORIOS ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'laboratorios'">
+
+        <p class="nd-hint">Selecciona un laboratorio para enfocarlo en 3D o trazar la ruta.</p>
+
+        <!-- Filtros por Edificio -->
+        <div class="nd-filter-chips">
+          <button
+            *ngFor="let opt of buildingFilterOptions"
+            type="button"
+            class="nd-chip"
+            [class.nd-chip--active]="selectedLabBuildingFilter === opt.id"
+            (click)="setLabBuildingFilter(opt.id)">
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div *ngIf="isLoadingLabs" class="nd-loading">
+          <span class="nd-spinner"></span> Cargando laboratorios...
+        </div>
+
+        <div *ngIf="!isLoadingLabs && laboratoriosFiltered.length > 0" class="nd-list-group">
+          <div
+            *ngFor="let lab of laboratoriosFiltered; trackBy: trackByNombre"
+            class="nd-list-item nd-list-item--actionable"
+            (click)="selectLaboratorio(lab, false)">
+            <span class="nd-list-icon">🔬</span>
+            <div class="nd-list-body">
+              <span class="nd-list-label">{{ lab.nombre }}</span>
+              <span class="nd-list-loc">
+                <span class="nd-badge-type">{{ lab.tipo }}</span> · Edif. {{ lab.edificio }} · {{ lab.piso }}
+                <strong *ngIf="lab.cuerpo">· Cuerpo {{ lab.cuerpo }}</strong>
+              </span>
+            </div>
+            <button class="nd-item-btn-nav" type="button" title="Cómo llegar" (click)="$event.stopPropagation(); selectLaboratorio(lab, true)">🧭</button>
+          </div>
+        </div>
+
+        <div *ngIf="!isLoadingLabs && laboratoriosFiltered.length === 0" class="nd-empty-state">
+          <span>🔬</span>
+          <p>No hay laboratorios registrados para este filtro.</p>
+        </div>
+
+      </div><!-- /laboratorios -->
+
+
+      <!-- ════════════════ OFICINAS ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'oficinas'">
+
+        <div class="nd-search-wrap">
+          <span class="nd-search-icon">🔍</span>
+          <input
+            class="nd-search-input"
+            type="text"
+            placeholder="Buscar oficina o tutoría..."
+            [(ngModel)]="oficinasSearchQuery"
+            (ngModelChange)="onOficinasSearch()"
+            autocomplete="off" />
+          <button *ngIf="oficinasSearchQuery" class="nd-search-clear" type="button" (click)="oficinasSearchQuery=''; onOficinasSearch()">✕</button>
+        </div>
+
+        <div *ngIf="isLoadingOficinas" class="nd-loading">
+          <span class="nd-spinner"></span> Cargando oficinas...
+        </div>
+
+        <div *ngIf="!isLoadingOficinas && oficinasFiltered.length > 0" class="nd-list-group">
+          <div
+            *ngFor="let o of oficinasFiltered; trackBy: trackByNombre"
+            class="nd-list-item nd-list-item--actionable"
+            [class.nd-list-item--selected]="selectedOficina?.nombre === o.nombre"
+            (click)="selectOficina(o, false)">
+            <span class="nd-list-icon">🗂️</span>
+            <div class="nd-list-body">
+              <span class="nd-list-label">{{ o.nombre }}</span>
+              <span class="nd-list-loc">
+                <span class="nd-badge-type">{{ o.tipo }}</span> · Edif. {{ o.edificio }} · {{ o.piso }}
+                <strong *ngIf="o.cuerpo">· Cuerpo {{ o.cuerpo }}</strong>
+              </span>
+            </div>
+            <button class="nd-item-btn-nav" type="button" title="Cómo llegar" (click)="$event.stopPropagation(); selectOficina(o, true)">🧭</button>
+          </div>
+        </div>
+
+        <div *ngIf="!isLoadingOficinas && oficinasFiltered.length === 0" class="nd-empty-state">
+          <span>🗂️</span>
+          <p>No se encontraron oficinas registradas.</p>
+        </div>
+
+      </div><!-- /oficinas -->
+
+
+      <!-- ════════════════ ESCALERAS ════════════════ -->
+      <div class="nd-view" [class.nd-view--active]="currentView === 'escaleras'">
+        <p class="nd-hint">Selecciona una escalera para verla en el mapa o acceder a otros pisos.</p>
+
+        <div
+          *ngFor="let e of escalerasList; trackBy: trackByNombre"
+          class="nd-list-item nd-list-item--actionable nd-list-item--stair"
+          [class.nd-list-item--selected]="selectedEscalera === e.nombre"
+          (click)="selectEscalera(e, false)">
+          <span class="nd-list-icon">🪜</span>
+          <div class="nd-list-body">
+            <span class="nd-list-label">{{ e.nombre }}</span>
+            <span class="nd-list-loc">Edificio {{ e.edificio }} · {{ e.piso }} <strong *ngIf="e.cuerpo">· Cuerpo {{ e.cuerpo }}</strong></span>
+            <span class="nd-list-floors">{{ e.desc }}</span>
+          </div>
+          <button class="nd-item-btn-nav" type="button" title="Cómo llegar" (click)="$event.stopPropagation(); selectEscalera(e, true)">🧭</button>
+        </div>
+
+        <div *ngIf="escalerasList.length === 0" class="nd-empty-state">
+          <span>🪜</span>
+          <p>No se encontraron escaleras registradas.</p>
+        </div>
+      </div><!-- /escaleras -->
+
+    </div><!-- /nd-body -->
+
+  </aside>
+
+</div>

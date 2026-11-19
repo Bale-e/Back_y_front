@@ -1,0 +1,900 @@
+// ══════════════════════════════════════════════════════════════════
+//  NAV-DRAWER – Estilos completos
+//  Tipografía: Inter / sistema. Paleta: oscuro + acentos por categoría
+// ══════════════════════════════════════════════════════════════════
+
+$font-base: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+// Colores base
+$bg-panel:        rgba(10, 14, 26, 0.97);
+$bg-inner:        rgba(14, 20, 38, 0.98);
+$border-subtle:   rgba(255, 255, 255, 0.07);
+$border-mid:      rgba(255, 255, 255, 0.12);
+$text-primary:    #f0f4ff;
+$text-muted:      rgba(200, 210, 240, 0.60);
+$accent-orange:   #ff6b2b;
+
+// Tamaño del panel
+$panel-width:     420px;
+$panel-width-sm:  calc(100vw - 24px);
+
+// ── HOST ──────────────────────────────────────────────────────────
+:host { display: block; }
+
+// ── OVERLAY ───────────────────────────────────────────────────────
+.nd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  animation: ndFadeIn 220ms ease forwards;
+}
+@keyframes ndFadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+// ── PANEL ────────────────────────────────────────────────────────
+.nd-panel {
+  position: relative;
+  z-index: 1600;
+}
+
+.nd-drawer {
+  position: fixed;
+  top: 20px;
+  right: 0;
+  width: $panel-width;
+  max-width: 94vw;
+  height: calc(100vh - 60px);
+  max-height: calc(100vh - 60px);
+  z-index: 1600;
+  display: flex;
+  flex-direction: column;
+  background: $bg-panel;
+  border-left: 1px solid $border-subtle;
+  border-radius: 16px 0 0 16px;
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.6), -4px 0 20px rgba(0, 0, 0, 0.4);
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 340ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 240ms ease;
+  overflow: hidden;
+  font-family: $font-base;
+
+  &--open {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  // Gradiente decorativo superior
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 180px;
+    background: radial-gradient(ellipse at top right, rgba($accent-orange, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+}
+
+// ── HEADER ───────────────────────────────────────────────────────
+.nd-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid $border-subtle;
+  position: relative;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+}
+
+.nd-header-brand {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nd-logo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: $accent-orange;
+  box-shadow: 0 0 10px rgba($accent-orange, 0.6);
+  flex-shrink: 0;
+}
+
+.nd-title {
+  color: $text-primary;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+
+  &--sub {
+    font-size: 17px;
+    letter-spacing: 0.08em;
+  }
+}
+
+.nd-btn-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid $border-mid;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  color: $text-primary;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+  flex-shrink: 0;
+
+  &:hover { background: rgba(255,255,255,0.12); transform: translateX(-2px); }
+}
+
+.nd-btn-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid $border-mid;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  color: $text-primary;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+  flex-shrink: 0;
+  position: absolute;
+  right: 16px;
+
+  &:hover { background: rgba(220, 50, 50, 0.25); border-color: rgba(220,50,50,0.4); }
+}
+
+// ── BODY ─────────────────────────────────────────────────────────
+.nd-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+// ── VIEWS (slide system) ─────────────────────────────────────────
+.nd-view {
+  position: absolute;
+  inset: 0;
+  padding: 16px 18px 20px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(24px);
+  transition: opacity 220ms ease, transform 220ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &--active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  // scrollbar
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+  &::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.24); }
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.14) transparent;
+}
+
+// ── SECTION LABEL ────────────────────────────────────────────────
+.nd-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nd-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: $text-muted;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.nd-section-line {
+  flex: 1;
+  height: 1px;
+  background: $border-subtle;
+}
+
+// ── GRID ─────────────────────────────────────────────────────────
+.nd-grid {
+  display: grid;
+  gap: 8px;
+
+  &--2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+// ── CARD (menú principal) ─────────────────────────────────────────
+.nd-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid $border-subtle;
+  background: rgba(255,255,255,0.04);
+  color: $text-primary;
+  cursor: pointer;
+  text-align: left;
+  transition: background 180ms ease, border-color 180ms ease,
+              transform 180ms ease, box-shadow 180ms ease;
+
+  &:hover {
+    background: rgba(255,255,255,0.09);
+    border-color: $border-mid;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+
+  &:active { transform: translateY(0); }
+
+  &--inactive {
+    opacity: 0.72;
+  }
+}
+
+.nd-card-icon {
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &--blue   { background: rgba(59,130,246,0.18);  box-shadow: 0 0 12px rgba(59,130,246,0.15); }
+  &--amber  { background: rgba(245,158,11,0.18);  box-shadow: 0 0 12px rgba(245,158,11,0.15); }
+  &--green  { background: rgba(16,185,129,0.18);  box-shadow: 0 0 12px rgba(16,185,129,0.15); }
+  &--red    { background: rgba(239,68,68,0.18);   box-shadow: 0 0 12px rgba(239,68,68,0.15);  }
+  &--purple { background: rgba(139,92,246,0.18);  box-shadow: 0 0 12px rgba(139,92,246,0.15); }
+  &--cyan   { background: rgba(6,182,212,0.18);   box-shadow: 0 0 12px rgba(6,182,212,0.15);  }
+  &--indigo { background: rgba(99,102,241,0.18);  box-shadow: 0 0 12px rgba(99,102,241,0.15); }
+  &--orange { background: rgba(249,115,22,0.18);  box-shadow: 0 0 12px rgba(249,115,22,0.15); }
+  &--teal   { background: rgba(20,184,166,0.18);  box-shadow: 0 0 12px rgba(20,184,166,0.15); }
+}
+
+.nd-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.nd-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text-primary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nd-card-sub {
+  font-size: 11px;
+  color: $text-muted;
+}
+
+.nd-badge--soon {
+  color: rgba(249,115,22,0.85);
+  font-weight: 600;
+}
+
+.nd-card-arrow {
+  color: $text-muted;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+// ── BOTÓN PRIMARIO ────────────────────────────────────────────────
+.nd-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba($accent-orange, 0.4);
+  background: linear-gradient(135deg, rgba($accent-orange, 0.25), rgba($accent-orange, 0.12));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 180ms ease, transform 160ms ease, box-shadow 180ms ease;
+
+  &:hover {
+    background: linear-gradient(135deg, rgba($accent-orange, 0.42), rgba($accent-orange, 0.26));
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba($accent-orange, 0.25);
+  }
+  &:active { transform: translateY(0); }
+}
+
+// ── INFO CARD (Biblioteca, Cafetería, etc.) ──────────────────────
+.nd-info-card {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid $border-subtle;
+  background: rgba(255,255,255,0.04);
+
+  &--amber  { border-color: rgba(245,158,11,0.25);  background: rgba(245,158,11,0.07);  }
+  &--green  { border-color: rgba(16,185,129,0.25);  background: rgba(16,185,129,0.07);  }
+  &--red    { border-color: rgba(239,68,68,0.25);   background: rgba(239,68,68,0.07);   }
+  &--purple { border-color: rgba(139,92,246,0.25);  background: rgba(139,92,246,0.07);  }
+}
+
+.nd-info-card-icon {
+  font-size: 36px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.nd-info-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nd-info-card-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: $text-primary;
+}
+
+.nd-info-card-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: $text-muted;
+}
+
+.nd-info-card-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+
+  span {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(200,210,240,0.75);
+    background: rgba(255,255,255,0.07);
+    padding: 3px 8px;
+    border-radius: 20px;
+  }
+}
+
+// ── COMING SOON ───────────────────────────────────────────────────
+.nd-coming-soon {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px dashed rgba(249,115,22,0.3);
+  background: rgba(249,115,22,0.05);
+}
+
+.nd-cs-icon { font-size: 28px; flex-shrink: 0; }
+
+.nd-cs-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(249,115,22,0.9);
+  margin-bottom: 4px;
+}
+
+.nd-cs-desc {
+  font-size: 11px;
+  color: $text-muted;
+  line-height: 1.5;
+}
+
+// ── ACORDEÓN (Baños) ──────────────────────────────────────────────
+.nd-accordion {
+  border-radius: 12px;
+  border: 1px solid $border-subtle;
+  overflow: hidden;
+  background: rgba(255,255,255,0.03);
+}
+
+.nd-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: $text-primary;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 160ms ease;
+
+  &:hover { background: rgba(255,255,255,0.05); }
+}
+
+.nd-acc-icon { font-size: 18px; }
+
+.nd-acc-title { flex: 1; }
+
+.nd-acc-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(59,130,246,0.85);
+  background: rgba(59,130,246,0.12);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.nd-acc-chevron {
+  font-size: 20px;
+  color: $text-muted;
+  transition: transform 220ms ease;
+  display: inline-block;
+
+  &--open { transform: rotate(90deg); }
+}
+
+.nd-accordion-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 300ms ease;
+  border-top: 0px solid $border-subtle;
+
+  &--open {
+    max-height: 600px;
+    border-top-width: 1px;
+  }
+}
+
+.nd-piso-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-muted;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 14px 4px;
+}
+
+// ── LIST ITEM ─────────────────────────────────────────────────────
+.nd-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: $text-primary;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease;
+
+  &:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: $border-subtle;
+  }
+
+  &--selected {
+    background: rgba($accent-orange, 0.14);
+    border-color: rgba($accent-orange, 0.35);
+  }
+
+  &--static { cursor: default; }
+  &--static:hover { background: transparent; border-color: transparent; }
+
+  &--search { border-color: $border-subtle; background: rgba(255,255,255,0.03); }
+}
+
+.nd-list-icon { font-size: 16px; flex-shrink: 0; }
+
+.nd-list-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.nd-list-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text-primary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nd-list-loc {
+  font-size: 11px;
+  color: $text-muted;
+}
+
+.nd-list-floors {
+  font-size: 11px;
+  color: rgba(6,182,212,0.75);
+  font-weight: 500;
+}
+
+// ── BUSCADOR ──────────────────────────────────────────────────────
+.nd-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid $border-mid;
+  background: rgba(255,255,255,0.05);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+
+  &:focus-within {
+    border-color: rgba($accent-orange, 0.5);
+    box-shadow: 0 0 0 3px rgba($accent-orange, 0.12);
+  }
+}
+
+.nd-search-icon { font-size: 14px; flex-shrink: 0; }
+
+.nd-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: $text-primary;
+  font-size: 13px;
+  font-family: $font-base;
+
+  &::placeholder { color: $text-muted; }
+}
+
+.nd-search-clear {
+  background: transparent;
+  border: none;
+  color: $text-muted;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+
+  &:hover { color: $text-primary; }
+}
+
+.nd-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 10px;
+  border: 1px solid $border-subtle;
+  overflow: hidden;
+  background: rgba(10,14,26,0.9);
+}
+
+// ── MINI CARDS (Salas Destacadas) ─────────────────────────────────
+.nd-cards-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nd-mini-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid $border-subtle;
+  background: rgba(255,255,255,0.04);
+  color: $text-primary;
+  cursor: pointer;
+  min-width: 80px;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  text-align: left;
+
+  &:hover {
+    background: rgba(255,255,255,0.09);
+    border-color: $border-mid;
+    transform: translateY(-2px);
+  }
+
+  &--selected {
+    background: rgba($accent-orange, 0.15);
+    border-color: rgba($accent-orange, 0.4);
+  }
+}
+
+.nd-mini-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: $text-primary;
+}
+
+.nd-mini-card-loc {
+  font-size: 10px;
+  color: rgba($accent-orange, 0.85);
+  font-weight: 600;
+}
+
+.nd-mini-card-piso {
+  font-size: 10px;
+  color: $text-muted;
+}
+
+// ── SUBSECCIÓN ────────────────────────────────────────────────────
+.nd-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nd-subsection-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: $text-muted;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.nd-clear-btn {
+  background: transparent;
+  border: none;
+  color: rgba(239,68,68,0.6);
+  font-size: 11px;
+  cursor: pointer;
+  font-family: $font-base;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: auto;
+
+  &:hover { color: rgba(239,68,68,0.9); background: rgba(239,68,68,0.08); }
+}
+
+// ── SELECTED INFO ─────────────────────────────────────────────────
+.nd-selected-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(16,185,129,0.3);
+  background: rgba(16,185,129,0.08);
+  animation: ndSlideIn 200ms ease;
+}
+
+@keyframes ndSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.nd-sel-icon { font-size: 20px; flex-shrink: 0; }
+
+.nd-sel-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: $text-primary;
+}
+
+.nd-sel-loc {
+  font-size: 12px;
+  color: $text-muted;
+  margin-top: 2px;
+}
+
+// ── LOADING ───────────────────────────────────────────────────────
+.nd-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: $text-muted;
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+.nd-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: $accent-orange;
+  border-radius: 50%;
+  animation: ndSpin 700ms linear infinite;
+  display: inline-block;
+}
+
+@keyframes ndSpin { to { transform: rotate(360deg); } }
+
+// ── EMPTY STATE ───────────────────────────────────────────────────
+.nd-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: $text-muted;
+  font-size: 13px;
+  text-align: center;
+
+  span { font-size: 36px; }
+  p { margin: 0; }
+}
+
+// ── HINT ─────────────────────────────────────────────────────────
+.nd-hint {
+  margin: 0;
+  font-size: 12px;
+  color: $text-muted;
+  line-height: 1.5;
+}
+
+// ── ACCIONES DUALES (Ver 3D & Cómo llegar) ────────────────────────
+.nd-actions-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.nd-btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 107, 43, 0.35);
+  background: rgba(255, 107, 43, 0.08);
+  color: #ff8c52;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 180ms ease;
+
+  &:hover {
+    background: rgba(255, 107, 43, 0.16);
+    border-color: rgba(255, 107, 43, 0.6);
+    transform: translateY(-1px);
+  }
+}
+
+// ── FILTROS DE EDIFICIO (CHIPS) ──────────────────────────────────
+.nd-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.nd-chip {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid $border-subtle;
+  background: rgba(255, 255, 255, 0.04);
+  color: $text-muted;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 160ms ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: $text-primary;
+  }
+
+  &--active {
+    background: rgba(255, 107, 43, 0.18);
+    border-color: rgba(255, 107, 43, 0.5);
+    color: #ff8c52;
+  }
+}
+
+// ── BOTÓN DIRECTO DE RUTA EN LIST ITEMS ───────────────────────────
+.nd-list-item--actionable {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  &:hover .nd-item-btn-nav {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.nd-item-btn-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 107, 43, 0.25);
+  background: rgba(255, 107, 43, 0.12);
+  color: #ff8c52;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.82;
+  transition: all 180ms ease;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(255, 107, 43, 0.28);
+    border-color: rgba(255, 107, 43, 0.7);
+    transform: scale(1.08);
+  }
+}
+
+// ── BADGES DE ESPECIALIDAD Y CUERPO ───────────────────────────────
+.nd-badge-type {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.nd-mini-card-cuerpo {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 2px;
+}
+
+// ── RESPONSIVE ───────────────────────────────────────────────────
+@media (max-width: 480px) {
+  .nd-drawer {
+    width: 100vw;
+    max-width: 100vw;
+    border-radius: 0;
+  }
+
+  .nd-grid--2 { grid-template-columns: 1fr; }
+
+  .nd-cards-row { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+}

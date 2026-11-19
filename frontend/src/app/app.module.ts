@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { AppComponent } from './app.component';
 import { AdminPanelComponent } from './admin/admin-panel.component';
 import { Map3dModule } from './map3d/map3d.module';
+import { SharedModule } from './shared/shared.module';
 
 @NgModule({
   declarations: [
@@ -15,7 +16,8 @@ import { Map3dModule } from './map3d/map3d.module';
     BrowserModule,
     HttpClientModule,
     FormsModule,
-    Map3dModule
+    Map3dModule,
+    SharedModule
   ],
   bootstrap: [AppComponent]
 })

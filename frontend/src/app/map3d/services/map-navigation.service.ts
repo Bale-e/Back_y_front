@@ -321,11 +321,117 @@ export class MapNavigationService {
       if (this.cachedLocations.length === 0) {
         this.cachedLocations = await this.espaciosApiService.getLocacionesDeTodosLosEdificios();
       }
-      const target = this.cachedLocations.find((loc: any) => {
-        const name = (loc.Nombre || loc.nombre || '').trim().toLowerCase();
-        return name === destinationName.trim().toLowerCase();
+
+      const clean = (s: string) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const query = clean(destinationName);
+
+      // 1. Coincidencia exacta
+      let target = this.cachedLocations.find((loc: any) => {
+        const name = clean(loc.Nombre || loc.nombre || '');
+        return name === query;
       });
-      return target || null;
+      if (target) return target;
+
+      // 2. Coincidencia con o sin prefijo "sala ", "aula ", "oficina ", "laboratorio ", etc.
+      const queryWithoutPrefix = query.replace(/^(sala|aula|lab|laboratorio|oficina|banos?|banio)\s+/i, '');
+      target = this.cachedLocations.find((loc: any) => {
+        const name = clean(loc.Nombre || loc.nombre || '');
+        const nameWithoutPrefix = name.replace(/^(sala|aula|lab|laboratorio|oficina|banos?|banio)\s+/i, '');
+        return nameWithoutPrefix === queryWithoutPrefix || name === queryWithoutPrefix || nameWithoutPrefix === query;
+      });
+      if (target) return target;
+
+      // 3. Coincidencia por código de sala (ej. a101, b304, c101, c102, a204)
+      const codeMatch = query.match(/[a-e]\d{3}/i);
+      if (codeMatch) {
+        const code = codeMatch[0];
+        target = this.cachedLocations.find((loc: any) => {
+          const name = clean(loc.Nombre || loc.nombre || '');
+          return name.includes(code);
+        });
+        if (target) return target;
+      }
+
+      // 4. Búsqueda y resolución de Baños
+      if (/ba[nñ]o/i.test(query)) {
+        const isDamas = /dama|mujer|femenino/i.test(query);
+        const isVarones = /varon|hombre|masculino/i.test(query);
+        const pMatch = query.match(/piso\s*(\d)/i);
+        const pisoNum = pMatch ? pMatch[1] : '1';
+        const edMatch = query.match(/edificio\s*([a-e])|\b([a-e])\b/i);
+        const edId: BuildingId = edMatch ? ((edMatch[1] || edMatch[2]).toUpperCase() as BuildingId) : 'A';
+
+        // Buscar en las locaciones cacheadas
+        target = this.cachedLocations.find((loc: any) => {
+          const name = clean(loc.Nombre || loc.nombre || '');
+          const locEd = (loc._edificioId || loc.Edificio || loc.edificio || '').toString().toUpperCase();
+          const locPiso = (loc.Piso || loc.piso || '').toString();
+          const matchEd = !edId || locEd.includes(edId);
+          const matchPiso = locPiso.includes(pisoNum);
+          const isBano = /ba[nñ]o/i.test(name) || /ba[nñ]o/i.test(loc.Tipo || loc.tipo || '');
+          return isBano && matchEd && matchPiso;
+        });
+        if (target) return target;
+
+        // Fallback dinámico si no está registrado en Firestore
+        if (edId === 'A') {
+          const cuerpoNum = isVarones ? 11 : 10;
+          const yElev = pisoNum === '3' ? 0.86 : (pisoNum === '2' ? 0.41 : 0.05);
+          return {
+            id: `bano_A_P${pisoNum}_${isVarones ? 'V' : 'D'}`,
+            Nombre: destinationName,
+            Tipo: 'Baño',
+            Edificio: 'Edificio A',
+            _edificioId: 'A',
+            _edificioNombre: 'Edificio A',
+            Piso: `Piso ${pisoNum}`,
+            Cuerpo: cuerpoNum,
+            coordenadas: { x: isVarones ? 4.20 : 3.50, y: yElev, z: 0.16 }
+          } as any;
+        } else if (edId === 'C') {
+          const mesh = isVarones ? 'C_P1_Grupo_11' : 'C_P1_Grupo_10';
+          return {
+            id: `bano_C_P1_${isVarones ? 'V' : 'D'}`,
+            Nombre: destinationName,
+            Tipo: 'Baño',
+            Edificio: 'Edificio C',
+            _edificioId: 'C',
+            _edificioNombre: 'Edificio C',
+            Piso: 'Piso 1',
+            MeshName: mesh,
+            Cuerpo: isVarones ? 11 : 10,
+            coordenadas: { x: -2.20, y: 0.05, z: isVarones ? 15.50 : 13.80 }
+          } as any;
+        }
+      }
+
+      // 5. Fallback para salas conocidas (A101, A204, B304, C101, C102)
+      if (codeMatch) {
+        const code = codeMatch[0].toUpperCase();
+        const ed = code.charAt(0) as BuildingId;
+        const pisoDigit = code.charAt(1);
+        const yElev = pisoDigit === '3' ? 0.86 : (pisoDigit === '2' ? 0.41 : 0.05);
+        let coords = { x: 0, y: yElev, z: 0 };
+        if (code === 'A101') coords = { x: -9.00, y: 0.05, z: 0.16 };
+        else if (code === 'A204') coords = { x: 2.80, y: 0.41, z: 0.16 };
+        else if (code === 'B304') coords = { x: -0.49, y: 0.86, z: -4.50 };
+        else if (code === 'C101') coords = { x: -2.40, y: 0.05, z: 4.80 };
+        else if (code === 'C102') coords = { x: -2.40, y: 0.05, z: 2.50 };
+
+        return {
+          id: `fallback_${code}`,
+          Nombre: destinationName,
+          Tipo: 'Sala',
+          Edificio: `Edificio ${ed}`,
+          _edificioId: ed,
+          _edificioNombre: `Edificio ${ed}`,
+          Piso: `Piso ${pisoDigit}`,
+          MeshName: code,
+          coordenadas: coords
+        } as any;
+      }
+
+      return null;
     } catch (err) {
       console.error('Error buscando locación:', err);
       return null;
@@ -658,10 +764,22 @@ export class MapNavigationService {
         position: { x: -2.40, y: getFloorY(piso), z: -2.20 }
       };
     }
+    if (sourceBuilding === 'C' && targetBuilding === 'E') {
+      return {
+        name: 'ConectorEdificioE',
+        position: { x: -3.160340012066989, y: 0.1469096839427877, z: 1.6463125327081438 }
+      };
+    }
     if (sourceBuilding === 'D' && targetBuilding === 'C') {
       return {
         name: 'ConectorEdificioC',
         position: { x: -0.05, y: getFloorY(piso), z: 11.10 }
+      };
+    }
+    if (sourceBuilding === 'E' && targetBuilding === 'C') {
+      return {
+        name: 'ConectorEdificioC',
+        position: { x: -10.257817831379821, y: 0.28873252858175036, z: 0.5507832656850731 }
       };
     }
     return {
@@ -1219,6 +1337,14 @@ export class MapNavigationService {
           destination.clone()
         ]);
       }
+    } else if (edificio === 'A') {
+      const targetY = destination.y;
+      const startX = 0.00;
+      routePoints = this.cleanRoutePoints([
+        new BABYLON.Vector3(startX, targetY, 0.16),
+        new BABYLON.Vector3(destination.x, targetY, 0.16),
+        destination.clone()
+      ]);
     }
 
     const finalRoute = routePoints.length > 0 ? routePoints : [destination.clone()];

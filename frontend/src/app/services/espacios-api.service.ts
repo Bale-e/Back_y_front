@@ -66,11 +66,15 @@ export class EspaciosApiService {
       edificios.map(async (ed) => {
         const locs = await this.getLocacionesDeEdificio(ed.id);
         const edNombre = ed.Nombre || ed.nombre || `Edificio ${ed.id}`;
+        const match = edNombre.match(/edifici?o\s*([a-zA-Z0-9]+)/i);
+        const edCodigo = match ? match[1].toUpperCase() : (ed.id && ed.id.length <= 2 ? ed.id.toUpperCase() : '');
         locs.forEach((loc) => {
           results.push({
             ...loc,
             _edificioId: ed.id,
-            _edificioNombre: edNombre
+            _edificioNombre: edNombre,
+            _edificioCodigo: edCodigo,
+            edificio: loc.edificio || loc.Edificio || edCodigo || undefined
           });
         });
       })

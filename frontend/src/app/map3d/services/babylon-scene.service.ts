@@ -59,6 +59,13 @@ export class BabylonSceneService implements OnDestroy {
   private cartoGround: BABYLON.Mesh | null = null;
   private cartoTexture: BABYLON.DynamicTexture | null = null;
 
+  // Seguimiento de coordenadas para depuración F12
+  public lastHoveredCoords: BABYLON.Vector3 | null = null;
+  public lastHoveredMeshName = '';
+  private onCoordinatesUpdatedCb?: (data: { coords: BABYLON.Vector3 | null; meshName: string; building: BuildingId; floor: string }) => void;
+  private f12KeyHandler: ((evt: KeyboardEvent) => void) | null = null;
+  private canvasClickHandler: ((evt: MouseEvent) => void) | null = null;
+
   constructor(
     private ngZone: NgZone,
     private buildingRegistry: BuildingRegistryService,
@@ -97,19 +104,22 @@ export class BabylonSceneService implements OnDestroy {
     this.inacapitoGuide.preloadModel(this.scene);
 
     this.scene.onPointerDown = (evt, pickResult) => {
-      if (evt.button === 0 && pickResult.hit && pickResult.pickedMesh) {
-        const picked = pickResult.pickedMesh;
-        const building = this.identifyBuildingFromMesh(picked.name, picked);
+      if (evt.button === 0) {
+        this.processCoordinatePick(pickResult, this.scene?.pointerX, this.scene?.pointerY, true);
+
+        const pickedMesh = pickResult?.pickedMesh || (this.scene?.pick(this.scene.pointerX, this.scene.pointerY, (m) => m.isVisible && m.name !== 'skyBox')?.pickedMesh);
+        const isSede = this.currentBuilding === 'S' || this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
+        const building = isSede && pickedMesh ? this.identifyBuildingFromMesh(pickedMesh.name, pickedMesh) : null;
+
         if (building) {
           // Si se hace click en un edificio de la Sede, no consideramos esto interacción manual que detenga el giro
           this.cancelUserInteraction();
-          console.log(`[Click Sede] Malla seleccionada: ${building} (${picked.name}) | Coordenadas:`, pickResult.pickedPoint);
         } else {
           this.registerUserInteraction();
-          console.log('Mesh seleccionado:', picked.name, 'Coordenadas:', pickResult.pickedPoint);
         }
-        if (onMeshClicked) {
-          onMeshClicked(pickResult.pickedMesh.name, pickResult);
+
+        if (onMeshClicked && pickedMesh) {
+          onMeshClicked(pickedMesh.name, pickResult || (this.scene?.pick(this.scene.pointerX, this.scene.pointerY) as any));
         }
       } else {
         this.registerUserInteraction();
@@ -117,6 +127,8 @@ export class BabylonSceneService implements OnDestroy {
     };
 
     this.scene.onPointerMove = (_evt, pickResult) => {
+      this.processCoordinatePick(pickResult, this.scene?.pointerX, this.scene?.pointerY, false);
+
       const isSede = this.currentBuilding === 'S' || this.isSedeModelName(this.currentFloorModel, this.currentBuilding);
       if (isSede && canvas) {
         if (pickResult.hit && pickResult.pickedMesh && this.identifyBuildingFromMesh(pickResult.pickedMesh.name, pickResult.pickedMesh)) {
@@ -128,6 +140,34 @@ export class BabylonSceneService implements OnDestroy {
         canvas.style.cursor = 'default';
       }
     };
+
+    // Observador Pointer Observable de BabylonJS (máxima confiabilidad para eventos de toque/clic)
+    this.scene.onPointerObservable.add((pointerInfo) => {
+      if (
+        pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN ||
+        pointerInfo.type === BABYLON.PointerEventTypes.POINTERTAP
+      ) {
+        this.processCoordinatePick(pointerInfo.pickInfo, this.scene?.pointerX, this.scene?.pointerY, true);
+      }
+    });
+
+    // Event listener nativo de click en canvas para garantizar 100% captura en cualquier navegador
+    this.canvasClickHandler = (evt: MouseEvent) => {
+      if (!this.scene) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      this.processCoordinatePick(null, x, y, true);
+    };
+    canvas.addEventListener('click', this.canvasClickHandler);
+
+    // Evento F12 global de teclado: cuando el usuario presiona F12 imprime coordenadas completas de inmediato
+    this.f12KeyHandler = (evt: KeyboardEvent) => {
+      if (evt.key === 'F12' || evt.code === 'F12' || evt.keyCode === 123) {
+        this.logCurrentCoordinates('F12 Tecla');
+      }
+    };
+    window.addEventListener('keydown', this.f12KeyHandler);
 
     this.ngZone.runOutsideAngular(() => {
       this.engine?.runRenderLoop(() => {
@@ -1889,18 +1929,21 @@ export class BabylonSceneService implements OnDestroy {
     const projectWorldPointOnGround = (
       worldX: number,
       worldZ: number,
-      heightOffset = 0.05
+      heightOffset = 0.05,
+      fixedY?: number
     ): { x: number; y: number; visible: boolean } => {
-      let groundY = 0;
-      try {
-        const rayOrigin = new BABYLON.Vector3(worldX, 50, worldZ);
-        const ray = new BABYLON.Ray(rayOrigin, BABYLON.Vector3.Down(), 200);
-        const pickInfo = this.scene ? this.scene.pickWithRay(ray) : null;
-        if (pickInfo && pickInfo.hit && pickInfo.pickedPoint) {
-          groundY = pickInfo.pickedPoint.y;
+      let groundY = fixedY !== undefined ? fixedY : 0;
+      if (fixedY === undefined) {
+        try {
+          const rayOrigin = new BABYLON.Vector3(worldX, 50, worldZ);
+          const ray = new BABYLON.Ray(rayOrigin, BABYLON.Vector3.Down(), 200);
+          const pickInfo = this.scene ? this.scene.pickWithRay(ray) : null;
+          if (pickInfo && pickInfo.hit && pickInfo.pickedPoint) {
+            groundY = pickInfo.pickedPoint.y;
+          }
+        } catch (e) {
+          // si falla el raycast, mantener groundY en 0
         }
-      } catch (e) {
-        // si falla el raycast, mantener groundY en 0
       }
 
       const adjustedWorldPos = new BABYLON.Vector3(worldX, groundY + heightOffset, worldZ);
@@ -1987,11 +2030,32 @@ export class BabylonSceneService implements OnDestroy {
           visible: projD.visible,
           type: 'building-d'
         });
+
+        // Marcador Edificio E (desde Edificio C Piso 1)
+        const projE = projectWorldPointOnGround(-3.160340012066989, 1.6463125327081438, 0.05, 0.1469096839427877);
+        markers.push({
+          id: 'marker-building-e',
+          label: '→ Ir al Edificio E',
+          x: projE.x,
+          y: projE.y,
+          visible: projE.visible,
+          type: 'building-e'
+        });
       }
     }
 
-    // Marcador Sede (desde Edificio E)
+    // Marcador Edificio C y Sede (desde Edificio E)
     if (this.currentBuilding === 'E') {
+      const projC = projectWorldPointOnGround(-10.257817831379821, 0.5507832656850731, 0.05, 0.28873252858175036);
+      markers.push({
+        id: 'marker-building-c',
+        label: '→ Ir para el Edificio C',
+        x: projC.x,
+        y: projC.y,
+        visible: projC.visible,
+        type: 'building-c'
+      });
+
       const proj = projectWorldPointOnGround(0, 0);
       markers.push({
         id: 'marker-sede',
@@ -2197,12 +2261,25 @@ export class BabylonSceneService implements OnDestroy {
         position: { x: -2.40, y: 1.17, z: -2.20 },
         color: new BABYLON.Color3(0.2, 0.8, 0.4) // Verde esmeralda
       });
+      portals.push({
+        id: 'portal-c-e',
+        name: 'Conector a Edificio E',
+        position: { x: -3.160340012066989, y: 0.1469096839427877, z: 1.6463125327081438 },
+        color: new BABYLON.Color3(0.9, 0.6, 0.1) // Ámbar dorado
+      });
     } else if (buildingId === 'D') {
       portals.push({
         id: 'portal-d-c',
         name: 'Conector a Edificio C',
         position: { x: -0.05, y: 3.60, z: 11.10 },
         color: new BABYLON.Color3(0.9, 0.2, 0.6) // Magenta
+      });
+    } else if (buildingId === 'E') {
+      portals.push({
+        id: 'portal-e-c',
+        name: 'Ir para el Edificio C',
+        position: { x: -10.257817831379821, y: 0.28873252858175036, z: 0.5507832656850731 },
+        color: new BABYLON.Color3(0.2, 0.8, 0.4) // Verde esmeralda
       });
     }
 
@@ -2544,12 +2621,41 @@ export class BabylonSceneService implements OnDestroy {
     let mesh = this.scene.getMeshByName(meshName);
     if (mesh) return mesh;
 
-    const normalizedMeshName = (meshName || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
-    return this.scene.meshes.find((candidate) => {
+    const clean = (meshName || '').trim();
+    const normalizedMeshName = clean.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+    // 1. Coincidencia normalizada directa
+    const directCandidate = this.scene.meshes.find((candidate) => {
       const meshNameCandidate = (candidate.name || '').toLowerCase();
       const normalizedCandidate = meshNameCandidate.replace(/[^a-z0-9]/gi, '');
       return meshNameCandidate === normalizedMeshName || normalizedCandidate === normalizedMeshName;
-    }) ?? null;
+    });
+    if (directCandidate) return directCandidate;
+
+    // 2. Coincidencia por número de cuerpo/grupo (ej: "cuerpo17", "17" -> busca "C_P1_Grupo_17", "Grupo_17", "cuerpo17")
+    const numMatch = clean.match(/(\d+)/);
+    if (numMatch) {
+      const targetNum = parseInt(numMatch[1], 10);
+      const groupCandidate = this.scene.meshes.find((candidate) => {
+        const cName = candidate.name || '';
+        const cNumMatch = cName.match(/_grupo_?0*(\d+)/i) || cName.match(/^grupo_?0*(\d+)/i) || cName.match(/cuerpo_?0*(\d+)/i);
+        return cNumMatch ? parseInt(cNumMatch[1], 10) === targetNum : false;
+      });
+      if (groupCandidate) return groupCandidate;
+    }
+
+    // 3. Coincidencia por código de sala (ej: "C101", "D101", "E101")
+    const codeMatch = clean.match(/([a-e]\d{3})/i);
+    if (codeMatch) {
+      const targetCode = codeMatch[1].toLowerCase();
+      const codeCandidate = this.scene.meshes.find((candidate) => {
+        const cName = (candidate.name || '').toLowerCase();
+        return cName.includes(targetCode);
+      });
+      if (codeCandidate) return codeCandidate;
+    }
+
+    return null;
   }
 
   /**
@@ -2571,7 +2677,7 @@ export class BabylonSceneService implements OnDestroy {
   public focusOnMesh(meshName: string, targetRadius = 6, durationMs = 700, flipAngle = false, baseAlpha = Math.PI / 2): void {
     if (!this.camera || !this.scene) return;
 
-    const targetMesh = this.scene.getMeshByName(meshName);
+    const targetMesh = this.getMeshByName(meshName);
     if (!targetMesh) return;
 
     targetMesh.computeWorldMatrix(true);
@@ -2616,15 +2722,7 @@ export class BabylonSceneService implements OnDestroy {
 
     const findMeshCI = (name: string): BABYLON.AbstractMesh | null => {
       if (!name || !this.scene) return null;
-      let mesh = this.scene.getMeshByName(name);
-      if (mesh) return mesh;
-      const lower = name.toLowerCase();
-      const norm = name.replace(/[^a-z0-9]/gi, '').toLowerCase();
-      return this.scene.meshes.find(m => {
-        const mName = (m.name || '').toLowerCase();
-        const mNorm = mName.replace(/[^a-z0-9]/gi, '');
-        return mName === lower || mNorm === norm;
-      }) ?? null;
+      return this.getMeshByName(name);
     };
 
     // 1. Buscar por cuerpoId explícito (ej. cuerpo15 o Cuerpo15)
@@ -2650,7 +2748,130 @@ export class BabylonSceneService implements OnDestroy {
     return targetMesh.getBoundingInfo().boundingBox.centerWorld.clone();
   }
 
+  /**
+   * Procesa la captura de coordenadas 3D para una posición de pantalla o PickingInfo.
+   * Emite el valor al listener angular e imprime en consola si es un clic.
+   */
+  private processCoordinatePick(
+    pickInfo?: BABYLON.PickingInfo | null,
+    screenX?: number,
+    screenY?: number,
+    isClick = false
+  ): void {
+    if (!this.scene) return;
+
+    let pick = pickInfo;
+    if (!pick || !pick.hit || !pick.pickedPoint) {
+      const px = screenX !== undefined ? screenX : this.scene.pointerX;
+      const py = screenY !== undefined ? screenY : this.scene.pointerY;
+      if (px !== undefined && py !== undefined && !isNaN(px) && !isNaN(py)) {
+        pick = this.scene.pick(px, py, (m) => m.isVisible && m.name !== 'skyBox') || pick;
+      }
+    }
+
+    let pickedPoint = pick?.pickedPoint;
+    const pickedMesh = pick?.pickedMesh;
+    const meshName = pickedMesh?.name || 'suelo/espacio';
+
+    // Si no impactó directamente en una malla, proyectar rayo al plano horizontal Y = 0.05
+    if (!pickedPoint && this.camera && screenX !== undefined && screenY !== undefined) {
+      const ray = this.scene.createPickingRay(screenX, screenY, BABYLON.Matrix.Identity(), this.camera);
+      const floorY = 0.05;
+      const denom = ray.direction.y;
+      if (Math.abs(denom) > 0.0001) {
+        const t = (floorY - ray.origin.y) / denom;
+        if (t > 0) {
+          pickedPoint = ray.origin.add(ray.direction.scale(t));
+        }
+      }
+    }
+
+    if (pickedPoint) {
+      this.lastHoveredCoords = pickedPoint.clone();
+      this.lastHoveredMeshName = meshName;
+
+      if (this.onCoordinatesUpdatedCb) {
+        this.onCoordinatesUpdatedCb({
+          coords: this.lastHoveredCoords,
+          meshName,
+          building: this.currentBuilding,
+          floor: this.currentFloorModel
+        });
+      }
+
+      if (isClick) {
+        const xStr = pickedPoint.x.toFixed(2);
+        const yStr = pickedPoint.y.toFixed(2);
+        const zStr = pickedPoint.z.toFixed(2);
+
+        // Formato clásico histórico del proyecto (compatibilidad F12):
+        console.log('Mesh seleccionado:', meshName, 'Coordenadas:', pickedPoint);
+
+        // Formato destacado en consola F12:
+        console.log(
+          `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${meshName}%c | X: ${xStr}, Y: ${yStr}, Z: ${zStr} (Edificio: ${this.currentBuilding})`,
+          'background: #111; color: #00ffaa; font-weight: bold; padding: 3px 8px; border-radius: 4px;',
+          'color: #aaa;',
+          'color: #ffaa00; font-weight: bold;',
+          'color: #ffffff; font-weight: bold;'
+        );
+      }
+    }
+  }
+
+  /**
+   * Suscripción para recibir cambios de coordenadas 3D en tiempo real (para HUD UI).
+   */
+  public onCoordinatesChange(
+    cb: (data: { coords: BABYLON.Vector3 | null; meshName: string; building: BuildingId; floor: string }) => void
+  ): () => void {
+    this.onCoordinatesUpdatedCb = cb;
+    return () => {
+      if (this.onCoordinatesUpdatedCb === cb) {
+        this.onCoordinatesUpdatedCb = undefined;
+      }
+    };
+  }
+
+  /**
+   * Imprime en consola un resumen completo de coordenadas 3D al presionar F12 o invocar depuración.
+   */
+  public logCurrentCoordinates(trigger = 'F12'): void {
+    const camTarget = this.camera?.target
+      ? `X: ${this.camera.target.x.toFixed(2)}, Y: ${this.camera.target.y.toFixed(2)}, Z: ${this.camera.target.z.toFixed(2)}`
+      : 'N/A';
+    const camPos = this.camera?.position
+      ? `X: ${this.camera.position.x.toFixed(2)}, Y: ${this.camera.position.y.toFixed(2)}, Z: ${this.camera.position.z.toFixed(2)}`
+      : 'N/A';
+    const ptrCoords = this.lastHoveredCoords
+      ? `X: ${this.lastHoveredCoords.x.toFixed(2)}, Y: ${this.lastHoveredCoords.y.toFixed(2)}, Z: ${this.lastHoveredCoords.z.toFixed(2)}`
+      : 'Haz clic o mueve el cursor sobre el mapa';
+    const lastMesh = this.lastHoveredMeshName || 'Ninguno';
+
+    console.log(
+      `%c📍 INACAP RENCA 3D — COORDENADAS [${trigger}] 📍%c\n` +
+      `🏢 Edificio: ${this.currentBuilding} | Modelo/Piso: ${this.currentFloorModel}\n` +
+      `🎯 Punto 3D Cursor: %c${ptrCoords}%c (Malla: ${lastMesh})\n` +
+      `📷 Cámara -> Target: ${camTarget} | Pos: ${camPos} | Radio: ${this.camera?.radius?.toFixed(2)} | Alpha: ${this.camera?.alpha?.toFixed(2)} | Beta: ${this.camera?.beta?.toFixed(2)}`,
+      'background: #d32f2f; color: #fff; font-weight: bold; font-size: 13px; padding: 4px 10px; border-radius: 4px;',
+      'color: #00ffaa; font-weight: bold; font-size: 12px;',
+      'color: #ffaa00; font-weight: bold;',
+      'color: #ffffff;'
+    );
+    if (this.lastHoveredCoords) {
+      console.log('Vector3 Cursor:', this.lastHoveredCoords);
+    }
+    if (this.camera?.target) {
+      console.log('Vector3 Cámara Target:', this.camera.target);
+    }
+  }
+
   public dispose(): void {
+    if (this.f12KeyHandler) {
+      window.removeEventListener('keydown', this.f12KeyHandler);
+      this.f12KeyHandler = null;
+    }
+    this.canvasClickHandler = null;
     this.buildingFocusAnimId++;
     this.currentFocusedBuilding = null;
     if (this.idleTimer) {
