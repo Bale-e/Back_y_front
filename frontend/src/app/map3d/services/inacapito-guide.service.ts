@@ -7,7 +7,7 @@ import { Injectable, NgZone } from '@angular/core';
 import * as BABYLON from 'babylonjs';
 
 export const INACAPITO_MODEL_URL = 'assets/3d-models/Inacapito/inacapito_walking.glb';
-export const INACAPITO_DEFAULT_SCALE = 22; // Altura ~0.29 unidades, escala humana en el mapa 3D
+export const INACAPITO_DEFAULT_SCALE = 80;
 export const ROUTE_LINE_COLOR = new BABYLON.Color3(0.92, 0.12, 0.12);
 
 @Injectable({
@@ -21,7 +21,6 @@ export class InacapitoGuideService {
   private activeRootNode: BABYLON.TransformNode | null = null;
   private activeMeshes: BABYLON.AbstractMesh[] = [];
   private activeAnimationGroup: BABYLON.AnimationGroup | null = null;
-  private shadowDisc: BABYLON.AbstractMesh | null = null;
 
   // Meshes de la línea de ruta en el piso
   private groundLineMeshes: BABYLON.AbstractMesh[] = [];
@@ -162,55 +161,29 @@ export class InacapitoGuideService {
           m.renderingGroupId = 1;
           m.isPickable = false;
           createdMeshes.push(m);
-          if (m.material && m.material instanceof BABYLON.PBRMaterial) {
-            m.material.emissiveColor = new BABYLON.Color3(0.12, 0.12, 0.12);
+          if (m.material) {
+            if (m.material instanceof BABYLON.PBRMaterial) {
+              const pbr = m.material.clone(`inacapitoRedPBR_${m.name}`) as BABYLON.PBRMaterial;
+              pbr.albedoTexture = null;
+              pbr.albedoColor = new BABYLON.Color3(0.95, 0.12, 0.12); // Rojo institucional INACAP
+              pbr.emissiveColor = new BABYLON.Color3(0.35, 0.08, 0.08); // Brillo tenue rojo para destacar en el mapa
+              pbr.roughness = 0.4;
+              pbr.metallic = 0.1;
+              m.material = pbr;
+            } else if (m.material instanceof BABYLON.StandardMaterial) {
+              const std = m.material.clone(`inacapitoRedStd_${m.name}`) as BABYLON.StandardMaterial;
+              std.diffuseTexture = null;
+              std.diffuseColor = new BABYLON.Color3(0.95, 0.12, 0.12);
+              std.emissiveColor = new BABYLON.Color3(0.35, 0.08, 0.08);
+              m.material = std;
+            }
           }
         });
       });
 
-      // Escalar al tamaño proporcional humano en la maqueta
+      // Escalar al tamaño deseado (300% de la escala inicial)
       const scale = INACAPITO_DEFAULT_SCALE;
       rootNode.scaling = new BABYLON.Vector3(scale, scale, scale);
-
-      // Círculo/aura guía rojo en los pies (proporcional al tamaño humano en la maqueta)
-      // Como rootNode tiene scaling = (22, 22, 22), 0.015 en local equivale a 0.33 unidades en mundo (diámetro 0.66)
-      const beacon = BABYLON.MeshBuilder.CreateDisc('inacapitoRedBeacon', {
-        radius: 0.015,
-        tessellation: 32
-      }, scene);
-      beacon.rotation.x = Math.PI / 2;
-      beacon.position.y = 0.0005;
-      beacon.parent = rootNode;
-
-      const beaconMat = new BABYLON.StandardMaterial('inacapitoRedBeaconMat', scene);
-      beaconMat.diffuseColor  = new BABYLON.Color3(1.0, 0.12, 0.12);
-      beaconMat.emissiveColor = new BABYLON.Color3(0.95, 0.22, 0.22); // Rojo brillante
-      beaconMat.specularColor = new BABYLON.Color3(1.0, 0.7, 0.7);
-      beaconMat.alpha = 0.70;
-      beacon.material = beaconMat;
-      beacon.isPickable = false;
-      beacon.renderingGroupId = 1;
-      this.shadowDisc = beacon;
-      createdMeshes.push(beacon);
-
-      // Anillo exterior brillante que delimita el círculo rojo (diámetro 0.66 unidades en mundo)
-      const outerRing = BABYLON.MeshBuilder.CreateTorus('inacapitoOuterRing', {
-        diameter: 0.030,
-        thickness: 0.002,
-        tessellation: 32
-      }, scene);
-      outerRing.rotation.x = Math.PI / 2;
-      outerRing.position.y = 0.0006;
-      outerRing.parent = rootNode;
-
-      const ringMat = new BABYLON.StandardMaterial('inacapitoRingMat', scene);
-      ringMat.diffuseColor  = new BABYLON.Color3(1.0, 0.3, 0.3);
-      ringMat.emissiveColor = new BABYLON.Color3(1.0, 0.5, 0.5);
-      ringMat.alpha = 0.95;
-      outerRing.material = ringMat;
-      outerRing.isPickable = false;
-      outerRing.renderingGroupId = 1;
-      createdMeshes.push(outerRing);
 
       // Configurar animación de caminar
       if (entries.animationGroups.length > 0) {
@@ -432,11 +405,6 @@ export class InacapitoGuideService {
       this.activeAnimationGroup.stop();
       this.activeAnimationGroup.dispose();
       this.activeAnimationGroup = null;
-    }
-
-    if (this.shadowDisc) {
-      this.shadowDisc.dispose();
-      this.shadowDisc = null;
     }
 
     if (this.activeRootNode) {
