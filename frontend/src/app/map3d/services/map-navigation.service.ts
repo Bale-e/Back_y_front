@@ -1188,7 +1188,7 @@ export class MapNavigationService {
     const piso = this.getPisoFromLoc(loc);
     const edificioField = (loc as any)._edificioNombre || (loc as any).Edificio || (loc as any).edificio || 'A';
     const clave = this.claveEdificio(edificioField);
-    const edificio: BuildingId = clave === 'b' ? 'B' : clave === 'c' ? 'C' : clave === 'd' ? 'D' : clave === 'e' ? 'E' : /s|sede/.test(clave) ? 'S' : 'A';
+    const edificio: BuildingId = clave === 'b' ? 'B' : clave === 'c' ? 'C' : clave === 'd' ? 'D' : clave === 'e' ? 'E' : clave === 'g' ? 'G' : /s|sede/.test(clave) ? 'S' : (clave.length === 1 ? clave.toUpperCase() as BuildingId : 'A');
     const cuerpoNum = (loc as any).Cuerpo ?? (loc as any).cuerpo;
     const cuerpoId = cuerpoNum != null ? `cuerpo${cuerpoNum}` : undefined;
 

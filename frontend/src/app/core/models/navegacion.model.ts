@@ -1,4 +1,4 @@
-export type BuildingId = 'A' | 'B' | 'C' | 'D' | 'E' | 'S' | string;
+export type BuildingId = 'A' | 'B' | 'C' | 'D' | 'E' | 'G' | 'S' | string;
 
 export interface FloorDefinition {
   number: number;

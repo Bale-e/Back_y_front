@@ -147,6 +147,9 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   private readonly buildingEFirstFloorModel = 'Edificio E - Piso1 con Letras.obj';
   private readonly buildingESecondFloorModel = 'Edificio E - Piso2 con Letras.obj';
 
+  private readonly buildingGFirstFloorModel = 'Edificio G - Piso 1.obj';
+  private readonly buildingGThirdFloorModel = 'Edificio G - Piso 3.obj';
+
   private readonly sedeModel = 'Instituto3D-color.obj';
   private readonly legacySedeModel = 'MODELO_INACAP_FIXED.obj';
   private readonly oldSedeModel = 'INSTITUTO CON LETRAS CON BASE FORMATO SKP.obj';
@@ -616,13 +619,13 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
           ? baseNameMatch[0].toLowerCase()
           : (meshName || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
 
-    const isFirstFloor = this.currentFloor === this.firstFloorModel || this.currentFloor === this.buildingBFirstFloorModel || this.currentFloor === this.buildingCFirstFloorModel || this.currentFloor === this.buildingDFirstFloorModel || this.currentFloor === this.buildingEFirstFloorModel;
+    const isFirstFloor = this.currentFloor === this.firstFloorModel || this.currentFloor === this.buildingBFirstFloorModel || this.currentFloor === this.buildingCFirstFloorModel || this.currentFloor === this.buildingDFirstFloorModel || this.currentFloor === this.buildingEFirstFloorModel || this.currentFloor === this.buildingGFirstFloorModel;
     const isSecondFloor = this.currentFloor === this.secondFloorModel || this.currentFloor === this.buildingBSecondFloorModel || this.currentFloor === this.buildingCSecondFloorModel || this.currentFloor === this.buildingDSecondFloorModel || this.currentFloor === this.buildingESecondFloorModel;
-    const isThirdFloor = this.currentFloor === this.thirdFloorModel || this.currentFloor === this.buildingBThirdFloorModel;
+    const isThirdFloor = this.currentFloor === this.thirdFloorModel || this.currentFloor === this.buildingBThirdFloorModel || this.currentFloor === this.buildingGThirdFloorModel;
 
     const shouldFocus = (
       /^cuerpo\d+/i.test(normalizedMeshName) ||
-      /^[cde]\d+/i.test(normalizedMeshName)
+      /^[a-z]\d{3}/i.test(normalizedMeshName)
     );
 
     if (!shouldFocus) {
@@ -1293,6 +1296,10 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
           ? floorKey === 'second'
             ? this.buildingESecondFloorModel
             : this.buildingEFirstFloorModel
+          : this.currentBuilding === 'G'
+          ? floorKey === 'third'
+            ? this.buildingGThirdFloorModel
+            : this.buildingGFirstFloorModel
           : this.currentBuilding === 'B'
           ? floorKey === 'first'
             ? this.buildingBFirstFloorModel
@@ -1878,6 +1885,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     const isBuildingC = [this.buildingCFirstFloorModel, this.buildingCSecondFloorModel].includes(modelName) || modelName.includes('Edificio C');
     const isBuildingD = [this.buildingDFirstFloorModel, this.buildingDSecondFloorModel].includes(modelName) || modelName.includes('Edificio D');
     const isBuildingE = [this.buildingEFirstFloorModel, this.buildingESecondFloorModel].includes(modelName) || modelName.includes('Edificio E');
+    const isBuildingG = [this.buildingGFirstFloorModel, this.buildingGThirdFloorModel].includes(modelName) || modelName.includes('Edificio G');
     const isSede = this.isSedeModel(modelName);
     const modelRoot = isSede
       ? '/assets/3d-models/sede/'
@@ -1889,10 +1897,12 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
             ? '/assets/3d-models/Edificio D/'
             : isBuildingE
               ? '/assets/3d-models/Edificio E/'
-              : '/assets/3d-models/Edificio A/';
+              : isBuildingG
+                ? '/assets/3d-models/Edificio G/'
+                : '/assets/3d-models/Edificio A/';
 
     // Actualizar el edificio actual
-    this.currentBuilding = isSede ? 'S' : (isBuildingB ? 'B' : (isBuildingC ? 'C' : (isBuildingD ? 'D' : (isBuildingE ? 'E' : 'A'))));
+    this.currentBuilding = isSede ? 'S' : (isBuildingB ? 'B' : (isBuildingC ? 'C' : (isBuildingD ? 'D' : (isBuildingE ? 'E' : (isBuildingG ? 'G' : 'A')))));
 
     try {
       const result = await BABYLON.SceneLoader.ImportMeshAsync(
@@ -1909,7 +1919,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
       // guardar referencia para centrar la cámara mientras el modelo rote
       this.modelRoot = allNodes;
       // Rotar el objeto para que el lado derecho quede al frente (90° en Y para Sede y Edificio C)
-      allNodes.rotation = (isSede || isBuildingC || isBuildingD || isBuildingE) ? new BABYLON.Vector3(0, -Math.PI / 2, 0) : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
+      allNodes.rotation = (isSede || isBuildingC || isBuildingD || isBuildingE || isBuildingG) ? new BABYLON.Vector3(0, -Math.PI / 2, 0) : new BABYLON.Vector3(-Math.PI / 2, Math.PI, 0);
 
       meshes.forEach((mesh, index) => {
         mesh.isVisible = true;

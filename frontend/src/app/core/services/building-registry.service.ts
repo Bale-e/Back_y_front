@@ -157,6 +157,30 @@ export class BuildingRegistryService {
         }
       ]
     });
+
+    // Edificio G
+    this.register({
+      id: 'G',
+      name: 'Edificio G',
+      center: { x: 35.0, y: 0, z: -40.0 },
+      rotation: { x: 0, y: -Math.PI / 2, z: 0 },
+      cameraBaseAlpha: 0,
+      cameraRadius: 28,
+      corridorAxis: 'x',
+      corridorFixedCoord: 0,
+      floors: [
+        { number: 1, label: 'Piso 1', modelFile: 'Edificio G - Piso 1.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.05 },
+        { number: 3, label: 'Piso 3', modelFile: 'Edificio G - Piso 3.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.86 }
+      ],
+      defaultStairs: [
+        {
+          nombre: 'Escalera Edificio G',
+          worldPos: { x: 0.0, z: 0.0 },
+          landing:   { x: 0.0, z: 0.0 },
+          threshold: { x: 0.0, z: 0.0 }
+        }
+      ]
+    });
   }
 
   public register(def: BuildingDefinition): void {
