@@ -148,12 +148,11 @@ export class MapNavigationService {
     const cleanMesh = (meshName || '').replace(/\s+/g, '').toLowerCase();
     const match = cleanMesh.match(/^cuerpo(\d+)/i);
     const grupoMatch = cleanMesh.match(/^[a-z]_p\d+_grupo_?(\d+)/i) || cleanMesh.match(/^grupo_?(\d+)/i);
-    const roomMatch = cleanMesh.match(/^([cde])(\d+)/i);
-    if (!match && !grupoMatch && !roomMatch) {
-      this.diag('mesh_sin_numero_de_cuerpo', { meshRecibido: meshName });
-      return null;
-    }
-    const cuerpoNum = match ? parseInt(match[1], 10) : (grupoMatch ? parseInt(grupoMatch[1], 10) : null);
+    const roomMatch = cleanMesh.match(/^[a-z](\d{3})/i);
+    const genericNumberMatch = cleanMesh.match(/(\d+)/);
+    const cuerpoNum = match
+      ? parseInt(match[1], 10)
+      : (grupoMatch ? parseInt(grupoMatch[1], 10) : (roomMatch ? parseInt(roomMatch[1], 10) : null));
 
     const currentBld = this.currentBuildingSubject.value;
     const modelo = this.currentFloorSubject.value; // ej. "Edificio B - Piso 3.obj"
@@ -203,17 +202,22 @@ export class MapNavigationService {
           });
 
       if (found) {
-        const nombre = (this.getCI(found, 'nombre') ?? (cuerpoNum !== null ? `Cuerpo ${cuerpoNum}` : cleanMesh.toUpperCase())).toString();
+        const docCuerpo = this.getCI(found, 'cuerpo') ?? this.getCI(found, 'Cuerpo');
+        const finalCuerpo = cuerpoNum !== null
+          ? cuerpoNum
+          : (docCuerpo != null && docCuerpo !== '' ? docCuerpo : undefined);
+        const nombre = (this.getCI(found, 'nombre') ?? (finalCuerpo !== undefined ? `Cuerpo ${finalCuerpo}` : cleanMesh.toUpperCase())).toString();
         const tipo = (this.getCI(found, 'tipo') ?? 'Espacio académico').toString();
         const edificioTxt = (nombreEdificioDe(found) ?? currentBld).toString();
         const pisoTxt = `Piso ${this.pisoDeLocacion(found)}`;
         const isStair = /escalera|stair/i.test(tipo) || /escalera|stair/i.test(nombre);
+        const cuerpoLabel = finalCuerpo !== undefined ? `Cuerpo ${finalCuerpo}, ` : '';
         return {
           nombre,
-          desc: `${tipo} — ${cuerpoNum !== null ? `Cuerpo ${cuerpoNum}, ` : ''}${edificioTxt}, ${pisoTxt}.`,
+          desc: `${tipo} — ${cuerpoLabel}${edificioTxt}, ${pisoTxt}.`,
           edificio: currentBld,
           piso: pisoTxt,
-          cuerpo: cuerpoNum ?? undefined,
+          cuerpo: finalCuerpo,
           tipo,
           isStair
         };

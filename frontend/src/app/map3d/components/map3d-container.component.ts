@@ -48,6 +48,9 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   f12CoordsVisible = false;
   currentCoordinatesText = '';
   currentMeshNameText = '';
+  currentCuerpoText = '';
+  currentSalaText = '';
+  lastCopiedText = '';
   private unsubCoords?: () => void;
 
   // Búsqueda/autocomplete esperado por spec
@@ -288,6 +291,8 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
         if (data.coords) {
           this.currentCoordinatesText = `X: ${data.coords.x.toFixed(2)}, Y: ${data.coords.y.toFixed(2)}, Z: ${data.coords.z.toFixed(2)}`;
           this.currentMeshNameText = data.meshName;
+          this.currentCuerpoText = data.cuerpo || 'Sin cuerpo asignado';
+          this.currentSalaText = data.sala || '';
           this.cd.detectChanges();
         }
       });
@@ -441,14 +446,42 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   }
 async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     try {
-      if (pickResult?.pickedPoint) {
-        const pt = pickResult.pickedPoint;
-        console.log('Mesh seleccionado:', meshName, 'Coordenadas:', pt);
+      const pt = pickResult?.pickedPoint;
+      // Extraer estrictamente el cuerpo (número) y la sala por separado
+      const cMatch = meshName.match(/cuerpo\s*(\d+)/i)
+        || meshName.match(/^[a-z]_p\d+_grupo_?(\d+)/i)
+        || meshName.match(/^grupo_?(\d+)/i);
+      const mMatch = meshName.match(/^mesh(\d+)/i);
+      const roomMatch = meshName.match(/^([a-z])(\d{3})/i);
+
+      let cLabel = '';
+      if (cMatch) {
+        cLabel = `Cuerpo ${cMatch[1]}`;
+      } else if (mMatch) {
+        cLabel = `Cuerpo ${mMatch[1]}`;
+      } else if (roomMatch) {
+        cLabel = `Cuerpo ${roomMatch[2]}`;
+      }
+
+      const salaLabel = roomMatch ? `Sala ${roomMatch[0].toUpperCase()}` : '';
+
+      if (pt) {
+        this.currentCoordinatesText = `X: ${pt.x.toFixed(2)}, Y: ${pt.y.toFixed(2)}, Z: ${pt.z.toFixed(2)}`;
+        this.currentMeshNameText = meshName;
+        this.currentCuerpoText = cLabel || 'Sin cuerpo asignado';
+        this.currentSalaText = salaLabel;
+        console.log('Mesh seleccionado:', meshName, '| Cuerpo:', cLabel || 'Sin cuerpo asignado', '| Sala:', salaLabel || 'N/A', '| Coordenadas:', pt);
+
+        const cuerpoPart = cLabel ? ` | %c${cLabel}%c` : '';
+        const salaPart = salaLabel ? ` | %c${salaLabel}%c` : '';
         console.log(
-          `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${meshName}%c | X: ${pt.x.toFixed(2)}, Y: ${pt.y.toFixed(2)}, Z: ${pt.z.toFixed(2)} (Edificio: ${this.currentBuilding})`,
+          `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${meshName}%c${cuerpoPart}${salaPart} | X: ${pt.x.toFixed(2)}, Y: ${pt.y.toFixed(2)}, Z: ${pt.z.toFixed(2)} (Edificio: ${this.currentBuilding})`,
           'background: #111; color: #00ffaa; font-weight: bold; padding: 3px 8px; border-radius: 4px;',
           'color: #aaa;',
           'color: #ffaa00; font-weight: bold;',
+          'color: #aaa;',
+          ...(cLabel ? ['color: #00ccff; font-weight: bold; font-size: 13px;', 'color: #aaa;'] : []),
+          ...(salaLabel ? ['color: #68d391; font-weight: bold; font-size: 13px;', 'color: #aaa;'] : []),
           'color: #ffffff; font-weight: bold;'
         );
       }
@@ -528,10 +561,41 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
         this.focusOnMeshIfNeeded(meshName);
         this.selectedLocationInfo = info;
         this.isDetailPanelOpen = true;
+
+        // Separar estrictamente la sala del cuerpo
+        this.currentSalaText = info.nombre || salaLabel || '';
+        if (info.cuerpo !== undefined && info.cuerpo !== null && info.cuerpo !== '' && info.cuerpo !== 0 && info.cuerpo !== '0') {
+          this.currentCuerpoText = `Cuerpo ${info.cuerpo}`;
+        } else if (cLabel) {
+          this.currentCuerpoText = cLabel;
+        } else {
+          this.currentCuerpoText = 'Sin cuerpo asignado';
+        }
+
+        if (pt) {
+          console.log(
+            `%c🏛️ ESPACIO IDENTIFICADO %c ${info.nombre} %c | Cuerpo: %c${this.currentCuerpoText}%c | Tipo: ${info.tipo} | ${info.edificio} - ${info.piso}`,
+            'background: #1565c0; color: #fff; font-weight: bold; padding: 3px 6px; border-radius: 3px;',
+            'color: #00ffaa; font-weight: bold; font-size: 13px;',
+            'color: #fff;',
+            'color: #ffeb3b; font-weight: bold; font-size: 13px;',
+            'color: #ccc;'
+          );
+        }
         this.cd.detectChanges();
       } else {
         // No está en Firestore para este edificio/piso
-        console.warn(`[Map3D Diagnostic] ⚠️ Malla clickeada "${meshName}" no tiene locación asociada en Firestore para Edificio ${this.currentBuilding} / Piso ${this.currentFloor}.`);
+        this.currentSalaText = salaLabel || '';
+        this.currentCuerpoText = cLabel || 'Sin cuerpo asignado';
+        console.warn(`[Map3D Diagnostic] ⚠️ Malla clickeada "${meshName}" (${cLabel || 'Sin cuerpo'}) no tiene locación asociada en Firestore para Edificio ${this.currentBuilding} / Piso ${this.currentFloor}.`);
+        if (pt) {
+          console.log(
+            `%c📍 COORDENADAS PARA FIRESTORE: %c { "X": ${Number(pt.x.toFixed(2))}, "Y": ${Number(pt.y.toFixed(2))}, "Z": ${Number(pt.z.toFixed(2))} } %c (Malla: ${meshName}, Cuerpo: ${cLabel || 'Sin cuerpo'})`,
+            'background: #ff9800; color: #000; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
+            'color: #ffff00; font-family: monospace; font-weight: bold;',
+            'color: #aaa;'
+          );
+        }
         this.closeDetailPanel();
         if (this.infoBox) this.infoBox.style.display = 'none';
       }
@@ -1429,6 +1493,27 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     this.cd.detectChanges();
   }
 
+  public copyCurrentCoords(): void {
+    if (this.babylonSceneService.lastHoveredCoords) {
+      const pt = this.babylonSceneService.lastHoveredCoords;
+      const jsonStr = `{\n  "X": ${Number(pt.x.toFixed(2))},\n  "Y": ${Number(pt.y.toFixed(2))},\n  "Z": ${Number(pt.z.toFixed(2))}\n}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(jsonStr).then(() => {
+          this.lastCopiedText = '¡Copiado!';
+          this.cd.detectChanges();
+          setTimeout(() => {
+            this.lastCopiedText = '';
+            this.cd.detectChanges();
+          }, 2000);
+        }).catch(() => {
+          prompt('Coordenadas 3D para Firestore:', jsonStr);
+        });
+      } else {
+        prompt('Coordenadas 3D para Firestore:', jsonStr);
+      }
+    }
+  }
+
   public getBuildingInfo(building: BuildingId): BuildingPromptData {
     const bld = this.buildingRegistry.getBuilding(building);
     const floorsCount = bld ? `${bld.floors.length} pisos disponibles` : 'Pisos disponibles';
@@ -1919,12 +2004,24 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
           const meshName = pickResult.pickedMesh ? pickResult.pickedMesh.name || 'cuerpo' : 'suelo';
           console.log('MESH CLICKEADO:', meshName);
           if (pickResult.pickedPoint) {
-            console.log('Mesh seleccionado:', meshName, 'Coordenadas:', pickResult.pickedPoint);
+            const cMatch2 = meshName.match(/cuerpo\s*(\d+)/i)
+              || meshName.match(/^[a-z]_p\d+_grupo_?(\d+)/i)
+              || meshName.match(/^grupo_?(\d+)/i);
+            const mMatch2 = meshName.match(/^mesh(\d+)/i);
+            const rMatch2 = meshName.match(/^([cde])(\d+)/i);
+            const cLabel2 = cMatch2 ? `Cuerpo ${cMatch2[1]}` : (mMatch2 ? `Cuerpo ${mMatch2[1]}` : '');
+            const salaLabel2 = rMatch2 ? `Sala ${rMatch2[0].toUpperCase()}` : '';
+            console.log('Mesh seleccionado:', meshName, '| Cuerpo:', cLabel2 || 'Sin cuerpo asignado', '| Sala:', salaLabel2 || 'N/A', '| Coordenadas:', pickResult.pickedPoint);
+            const cPart = cLabel2 ? ` | %c${cLabel2}%c` : '';
+            const sPart = salaLabel2 ? ` | %c${salaLabel2}%c` : '';
             console.log(
-              `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${meshName}%c | X: ${pickResult.pickedPoint.x.toFixed(2)}, Y: ${pickResult.pickedPoint.y.toFixed(2)}, Z: ${pickResult.pickedPoint.z.toFixed(2)} (Edificio: ${this.currentBuilding})`,
+              `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${meshName}%c${cPart}${sPart} | X: ${pickResult.pickedPoint.x.toFixed(2)}, Y: ${pickResult.pickedPoint.y.toFixed(2)}, Z: ${pickResult.pickedPoint.z.toFixed(2)} (Edificio: ${this.currentBuilding})`,
               'background: #111; color: #00ffaa; font-weight: bold; padding: 3px 8px; border-radius: 4px;',
               'color: #aaa;',
               'color: #ffaa00; font-weight: bold;',
+              'color: #aaa;',
+              ...(cLabel2 ? ['color: #00ccff; font-weight: bold; font-size: 13px;', 'color: #aaa;'] : []),
+              ...(salaLabel2 ? ['color: #68d391; font-weight: bold; font-size: 13px;', 'color: #aaa;'] : []),
               'color: #ffffff; font-weight: bold;'
             );
           }

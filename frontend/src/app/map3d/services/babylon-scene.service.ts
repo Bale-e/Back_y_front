@@ -62,9 +62,10 @@ export class BabylonSceneService implements OnDestroy {
   // Seguimiento de coordenadas para depuración F12
   public lastHoveredCoords: BABYLON.Vector3 | null = null;
   public lastHoveredMeshName = '';
-  private onCoordinatesUpdatedCb?: (data: { coords: BABYLON.Vector3 | null; meshName: string; building: BuildingId; floor: string }) => void;
+  public lastHoveredCuerpo = '';
+  public lastHoveredSala = '';
+  private onCoordinatesUpdatedCb?: (data: { coords: BABYLON.Vector3 | null; meshName: string; cuerpo: string; sala: string; building: BuildingId; floor: string }) => void;
   private f12KeyHandler: ((evt: KeyboardEvent) => void) | null = null;
-  private canvasClickHandler: ((evt: MouseEvent) => void) | null = null;
 
   constructor(
     private ngZone: NgZone,
@@ -140,26 +141,6 @@ export class BabylonSceneService implements OnDestroy {
         canvas.style.cursor = 'default';
       }
     };
-
-    // Observador Pointer Observable de BabylonJS (máxima confiabilidad para eventos de toque/clic)
-    this.scene.onPointerObservable.add((pointerInfo) => {
-      if (
-        pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN ||
-        pointerInfo.type === BABYLON.PointerEventTypes.POINTERTAP
-      ) {
-        this.processCoordinatePick(pointerInfo.pickInfo, this.scene?.pointerX, this.scene?.pointerY, true);
-      }
-    });
-
-    // Event listener nativo de click en canvas para garantizar 100% captura en cualquier navegador
-    this.canvasClickHandler = (evt: MouseEvent) => {
-      if (!this.scene) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = evt.clientX - rect.left;
-      const y = evt.clientY - rect.top;
-      this.processCoordinatePick(null, x, y, true);
-    };
-    canvas.addEventListener('click', this.canvasClickHandler);
 
     // Evento F12 global de teclado: cuando el usuario presiona F12 imprime coordenadas completas de inmediato
     this.f12KeyHandler = (evt: KeyboardEvent) => {
@@ -2638,7 +2619,7 @@ export class BabylonSceneService implements OnDestroy {
       const targetNum = parseInt(numMatch[1], 10);
       const groupCandidate = this.scene.meshes.find((candidate) => {
         const cName = candidate.name || '';
-        const cNumMatch = cName.match(/_grupo_?0*(\d+)/i) || cName.match(/^grupo_?0*(\d+)/i) || cName.match(/cuerpo_?0*(\d+)/i);
+        const cNumMatch = cName.match(/_grupo_?0*(\d+)/i) || cName.match(/^grupo_?0*(\d+)/i) || cName.match(/cuerpo_?0*(\d+)/i) || cName.match(/^[a-z]0*(\d{3})/i);
         return cNumMatch ? parseInt(cNumMatch[1], 10) === targetNum : false;
       });
       if (groupCandidate) return groupCandidate;
@@ -2787,13 +2768,66 @@ export class BabylonSceneService implements OnDestroy {
     }
 
     if (pickedPoint) {
+      // Detección inteligente de cuerpo si impactó en suelo, espacio o estructura de fondo
+      let resolvedMesh = pickedMesh;
+      let resolvedName = meshName;
+      if ((!pickedMesh || /suelo|ground|espacio|skybox|piso|estructura/i.test(meshName)) && this.modelRoot) {
+        const candidateMeshes = this.modelRoot.getChildMeshes(false, (m: any) => m.isVisible && !/suelo|ground|skybox|base_maqueta|estructura/i.test(m.name || ''));
+        let closestDist = Infinity;
+        let closestMesh: BABYLON.AbstractMesh | null = null;
+        for (const m of candidateMeshes) {
+          const bi = m.getBoundingInfo();
+          const min = bi.boundingBox.minimumWorld;
+          const max = bi.boundingBox.maximumWorld;
+          if (pickedPoint.x >= min.x && pickedPoint.x <= max.x && pickedPoint.z >= min.z && pickedPoint.z <= max.z) {
+            closestMesh = m;
+            break;
+          }
+          const center = bi.boundingBox.centerWorld;
+          const dist = Math.hypot(pickedPoint.x - center.x, pickedPoint.z - center.z);
+          if (dist < closestDist && dist < 4.0) {
+            closestDist = dist;
+            closestMesh = m;
+          }
+        }
+        if (closestMesh) {
+          resolvedMesh = closestMesh;
+          resolvedName = closestMesh.name;
+        }
+      }
+
+      // Extraer estrictamente el número de cuerpo (NUNCA mezclar con la sala)
+      const cleanR = resolvedName.replace(/\s+/g, '').toLowerCase();
+      const cMatch = cleanR.match(/^cuerpo(\d+)/i) || cleanR.match(/cuerpo\s*(\d+)/i);
+      const gMatch = cleanR.match(/^[a-z]_p\d+_grupo_?(\d+)/i) || cleanR.match(/^grupo_?(\d+)/i);
+      const mMatch = cleanR.match(/^mesh(\d+)/i);
+      const roomMatch = cleanR.match(/^([a-z])(\d{3})/i);
+
+      let cuerpoLabel = '';
+      if (cMatch) {
+        cuerpoLabel = `Cuerpo ${cMatch[1]}`;
+      } else if (gMatch) {
+        cuerpoLabel = `Cuerpo ${gMatch[1]}`;
+      } else if (mMatch) {
+        cuerpoLabel = `Cuerpo ${mMatch[1]}`;
+      } else if (roomMatch) {
+        cuerpoLabel = `Cuerpo ${roomMatch[2]}`;
+      }
+
+      // La sala va por separado si la malla lleva el código de sala (ej. E101, D201, C102)
+      const salaLabel = roomMatch ? `Sala ${roomMatch[0].toUpperCase()}` : '';
+
       this.lastHoveredCoords = pickedPoint.clone();
-      this.lastHoveredMeshName = meshName;
+      this.lastHoveredMeshName = resolvedName;
+      this.lastHoveredCuerpo = cuerpoLabel;
+      this.lastHoveredSala = salaLabel;
 
       if (this.onCoordinatesUpdatedCb) {
         this.onCoordinatesUpdatedCb({
           coords: this.lastHoveredCoords,
-          meshName,
+          meshName: resolvedName,
+          cuerpo: cuerpoLabel,
+          sala: salaLabel,
           building: this.currentBuilding,
           floor: this.currentFloorModel
         });
@@ -2805,15 +2839,23 @@ export class BabylonSceneService implements OnDestroy {
         const zStr = pickedPoint.z.toFixed(2);
 
         // Formato clásico histórico del proyecto (compatibilidad F12):
-        console.log('Mesh seleccionado:', meshName, 'Coordenadas:', pickedPoint);
+        console.log('Mesh seleccionado:', resolvedName, '| Cuerpo:', cuerpoLabel || 'Sin cuerpo asignado', '| Sala:', salaLabel || 'N/A', '| Coordenadas:', pickedPoint);
 
-        // Formato destacado en consola F12:
+        // Formato destacado en consola F12 separando claramente Cuerpo de Sala:
+        const cuerpoPart = cuerpoLabel ? ` | %c${cuerpoLabel}%c` : '';
+        const salaPart = salaLabel ? ` | %c${salaLabel}%c` : '';
         console.log(
-          `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${meshName}%c | X: ${xStr}, Y: ${yStr}, Z: ${zStr} (Edificio: ${this.currentBuilding})`,
+          `%c📍 COORDENADAS 3D [F12] %c Mesh: %c${resolvedName}%c${cuerpoPart}${salaPart} | X: ${xStr}, Y: ${yStr}, Z: ${zStr} (Edificio: ${this.currentBuilding}, Piso: ${this.currentFloorModel})\n` +
+          `%c📋 JSON Firestore:%c { "x": ${xStr}, "y": ${yStr}, "z": ${zStr} }`,
           'background: #111; color: #00ffaa; font-weight: bold; padding: 3px 8px; border-radius: 4px;',
           'color: #aaa;',
           'color: #ffaa00; font-weight: bold;',
-          'color: #ffffff; font-weight: bold;'
+          'color: #aaa;',
+          ...(cuerpoLabel ? ['color: #00ccff; font-weight: bold; font-size: 13px;', 'color: #aaa;'] : []),
+          ...(salaLabel ? ['color: #68d391; font-weight: bold; font-size: 13px;', 'color: #aaa;'] : []),
+          'color: #ffffff; font-weight: bold;',
+          'color: #a0aec0; font-family: monospace;',
+          'color: #f6e05e; font-weight: bold; font-family: monospace;'
         );
       }
     }
@@ -2823,7 +2865,7 @@ export class BabylonSceneService implements OnDestroy {
    * Suscripción para recibir cambios de coordenadas 3D en tiempo real (para HUD UI).
    */
   public onCoordinatesChange(
-    cb: (data: { coords: BABYLON.Vector3 | null; meshName: string; building: BuildingId; floor: string }) => void
+    cb: (data: { coords: BABYLON.Vector3 | null; meshName: string; cuerpo: string; sala: string; building: BuildingId; floor: string }) => void
   ): () => void {
     this.onCoordinatesUpdatedCb = cb;
     return () => {
@@ -2848,10 +2890,23 @@ export class BabylonSceneService implements OnDestroy {
       : 'Haz clic o mueve el cursor sobre el mapa';
     const lastMesh = this.lastHoveredMeshName || 'Ninguno';
 
+    // Extraer estrictamente número de cuerpo (sin sala)
+    const cMatch2 = lastMesh.match(/cuerpo\s*(\d+)/i)
+      || lastMesh.match(/^[a-z]_p\d+_grupo_?(\d+)/i)
+      || lastMesh.match(/^grupo_?(\d+)/i)
+      || lastMesh.match(/^mesh(\d+)/i)
+      || lastMesh.match(/^[a-z](\d{3})/i);
+    const cuerpoLabel2 = cMatch2 ? `Cuerpo ${cMatch2[1]}` : (this.lastHoveredCuerpo || 'Sin cuerpo');
+    const rMatch2 = lastMesh.match(/^([a-z])(\d{3})/i);
+    const salaLabel2 = rMatch2 ? `Sala ${rMatch2[0].toUpperCase()}` : (this.lastHoveredSala || '');
+
+    const cuerpoDisplay = cuerpoLabel2 ? ` | ${cuerpoLabel2}` : '';
+    const salaDisplay = salaLabel2 ? ` | ${salaLabel2}` : '';
+
     console.log(
       `%c📍 INACAP RENCA 3D — COORDENADAS [${trigger}] 📍%c\n` +
       `🏢 Edificio: ${this.currentBuilding} | Modelo/Piso: ${this.currentFloorModel}\n` +
-      `🎯 Punto 3D Cursor: %c${ptrCoords}%c (Malla: ${lastMesh})\n` +
+      `🎯 Punto 3D Cursor: %c${ptrCoords}%c (Malla: ${lastMesh}${cuerpoDisplay}${salaDisplay})\n` +
       `📷 Cámara -> Target: ${camTarget} | Pos: ${camPos} | Radio: ${this.camera?.radius?.toFixed(2)} | Alpha: ${this.camera?.alpha?.toFixed(2)} | Beta: ${this.camera?.beta?.toFixed(2)}`,
       'background: #d32f2f; color: #fff; font-weight: bold; font-size: 13px; padding: 4px 10px; border-radius: 4px;',
       'color: #00ffaa; font-weight: bold; font-size: 12px;',
@@ -2871,7 +2926,6 @@ export class BabylonSceneService implements OnDestroy {
       window.removeEventListener('keydown', this.f12KeyHandler);
       this.f12KeyHandler = null;
     }
-    this.canvasClickHandler = null;
     this.buildingFocusAnimId++;
     this.currentFocusedBuilding = null;
     if (this.idleTimer) {

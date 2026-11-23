@@ -201,5 +201,41 @@
         </button>
       </div>
     </div>
+
+
+    <!-- Panel flotante HUD de Coordenadas y Cuerpos 3D (activable con F12 o botón) -->
+    <div class="f12-coords-hud" *ngIf="f12CoordsVisible" (click)="$event.stopPropagation()">
+      <div class="f12-hud-header">
+        <span class="f12-hud-title">📍 Inspector de Coordenadas 3D</span>
+        <button type="button" class="f12-hud-close" (click)="toggleF12Coords()" title="Cerrar">&times;</button>
+      </div>
+      <div class="f12-hud-body">
+        <div class="f12-hud-row">
+          <span class="f12-hud-label">🏢 Edificio/Piso:</span>
+          <span class="f12-hud-val">Edif. {{ currentBuilding }} · {{ getCurrentFloorLabel() }}</span>
+        </div>
+        <div class="f12-hud-row">
+          <span class="f12-hud-label">🏛️ Cuerpo:</span>
+          <span class="f12-hud-val highlight-cuerpo">{{ currentCuerpoText || 'Sin cuerpo asignado' }}</span>
+        </div>
+        <div class="f12-hud-row" *ngIf="currentSalaText">
+          <span class="f12-hud-label">🎓 Sala:</span>
+          <span class="f12-hud-val highlight-sala">{{ currentSalaText }}</span>
+        </div>
+        <div class="f12-hud-row">
+          <span class="f12-hud-label">🏷️ Malla 3D:</span>
+          <span class="f12-hud-val">{{ currentMeshNameText || 'Ninguna' }}</span>
+        </div>
+        <div class="f12-hud-row">
+          <span class="f12-hud-label">🎯 Coordenadas:</span>
+          <span class="f12-hud-val coords-val">{{ currentCoordinatesText || 'Haz clic en el mapa 3D' }}</span>
+        </div>
+      </div>
+      <div class="f12-hud-actions" *ngIf="currentCoordinatesText">
+        <button type="button" class="btn-copy-coords" (click)="copyCurrentCoords()">
+          {{ lastCopiedText || '📋 Copiar { X, Y, Z } para Firestore' }}
+        </button>
+      </div>
+    </div>
   </div>
 </div>
