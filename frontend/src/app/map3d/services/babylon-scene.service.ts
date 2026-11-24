@@ -2518,7 +2518,8 @@ export class BabylonSceneService implements OnDestroy {
 
   public clearDestinationMarker(): void {
     if (this.destinationMarker) {
-      this.destinationMarker.dispose();
+      // true = liberar también el material 'destMat' (antes quedaba uno por búsqueda)
+      this.destinationMarker.dispose(false, true);
       this.destinationMarker = null;
     }
   }

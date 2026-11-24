@@ -24,6 +24,14 @@ export class InacapitoGuideService {
 
   // Meshes de la línea de ruta en el piso
   private groundLineMeshes: BABYLON.AbstractMesh[] = [];
+  /**
+   * Materiales, texturas y esqueletos creados por la ruta actual (línea roja
+   * de la ruta y la copia de Inacapito). Antes solo se borraban las mallas:
+   * en cada búsqueda quedaban en memoria ~6 materiales, 2 texturas y 1
+   * esqueleto (prueba de fatiga 2026-11-24: 35 → 83 MB en 94 búsquedas).
+   */
+  private recursosRuta: { materiales: BABYLON.Material[]; texturas: BABYLON.BaseTexture[]; esqueletos: BABYLON.Skeleton[] } =
+    { materiales: [], texturas: [], esqueletos: [] };
 
   // Puntos del recorrido actual
   private currentWorldPoints: BABYLON.Vector3[] = [];
@@ -76,6 +84,13 @@ export class InacapitoGuideService {
     if (worldPoints.length < 2) {
       return [];
     }
+
+    // Foto de lo que ya existe: lo que aparezca después lo creó esta ruta.
+    const previos = {
+      materiales: new Set(scene.materials),
+      texturas: new Set(scene.textures),
+      esqueletos: new Set(scene.skeletons),
+    };
 
     const createdMeshes: BABYLON.AbstractMesh[] = [];
 
@@ -207,6 +222,18 @@ export class InacapitoGuideService {
     } catch (err) {
       console.error('InacapitoGuideService: Error al instanciar Inacapito:', err);
     }
+
+    // Lo del modelo base (containerCache) se reutiliza entre rutas: nunca se libera aquí.
+    const delContenedor = new Set<unknown>([
+      ...(this.containerCache?.materials ?? []),
+      ...(this.containerCache?.textures ?? []),
+      ...(this.containerCache?.skeletons ?? []),
+    ]);
+    this.recursosRuta = {
+      materiales: scene.materials.filter(m => !previos.materiales.has(m) && !delContenedor.has(m)),
+      texturas: scene.textures.filter(t => !previos.texturas.has(t) && !delContenedor.has(t)),
+      esqueletos: scene.skeletons.filter(k => !previos.esqueletos.has(k) && !delContenedor.has(k)),
+    };
 
     return createdMeshes;
   }
@@ -421,6 +448,12 @@ export class InacapitoGuideService {
       if (!m.isDisposed()) m.dispose();
     });
     this.groundLineMeshes = [];
+
+    // Liberar lo que creó la ruta (después de las mallas que los usaban)
+    this.recursosRuta.esqueletos.forEach(k => k.dispose());
+    this.recursosRuta.materiales.forEach(m => m.dispose(false, false));
+    this.recursosRuta.texturas.forEach(t => t.dispose());
+    this.recursosRuta = { materiales: [], texturas: [], esqueletos: [] };
 
     this.currentWorldPoints = [];
     this.activeStepIndex = 0;
