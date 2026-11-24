@@ -2,9 +2,10 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { SelectedLocationInfo } from '../../../core/models/navegacion.model';
 
 @Component({
-  selector: 'app-location-detail-panel',
-  templateUrl: './location-detail-panel.component.html',
-  styleUrls: ['./location-detail-panel.component.scss']
+    selector: 'app-location-detail-panel',
+    templateUrl: './location-detail-panel.component.html',
+    styleUrls: ['./location-detail-panel.component.scss'],
+    standalone: false
 })
 export class LocationDetailPanelComponent {
   @Input() locationInfo: SelectedLocationInfo | null = null;

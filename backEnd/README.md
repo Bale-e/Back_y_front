@@ -20,7 +20,7 @@
 
 El backend de InaGo actúa como la fuente de verdad y el motor de cálculo del sistema de navegación indoor:
 - **Base de datos:** Google Firebase Firestore (colecciones `edificios`, `locaciones`, `navigation-paths`).
-- **Autenticación:** Validación de `Bearer Token` vía `authMiddleware`.
+- **Autenticación:** lecturas públicas; escrituras con `ADMIN_TOKEN` vía `adminAuth.js` (ver README principal, sección Seguridad).
 - **Caché en memoria:** `MemoryCacheAdapter` con TTL configurable para reducir lecturas a Firestore.
 - **Servidor monolítico en producción:** Si el frontend está compilado en `frontend/dist/`, Express sirve automáticamente la SPA estática para rutas web fuera de la API.
 
@@ -40,9 +40,7 @@ backEnd/
 │   └── test_hexagonal_endpoints.js   ← Suite principal de pruebas de arquitectura
 │
 ├── scripts/                          ← Scripts administrativos y utilidades de Firestore
-│   ├── crear_token_firestore.js      ← Registro de tokens en base de datos
 │   ├── debug_paths.js                ← Depuración e inspección de grafos de navegación
-│   └── ver_tokens.js                 ← Visualización de tokens existentes
 │
 └── src/
     ├── app.js                        ← Configuración de Express, middlewares y rutas
@@ -102,8 +100,8 @@ CACHE_TTL_MS=600000
 # Orígenes CORS permitidos (separados por coma)
 CORS_ORIGIN=http://localhost:4200,https://tu-dominio.com
 
-# Token secreto para validar peticiones Bearer
-API_TOKEN=inago_sec_xxxxxxxxxxxxxxxxxxxx
+# Clave del panel #admin (crear/editar/eliminar edificios). Mínimo 24 caracteres.
+ADMIN_TOKEN=genera-una-clave-larga-y-aleatoria
 
 # Credenciales de cuenta de servicio Firebase Admin SDK
 FIREBASE_PROJECT_ID=tu-proyecto-firebase
@@ -149,14 +147,12 @@ Ejecuta `tests/test_hexagonal_endpoints.js`, levantando un servidor efímero en 
 
 ### Tests adicionales disponibles:
 ```bash
-node tests/test_auth_endpoints.js   # Valida seguridad, tokens válidos y rechazos 401
+node tests/test_auth_endpoints.js   # Lecturas públicas, escrituras con ADMIN_TOKEN y validación (no escribe en Firestore)
 node tests/test_crud_edificios.js   # Valida operaciones completas sobre edificios
 ```
 
 ### Scripts administrativos (`scripts/`):
 ```bash
-node scripts/crear_token_firestore.js   # Genera un nuevo token de acceso
-node scripts/ver_tokens.js              # Lista tokens en Firestore
 node scripts/debug_paths.js             # Muestra la conectividad del grafo de navegación
 ```
 
@@ -177,3 +173,13 @@ node scripts/debug_paths.js             # Muestra la conectividad del grafo de n
 | `GET` | `/navegacion/ruta?origen=...&destino=...` | Ruta óptima + waypoints + flechas 3D | Sí |
 | `GET` | `/navigation-paths` | Grafos de navegación completos | Sí |
 | `GET` | `/ruta/:destino` | Endpoint de retrocompatibilidad | Sí |
+
+## Despliegue al hosting (api.inago.inacode.cl)
+
+1. Crear `backEnd/.env.production` a partir de `.env.example` con los datos de producción
+   (`CORS_ORIGIN=https://inago.inacode.cl`, `TRUST_PROXY=true`, un `ADMIN_TOKEN` propio y las credenciales de Firebase).
+   Este archivo no se sube a git.
+2. Ejecutar `npm run deploy:preparar`: arma `backEnd/deploy/` con el código, el `.env` de producción y un `LEEME.txt` con los pasos para FileZilla y cPanel.
+3. Subir el contenido de `backEnd/deploy/` a la app de cPanel, luego **Run NPM Install** y **Restart**.
+
+La carpeta `deploy/` está en `.gitignore` porque lleva credenciales.

@@ -5,6 +5,12 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.production
+
+# ── Paquetes listos para subir al hosting (llevan el .env de producción) ──
+deploy/
+backEnd/deploy/
+frontend/deploy/
 
 # ── Frontend Angular: build y caché ──────────────────────────
 frontend/dist/

@@ -1,9 +1,10 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 @Component({
-  selector: 'app-map-search',
-  templateUrl: './map-search.component.html',
-  styleUrls: ['./map-search.component.scss']
+    selector: 'app-map-search',
+    templateUrl: './map-search.component.html',
+    styleUrls: ['./map-search.component.scss'],
+    standalone: false
 })
 export class MapSearchComponent {
   @Input() destinations: string[] = [];

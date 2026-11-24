@@ -9,11 +9,22 @@ export const API_BASE_URL = (
 ).replace(/\/$/, '');
 
 /**
- * Token de autorización configurado para realizar solicitudes GET a la API
+ * Cabeceras para las lecturas del mapa (públicas, sin token).
+ *
+ * Antes aquí había un API_TOKEN escrito en el código: terminaba dentro del
+ * JavaScript que descarga cualquier visitante, así que no protegía nada y
+ * además permitía modificar datos. Las escrituras ahora usan la clave de
+ * administrador que se escribe en el panel #admin (ver admin-panel.component.ts),
+ * que nunca queda guardada en el código.
  */
-export const API_TOKEN = 'inago_sec_7f9c2d1b8e4a053f6e8d2b1a9c4e7f0b5d3a6c8e1f4b2a9d7c0e5f8b1a3d6e9f';
-
 export const AUTH_HEADERS: HeadersInit = {
-  'Authorization': `Bearer ${API_TOKEN}`,
   'Content-Type': 'application/json'
 };
+
+/** Cabeceras para crear/editar/eliminar: llevan la clave de administrador. */
+export function adminHeaders(adminToken: string): HeadersInit {
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${adminToken}`
+  };
+}

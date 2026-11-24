@@ -188,13 +188,16 @@ $panel-width-sm:  calc(100vw - 24px);
     transform: translateX(0);
   }
 
-  // scrollbar
+  // scrollbar. Envuelto en `& { }`: Sass deja de aceptar declaraciones
+  // sueltas después de reglas anidadas.
+  & {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.14) transparent;
+  }
   &::-webkit-scrollbar { width: 5px; }
   &::-webkit-scrollbar-track { background: transparent; }
   &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
   &::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.24); }
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.14) transparent;
 }
 
 // ── SECTION LABEL ────────────────────────────────────────────────

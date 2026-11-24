@@ -34,7 +34,7 @@ El proyecto está dividido en dos capas principales:
 | Capa | Tecnología | Responsabilidad |
 |---|---|---|
 | **Backend** | Node.js + Express 5 | API REST, cálculo de rutas, acceso a Firestore |
-| **Frontend** | Angular 17 + BabylonJS 7 | Visualización 3D, búsqueda de destinos, navegación por pisos |
+| **Frontend** | Angular 20 + BabylonJS 7 | Visualización 3D, búsqueda de destinos, navegación por pisos |
 
 La comunicación entre ambas capas se realiza mediante peticiones HTTP autenticadas con un token de portador (`Bearer Token`). El backend sirve además los archivos estáticos del frontend cuando este se compila, actuando como servidor monolítico para el despliegue en producción.
 
@@ -44,12 +44,12 @@ La comunicación entre ambas capas se realiza mediante peticiones HTTP autentica
 
 | Tecnología | Versión | Uso |
 |---|---|---|
-| **Node.js** | ≥ 18 | Runtime del backend |
+| **Node.js** | ≥ 20.19 | Runtime del backend y build del frontend |
 | **Express** | ^5.2.1 | Framework HTTP / API REST |
 | **Firebase Admin SDK** | ^13.10.0 | Conexión y lectura de Firestore |
 | **dotenv** | ^17.4.2 | Gestión de variables de entorno |
 | **nodemon** | ^3.0.0 | Recarga automática en desarrollo |
-| **Angular** | ^17.3.0 | Framework del frontend (SPA) |
+| **Angular** | ^20.3 | Framework del frontend (SPA) |
 | **BabylonJS** | ^7.0.0 | Motor de renderizado 3D WebGL |
 | **babylonjs-loaders** | ^7.54.3 | Carga de modelos OBJ/MTL |
 | **RxJS** | ~7.8.0 | Programación reactiva (Angular) |
@@ -87,7 +87,7 @@ Back_y_front/                          ← Raíz del monorepo
 │       │   │   │   │   ├── LocacionesController.js
 │       │   │   │   │   └── NavegacionController.js   ← Controlador de rutas y navegación
 │       │   │   │   ├── middlewares/
-│       │   │   │   │   ├── authMiddleware.js          ← Validación de Bearer Token
+│       │   │   │   │   ├── adminAuth.js               ← Clave de administrador (escrituras)
 │       │   │   │   │   ├── corsConfig.js              ← Configuración CORS multi-origen
 │       │   │   │   │   ├── errorHandler.js            ← 404 y errores globales
 │       │   │   │   │   └── validateRequest.js         ← Validación de parámetros de entrada
@@ -182,7 +182,7 @@ Back_y_front/                          ← Raíz del monorepo
 │       │           └── firebase/
 │       │               └── firebaseAdmin.js        ← Inicialización de Firebase Admin SDK
 │
-└── frontend/                          ← Aplicación frontend (Angular 17)
+└── frontend/                          ← Aplicación frontend (Angular 20)
     ├── package.json                   ← Dependencias y scripts del frontend
     ├── angular.json                   ← Configuración del proyecto Angular
     ├── tsconfig.json / tsconfig.app.json
@@ -465,7 +465,7 @@ Este slice **no tiene lógica de negocio propia**. Actúa como intermediario ent
 | `controllers/` | `EdificiosController.js` | Extrae parámetros del `req`, invoca `ListarEdificiosUseCase` o `BuscarLocacionUseCase`, envía `res` |
 | | `LocacionesController.js` | Igual para búsquedas globales de locaciones |
 | | `NavegacionController.js` | Igual para navegación; encadena además `GenerarVisualizacionRutaUseCase` |
-| `middlewares/` | `authMiddleware.js` | Extrae y valida el Bearer Token contra `API_TOKEN` del `.env`. Devuelve 401 si falla |
+| `middlewares/` | `adminAuth.js` | Valida `ADMIN_TOKEN` (Bearer) solo en las escrituras. Devuelve 401 si falla |
 | | `corsConfig.js` | Lee `CORS_ORIGIN` del `.env` y configura qué orígenes pueden hacer peticiones |
 | | `errorHandler.js` | Captura errores no manejados; mapea `DomainError` → 4xx, genéricos → 500 |
 | | `validateRequest.js` | Valida la forma de los parámetros de entrada antes de llegar al controlador |
@@ -499,7 +499,7 @@ Frontend
   ▼
 [Slice API — infrastructure]
   corsConfig      → origen http://localhost:4200 permitido ✓
-  authMiddleware  → Bearer Token válido ✓
+  adminAuth       → ADMIN_TOKEN válido (solo escrituras) ✓
   validateRequest → parámetros correctos ✓
   NavegacionController.calcularRuta()
   │
@@ -593,7 +593,7 @@ Punto de entrada de todas las peticiones HTTP. No contiene lógica de negocio: d
 - **`infrastructure/`**: controladores, rutas y middlewares
   - `EdificiosController`, `LocacionesController`, `NavegacionController`
   - `edificios.routes.js`, `locaciones.routes.js`, `navegacion.routes.js`
-  - `authMiddleware` — valida el Bearer Token
+  - `adminAuth` — valida `ADMIN_TOKEN` en las escrituras
   - `corsConfig` — configura los orígenes permitidos
   - `errorHandler` — convierte errores en respuestas HTTP apropiadas
   - `validateRequest` — valida parámetros de entrada antes de llegar al controlador
@@ -622,7 +622,7 @@ Piezas reutilizables por todos los módulos:
 
 ## API REST — Endpoints
 
-> **Nota:** Todos los endpoints (excepto `/health`) requieren el header `Authorization: Bearer <API_TOKEN>`.
+> **Nota:** Las consultas (`GET`) son **públicas**. Crear, editar y eliminar edificios (`POST`/`PUT`/`DELETE /edificios`) requiere `Authorization: Bearer <ADMIN_TOKEN>`. Ver [Seguridad](#seguridad--autenticación-por-token).
 
 ### Healthcheck
 | Método | Ruta | Descripción |
@@ -684,16 +684,18 @@ Piezas reutilizables por todos los módulos:
 
 ## Seguridad — Autenticación por token
 
-Todos los endpoints protegidos validan el token mediante el middleware `authMiddleware`:
+> **Cambio 2026-11-24.** Antes había un único `API_TOKEN` para todo, escrito también en el frontend (`api.config.ts`) — cualquier visitante lo veía en el JavaScript de la página y con él podía borrar edificios. Además, `backEnd/.env` (con la clave privada de Firebase) estaba subido a este repositorio público. Si tienes acceso al proyecto Firebase: **la clave de la cuenta de servicio debe revocarse y reemplazarse** en Google Cloud → IAM → Cuentas de servicio.
 
-```http
-GET /edificios HTTP/1.1
-Authorization: Bearer <API_TOKEN>
-```
+| Tipo de petición | Acceso | Protección |
+|---|---|---|
+| `GET` (edificios, locaciones, rutas, navigation-paths) | Público | Límite de 300 solicitudes por minuto por IP |
+| `POST`/`PUT`/`DELETE /edificios` | Solo administradores | `Authorization: Bearer <ADMIN_TOKEN>` + 20 intentos cada 15 min por IP + validación del cuerpo |
+| `POST /admin/verificar` | Login del panel `#admin` | Igual que las escrituras |
 
-El middleware extrae el token del header `Authorization` (formato `Bearer <token>` o token directo), lo compara con la variable de entorno `API_TOKEN` y responde con `401` si no coincide o `500` si `API_TOKEN` no está configurada.
-
-El token **nunca se almacena en Firestore**, lo que mantiene la base de datos limpia y el sistema de autenticación simple de gestionar.
+- `ADMIN_TOKEN` vive **solo** en `backEnd/.env` (mínimo 24 caracteres). Los administradores lo escriben en el panel `#admin`; el frontend lo guarda solo en memoria mientras el panel está abierto. **Nunca** se escribe en el código.
+- El cuerpo de `POST`/`PUT /edificios` solo acepta `Nombre`, `descripcion`, `Pisos`/`Piso` y `cuerpo`, con tipo y largo controlados; cualquier otro campo se rechaza con `400`.
+- Cabeceras de seguridad con `helmet`, cuerpo JSON de máx. 20 KB, CORS limitado a `CORS_ORIGIN` y errores internos con mensaje genérico (el detalle queda solo en el log).
+- El frontend escapa los nombres que vienen de Firestore antes de mostrarlos (evita XSS).
 
 ---
 
@@ -860,15 +862,18 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 # Orígenes permitidos para CORS (separados por coma)
 CORS_ORIGIN=http://localhost:4200,https://tu-dominio.com
 
-# Token de autenticación para la API (Bearer Token)
-API_TOKEN=tu-token-secreto-aqui
+# Clave del panel #admin (crear/editar/eliminar edificios). Mínimo 24 caracteres.
+ADMIN_TOKEN=genera-una-clave-larga-y-aleatoria
+
+# true solo si hay un proxy de confianza adelante (cPanel/LiteSpeed, Nginx)
+TRUST_PROXY=false
 ```
 
 > **⚠️ Importante:** Nunca subas el archivo `.env` al repositorio. Está incluido en `.gitignore`. Las credenciales de Firebase son sensibles y permiten acceso completo a la base de datos.
 
 ### Frontend (`frontend/.env.example`)
 
-El frontend puede requerir la URL de la API y el token configurados como variables de entorno del build (ver `frontend/.env.example`).
+El frontend no usa token: la URL de la API se define en `src/app/core/config/api.config.ts`.
 
 ---
 
@@ -876,10 +881,10 @@ El frontend puede requerir la URL de la API y el token configurados como variabl
 
 ### Requisitos previos
 
-- **Node.js** ≥ 18.x
+- **Node.js** ≥ 20.19
 - **npm** ≥ 9.x
 - Cuenta de Firebase con un proyecto Firestore configurado
-- Archivo `.env` con las credenciales de Firebase y el `API_TOKEN`
+- Archivo `backEnd/.env` (copiar `backEnd/.env.example`) con las credenciales de Firebase y el `ADMIN_TOKEN`
 
 ### Instalación
 
@@ -1048,7 +1053,7 @@ La dirección (`'up'` o `'down'`) se determina comparando el número de piso act
 ### Funcionalidades implementadas ✅
 
 - [x] API REST hexagonal con 12+ endpoints
-- [x] Autenticación por Bearer Token en todos los endpoints protegidos
+- [x] Lecturas públicas con límite por IP; escrituras protegidas con `ADMIN_TOKEN` (solo en el servidor)
 - [x] Caché en memoria con TTL configurable
 - [x] Cálculo de rutas con punto de inflexión exacto en 90°
 - [x] Algoritmo A* para grafos topológicos

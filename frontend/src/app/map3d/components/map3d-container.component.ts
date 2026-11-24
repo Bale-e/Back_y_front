@@ -18,10 +18,21 @@ export interface BuildingPromptData {
   floorsCount: string;
 }
 
+/** Escapa texto para insertarlo en HTML sin que se interprete como código. */
+function escapeHtml(valor: unknown): string {
+  return String(valor ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 @Component({
-  selector: 'app-map3d',
-  templateUrl: './map3d-container.component.html',
-  styleUrls: ['./map3d-container.component.scss']
+    selector: 'app-map3d',
+    templateUrl: './map3d-container.component.html',
+    styleUrls: ['./map3d-container.component.scss'],
+    standalone: false
 })
 export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   @ViewChild('renderCanvas', { static: false })
@@ -40,6 +51,8 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
   set destinationOptions(v: string[]) { this.destinations = v; }
   selectedDestination: string | null = null;
   destinationCoordinatesText = '';
+  /** Mensaje bajo el buscador cuando no se puede trazar la ruta (antes no se mostraba nada). */
+  searchStatus = '';
   selectedLocationInfo: SelectedLocationInfo | null = null;
   isDetailPanelOpen = false;
   pendingBuildingPrompt: BuildingPromptData | null = null;
@@ -226,13 +239,14 @@ export class Map3dContainerComponent implements AfterViewInit, OnDestroy {
       if (l.nombre) namesSet.add(String(l.nombre));
     }
     const names = Array.from(namesSet) as string[];
-    // Debug: mostrar datos durante tests si falla
-    console.log('loadLocationOptions locs:', locs, 'names:', names);
     this.destinationOptions = names;
     // Inicializar filtered con todas las opciones (las specs esperan la lista completa tras cargar)
     this.filteredDestinations = [...this.destinationOptions];
     if (this.searchSuggestionsPanel) {
-      this.searchSuggestionsPanel.innerHTML = this.destinationOptions.map(d => `<div class="suggestion">${d}</div>`).join('');
+      // Los nombres vienen de la base de datos: se escapan antes de
+      // insertarlos como HTML (antes un nombre con <script>/<img onerror>
+      // se ejecutaba en el navegador de cada visitante).
+      this.searchSuggestionsPanel.innerHTML = this.destinationOptions.map(d => `<div class="suggestion">${escapeHtml(d)}</div>`).join('');
     }
   }
 
@@ -734,6 +748,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
   async onDestinationSelected(destinationName: string): Promise<void> {
     this.closeBuildingPrompt(false);
     this.selectedDestination = destinationName;
+    this.searchStatus = '';
     this.clearNavSteps();
     const result = await this.mapNavService.calculateRoute(
       destinationName,
@@ -741,6 +756,9 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
     );
     if (!result) {
       this.destinationCoordinatesText = `No se encontró la locación '${destinationName}'.`;
+      // Ej.: salas sin coordenadas en Firestore (36 de 202 al 2026-11-24): antes
+      // el usuario elegía la sala y no pasaba nada, sin ningún aviso.
+      this.searchStatus = `No se pudo trazar una ruta hacia «${destinationName}»: esta ubicación todavía no está marcada en el mapa.`;
       this.cd.detectChanges();
       return;
     }
@@ -1266,6 +1284,7 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
 
   onSearchCleared(): void {
     this.selectedDestination = null;
+    this.searchStatus = '';
     this.destinationCoordinatesText = '';
     this.clearNavSteps();
     this.babylonSceneService.clearGuideArrows();
@@ -2147,8 +2166,8 @@ async onMeshPicked(meshName: string, pickResult?: any): Promise<void> {
                 const info = this.infoData[pickResult.pickedMesh.name];
                 if (info) {
                   this.infoBox.innerHTML = `
-                    <p style="font-weight:bold;font-size:14px;margin:0 0 4px">${info.nombre}</p>
-                    <p style="font-size:12px;color:#555;margin:0">${info.desc}</p>
+                    <p style="font-weight:bold;font-size:14px;margin:0 0 4px">${escapeHtml(info.nombre)}</p>
+                    <p style="font-size:12px;color:#555;margin:0">${escapeHtml(info.desc)}</p>
                   `;
                   this.infoBox.style.display = 'block';
                   this.infoBox.style.left = (evt.clientX + 15) + 'px';

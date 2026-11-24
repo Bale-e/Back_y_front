@@ -3,9 +3,10 @@ import { BuildingDefinition, BuildingId, FloorDefinition } from '../../../core/m
 import { BuildingRegistryService } from '../../../core/services/building-registry.service';
 
 @Component({
-  selector: 'app-floor-selector',
-  templateUrl: './floor-selector.component.html',
-  styleUrls: ['./floor-selector.component.scss']
+    selector: 'app-floor-selector',
+    templateUrl: './floor-selector.component.html',
+    styleUrls: ['./floor-selector.component.scss'],
+    standalone: false
 })
 export class FloorSelectorComponent {
   @Input() currentBuilding: BuildingId = 'S';

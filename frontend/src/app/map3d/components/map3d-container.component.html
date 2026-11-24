@@ -6,6 +6,7 @@
     <!-- Componente de búsqueda superior -->
     <app-map-search
       [destinations]="destinations"
+      [statusText]="searchStatus"
       (destinationSelected)="onDestinationSelected($event)"
       (searchCleared)="onSearchCleared()"
     ></app-map-search>

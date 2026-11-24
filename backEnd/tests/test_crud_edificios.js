@@ -8,7 +8,7 @@ async function testCrud() {
   await new Promise((resolve) => server.listen(0, resolve));
   const port = server.address().port;
   const baseUrl = `http://localhost:${port}`;
-  const token = process.env.API_TOKEN;
+  const token = process.env.ADMIN_TOKEN;
 
   console.log(`Servidor de prueba iniciado en ${baseUrl}\n`);
 

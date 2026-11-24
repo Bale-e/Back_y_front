@@ -718,9 +718,10 @@ export function resolveLocationBuilding(l: any): BuildingId {
 }
 
 @Component({
-  selector: 'app-nav-drawer',
-  templateUrl: './nav-drawer.component.html',
-  styleUrls: ['./nav-drawer.component.scss'],
+    selector: 'app-nav-drawer',
+    templateUrl: './nav-drawer.component.html',
+    styleUrls: ['./nav-drawer.component.scss'],
+    standalone: false
 })
 export class NavDrawerComponent implements OnInit, OnDestroy {
   @Input() isOpen = false;

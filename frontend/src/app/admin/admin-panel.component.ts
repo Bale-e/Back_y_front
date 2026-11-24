@@ -3,15 +3,17 @@ import { EspaciosApiService } from '../services/espacios-api.service';
 import { Edificio } from '../core/models/edificio.model';
 
 @Component({
-  selector: 'app-admin-panel',
-  templateUrl: './admin-panel.component.html',
-  styleUrls: ['./admin-panel.component.scss']
+    selector: 'app-admin-panel',
+    templateUrl: './admin-panel.component.html',
+    styleUrls: ['./admin-panel.component.scss'],
+    standalone: false
 })
 export class AdminPanelComponent implements OnInit {
   @Output() cerrar = new EventEmitter<void>();
 
-  // Clave de acceso exclusiva para los 4 administradores
-  private readonly ADMIN_PASSWORD = 'Inago_Mapa_26';
+  // La clave de administrador ya NO está escrita aquí (antes cualquiera la
+  // veía en el JavaScript de la página). Ahora la valida el backend contra
+  // ADMIN_TOKEN de su .env, y el servicio la guarda solo en memoria.
 
   isAuthenticated = false;
   passwordInput = '';
@@ -33,27 +35,37 @@ export class AdminPanelComponent implements OnInit {
   constructor(private espaciosApiService: EspaciosApiService) {}
 
   ngOnInit(): void {
-    // Si ya inició sesión anteriormente en esta sesión de pestaña, la recordamos
-    const storedAuth = sessionStorage.getItem('inago_admin_auth');
-    if (storedAuth === 'true') {
+    // Limpia la marca que usaba la versión anterior (ya no se usa).
+    try { sessionStorage.removeItem('inago_admin_auth'); } catch { /* sin storage */ }
+    if (this.espaciosApiService.haySesionAdmin) {
       this.isAuthenticated = true;
       this.cargarEdificios();
     }
   }
 
-  verificarAcceso(): void {
+  async verificarAcceso(): Promise<void> {
     this.authError = '';
-    if (this.passwordInput === this.ADMIN_PASSWORD) {
-      this.isAuthenticated = true;
-      sessionStorage.setItem('inago_admin_auth', 'true');
-      this.cargarEdificios();
-    } else {
-      this.authError = 'Contraseña incorrecta. Acceso restringido únicamente a los 4 administradores.';
+    const clave = this.passwordInput.trim();
+    if (!clave) {
+      this.authError = 'Escribe la clave de administrador.';
+      return;
+    }
+    try {
+      const ok = await this.espaciosApiService.iniciarSesionAdmin(clave);
+      if (ok) {
+        this.isAuthenticated = true;
+        this.passwordInput = '';
+        this.cargarEdificios();
+      } else {
+        this.authError = 'Clave incorrecta. Acceso restringido a los administradores.';
+      }
+    } catch (err: any) {
+      this.authError = err?.message || 'No se pudo verificar la clave. Revisa tu conexión.';
     }
   }
 
   cerrarSesionAdmin(): void {
-    sessionStorage.removeItem('inago_admin_auth');
+    this.espaciosApiService.cerrarSesionAdmin();
     this.isAuthenticated = false;
     this.passwordInput = '';
     this.cerrar.emit();
@@ -105,6 +117,7 @@ export class AdminPanelComponent implements OnInit {
       await this.cargarEdificios();
     } catch (err: any) {
       this.errorMessage = 'Error al guardar el edificio: ' + (err.message || err);
+      this.isAuthenticated = this.espaciosApiService.haySesionAdmin;
     }
   }
 
@@ -137,6 +150,7 @@ export class AdminPanelComponent implements OnInit {
       }
     } catch (err: any) {
       this.errorMessage = 'Error al eliminar edificio: ' + (err.message || err);
+      this.isAuthenticated = this.espaciosApiService.haySesionAdmin;
     }
   }
 

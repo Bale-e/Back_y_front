@@ -10,15 +10,25 @@
     "dev:frontend": "npm --prefix ../frontend start",
     "build:frontend": "npm --prefix ../frontend run build",
     "build": "npm run build:frontend",
-    "test:backend": "node tests/test_hexagonal_endpoints.js"
+    "test:backend": "node tests/test_hexagonal_endpoints.js",
+    "deploy:preparar": "node scripts/preparar_deploy.js"
   },
   "dependencies": {
+    "compression": "^1.8.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "firebase-admin": "^13.10.0"
+    "express-rate-limit": "^8.7.5",
+    "firebase-admin": "^13.10.0",
+    "helmet": "^8.3.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

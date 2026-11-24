@@ -89,8 +89,11 @@ export class BabylonSceneService implements OnDestroy {
     canvas.style.outline = 'none';
     canvasContainer.replaceChildren(canvas);
 
+    // preserveDrawingBuffer en false (antes true): obliga a la GPU a conservar
+    // cada cuadro y solo sirve para capturar el canvas, cosa que la app no hace.
+    // stencil se mantiene: lo necesita el HighlightLayer del resaltado de edificios.
     this.engine = new BABYLON.Engine(canvas, true, {
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
       stencil: true
     });
 

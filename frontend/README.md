@@ -1,6 +1,6 @@
 # InaGo — Frontend Angular 3D (BabylonJS)
 
-> Aplicación web Single Page Application (SPA) desarrollada con **Angular 17** y el motor WebGL **BabylonJS 7**. Proporciona un visor 3D interactivo del campus de INACAP con navegación indoor, selector de edificios y pisos, panel de administración y cálculo visual de rutas guiadas paso a paso.
+> Aplicación web Single Page Application (SPA) desarrollada con **Angular 20** y el motor WebGL **BabylonJS 7**. Proporciona un visor 3D interactivo del campus de INACAP con navegación indoor, selector de edificios y pisos, panel de administración y cálculo visual de rutas guiadas paso a paso.
 
 ---
 
@@ -34,7 +34,7 @@ frontend/
 ├── angular.json                      ← Configuración del workspace Angular
 ├── Dockerfile                        ← Build multi-etapa: compilación Angular → Nginx alpine
 ├── nginx.conf                        ← Configuración de Nginx para SPA (rutas y caché)
-├── package.json                      ← Dependencias (Angular 17, BabylonJS 7, RxJS)
+├── package.json                      ← Dependencias (Angular 20, BabylonJS 7, RxJS)
 ├── tsconfig.json / tsconfig.app.json ← Configuración de TypeScript
 ├── .env.example                      ← Plantilla de configuración de entorno
 │
@@ -129,7 +129,7 @@ Modelos disponibles en la aplicación:
 ## Instalación y ejecución
 
 ### Requisitos
-- **Node.js** ≥ 18.x
+- **Node.js** ≥ 20.19
 - **npm** ≥ 9.x
 
 ### Instalar dependencias
@@ -176,3 +176,11 @@ En `frontend/scripts/inspect_obj.js` se dispone de una herramienta de Node.js pa
 node scripts/inspect_obj.js
 ```
 Reporta el número total de mallas, recuento de vértices y centro geométrico tridimensional `(X, Y, Z)` de cada sala, permitiendo calibrar bounding boxes y coordenadas de navegación.
+
+## Despliegue al hosting (inago.inacode.cl)
+
+1. Ejecutar `npm run deploy:preparar`: compila en modo producción y arma `frontend/deploy/` con el sitio, el `.htaccess` (HTTPS, rutas de Angular, compresión, caché y Content-Security-Policy) y un `LEEME.txt` con los pasos para FileZilla.
+   El comando se detiene si el build falla o si encuentra source maps o algo parecido a un secreto en el JavaScript.
+2. Subir el contenido de `frontend/deploy/`, incluido el `.htaccess` (archivo oculto), a la carpeta de `inago.inacode.cl`.
+
+La carpeta `deploy/` está en `.gitignore`.

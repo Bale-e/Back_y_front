@@ -9,9 +9,10 @@ import { Map3dContainerComponent } from './map3d/components/map3d-container.comp
 import { BuildingId } from './core/models/navegacion.model';
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrls: ['./app.component.scss'],
+    standalone: false
 })
 export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild(Map3dContainerComponent) mapContainer?: Map3dContainerComponent;
