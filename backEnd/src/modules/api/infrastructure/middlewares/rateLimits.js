@@ -14,14 +14,23 @@ const lecturaLimiter = rateLimit({
   handler: demasiadas,
 });
 
-// Escrituras / login de administrador: muy pocos intentos, para que la clave
-// de administrador no se pueda adivinar por fuerza bruta.
-const adminLimiter = rateLimit({
+// Login de administrador: muy pocos intentos para evitar fuerza bruta contra la clave
+const adminLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: Number(process.env.RATE_LIMIT_ADMIN) || 20,
+  limit: Number(process.env.RATE_LIMIT_ADMIN_LOGIN) || 20,
   standardHeaders: true,
   legacyHeaders: false,
   handler: demasiadas,
 });
 
-module.exports = { lecturaLimiter, adminLimiter };
+// Operaciones autenticadas de administrador (CRUD, explorador Firestore):
+// Cupo amplio para permitir navegación, edición de múltiples documentos y auditoría.
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: Number(process.env.RATE_LIMIT_ADMIN) || 1200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: demasiadas,
+});
+
+module.exports = { lecturaLimiter, adminLimiter, adminLoginLimiter };

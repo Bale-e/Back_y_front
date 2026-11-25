@@ -13,6 +13,7 @@ const { lecturaLimiter, adminLimiter } = require('./modules/api/infrastructure/m
 const navegacionRoutes = require('./modules/api/infrastructure/routes/navegacion.routes');
 const edificiosRoutes = require('./modules/api/infrastructure/routes/edificios.routes');
 const locacionesRoutes = require('./modules/api/infrastructure/routes/locaciones.routes');
+const adminRoutes = require('./modules/api/infrastructure/routes/admin.routes');
 const NavegacionController = require('./modules/api/infrastructure/controllers/NavegacionController');
 
 const app = express();
@@ -57,19 +58,17 @@ if (!hayFrontend) {
 // que había antes igual viajaba dentro del frontend, a la vista de todos),
 // con límite de solicitudes por IP. Escrituras: ver edificios.routes.js,
 // exigen ADMIN_TOKEN.
-app.use(['/navegacion', '/edificios', '/locaciones', '/ruta', '/navigation-paths', '/rutas', '/admin'], lecturaLimiter);
+app.use(['/navegacion', '/edificios', '/locaciones', '/ruta', '/navigation-paths', '/rutas'], lecturaLimiter);
 app.use('/navegacion', navegacionRoutes);
 app.use('/edificios', edificiosRoutes);
 app.use('/locaciones', locacionesRoutes);
+app.use('/admin', adminRoutes);
 
 // ── Rutas de Compatibilidad Directa con el Frontend Angular ──
 app.get('/ruta/:destino', NavegacionController.obtenerRutaHaciaDestino);
 app.get('/navigation-paths', NavegacionController.listarNavigationPaths);
 app.get('/navigation-paths/piso/:piso', NavegacionController.obtenerNavigationPathPorPiso);
 app.get('/rutas', NavegacionController.listarRutasAntiguas);
-
-// ── Login del panel #admin: solo confirma que la clave es correcta ──
-app.post('/admin/verificar', adminLimiter, requireAdmin, (req, res) => res.json({ ok: true }));
 
 // ── Monorepo: Servicio Estático del Frontend Angular Compilado ─
 const frontendDistPath = path.join(__dirname, '../../frontend/dist/inamap-angular/browser');

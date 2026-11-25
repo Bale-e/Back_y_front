@@ -158,6 +158,29 @@ export class BuildingRegistryService {
       ]
     });
 
+    // Edificio F
+    this.register({
+      id: 'F',
+      name: 'Edificio F',
+      center: { x: -42.1, y: 3.1, z: -32.6 },
+      rotation: { x: 0, y: -Math.PI / 2, z: 0 },
+      cameraBaseAlpha: 0,
+      cameraRadius: 28,
+      corridorAxis: 'x',
+      corridorFixedCoord: 0,
+      floors: [
+        { number: 1, label: 'Piso 1', modelFile: 'Edificio F - Piso 1.obj', modelDir: '/assets/3d-models/Edificio F/', elevation: 0.05 }
+      ],
+      defaultStairs: [
+        {
+          nombre: 'Escalera Edificio F',
+          worldPos: { x: 9.68, z: -15.03 },
+          landing:   { x: 9.68, z: -15.03 },
+          threshold: { x: 9.68, z: -15.03 }
+        }
+      ]
+    });
+
     // Edificio G
     this.register({
       id: 'G',
@@ -170,6 +193,8 @@ export class BuildingRegistryService {
       corridorFixedCoord: 0,
       floors: [
         { number: 1, label: 'Piso 1', modelFile: 'Edificio G - Piso 1.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.05 },
+        { number: 1.5, label: 'Entrepiso', modelFile: 'Edificio G - Piso 2.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.25 },
+        { number: 2, label: 'Piso 2', modelFile: 'Edificio G - Entrepiso.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.41 },
         { number: 3, label: 'Piso 3', modelFile: 'Edificio G - Piso 3.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.86 }
       ],
       defaultStairs: [
@@ -216,15 +241,26 @@ export class BuildingRegistryService {
     const byFile = floors.find(f => f.modelFile.toLowerCase() === cleanStr.toLowerCase());
     if (byFile) return byFile;
 
-    // 2. Por número contenido en string (ej. 'Piso 2' -> 2)
+    // 2. Por etiqueta exacta o 'Entrepiso'
+    const byLabel = floors.find(f => f.label.toLowerCase() === cleanStr.toLowerCase());
+    if (byLabel) return byLabel;
+
+    if (cleanStr.toLowerCase().includes('entre')) {
+      const byEntre = floors.find(f => f.label.toLowerCase().includes('entre') || f.modelFile.toLowerCase().includes('entre'));
+      if (byEntre) return byEntre;
+    }
+
+    // 3. Por número contenido en string (ej. 'Piso 2' -> busca label 'Piso 2' o number 2)
     const num = parseInt(cleanStr.replace(/\D/g, ''), 10);
     if (!isNaN(num)) {
+      const byLabelNum = floors.find(f => f.label.toLowerCase().includes(`piso ${num}`));
+      if (byLabelNum) return byLabelNum;
       const byNum = floors.find(f => f.number === num);
       if (byNum) return byNum;
     }
 
-    // 3. Por etiqueta (ej. 'Piso 1')
-    return floors.find(f => f.label.toLowerCase() === cleanStr.toLowerCase());
+    // 4. Por etiqueta parcial
+    return floors.find(f => f.label.toLowerCase().includes(cleanStr.toLowerCase()));
   }
 
   public resolveFloorModel(buildingId: string | null | undefined, floor: string | number | null | undefined): string {
@@ -243,6 +279,7 @@ export class BuildingRegistryService {
     const str = piso.toString().toLowerCase();
     if (str.includes('3')) return 0.86;
     if (str.includes('2')) return 0.41;
+    if (str.includes('entre')) return 0.25;
     return 0.05;
   }
 

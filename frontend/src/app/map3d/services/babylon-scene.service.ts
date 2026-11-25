@@ -785,6 +785,7 @@ export class BabylonSceneService implements OnDestroy {
       if (/^C$/i.test(buildingGroup)) return 'C';
       if (/^D$/i.test(buildingGroup)) return 'D';
       if (/^E$/i.test(buildingGroup)) return 'E';
+      if (/^F$/i.test(buildingGroup)) return 'F';
       if (/^G$/i.test(buildingGroup)) return 'G';
     }
     if (!meshName) return null;
@@ -864,6 +865,17 @@ export class BabylonSceneService implements OnDestroy {
       return 'E';
     }
 
+    // Edificio F
+    if (
+      /^(?:f(?=[_\-\s]|_mm|$)|edificio[\s_\-]*f(?=[_\-\s]|$))/i.test(meshName) ||
+      normalized === 'f' ||
+      normalized.startsWith('fmm') ||
+      normalized.includes('edificiof') ||
+      normalized.includes('f1')
+    ) {
+      return 'F';
+    }
+
     // Edificio G
     if (
       /^(?:g(?=[_\-\s]|_mm|$)|edificio[\s_\-]*g(?=[_\-\s]|$))/i.test(meshName) ||
@@ -894,9 +906,11 @@ export class BabylonSceneService implements OnDestroy {
             ? /^(?:d(?=[_\-\s]|_mm|$)|edificio[\s_\-]*d(?=[_\-\s]|$))|mesh65|group37|group36|group35|edificiod|d1/i
             : building === 'E'
               ? /^(?:e(?=[_\-\s]|_mm|$)|edificio[\s_\-]*e(?=[_\-\s]|$))|edificioe|e1/i
-              : building === 'G'
-                ? /^(?:g(?=[_\-\s]|_mm|$)|edificio[\s_\-]*g(?=[_\-\s]|$))|edificiog|g1/i
-                : /^$/;
+              : building === 'F'
+                ? /^(?:f(?=[_\-\s]|_mm|$)|edificio[\s_\-]*f(?=[_\-\s]|$))|edificiof|f1/i
+                : building === 'G'
+                  ? /^(?:g(?=[_\-\s]|_mm|$)|edificio[\s_\-]*g(?=[_\-\s]|$))|edificiog|g1/i
+                  : /^$/;
 
     return parentNode.getChildMeshes(false).filter(m => {
       const meta = (m.metadata as any)?.buildingGroup;

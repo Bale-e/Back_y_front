@@ -1,0 +1,222 @@
+<!-- Botón Flotante Redondo (Ubicado 12px encima del selector de pisos) -->
+<div class="dev-fab-container" (click)="$event.stopPropagation()">
+  <button
+    type="button"
+    class="dev-fab"
+    (click)="togglePanel()"
+    title="Equipo de desarrollo"
+    aria-label="Equipo de desarrollo"
+    [attr.aria-expanded]="isOpen()">
+    <span class="dev-fab__ring"></span>
+    <span class="dev-fab__icon">&lt;/&gt;</span>
+  </button>
+</div>
+
+<!-- Backdrop y Panel Deslizante -->
+<div
+  *ngIf="isOpen()"
+  class="dev-backdrop"
+  (click)="closePanel()"
+  role="presentation">
+  
+  <aside
+    class="dev-panel"
+    (click)="$event.stopPropagation()"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Equipo de Desarrollo InaGo">
+    
+    <!-- Encabezado del Panel con Mascota InaGo! -->
+    <header class="dev-panel__header">
+      <div class="dev-panel__header-brand">
+        <div
+          class="dev-mascot-avatar"
+          title="Mascota Oficial InaGo! (Clic para ampliar)"
+          (click)="openLightbox('assets/images/inago-mascota.jpg')">
+          <img
+            src="assets/images/inago-mascota.jpg"
+            alt="Mascota Oficial InaGo!"
+            class="dev-mascot-img"
+          />
+        </div>
+        <div class="dev-panel__header-text">
+          <div class="dev-badge-brand">
+            <span class="dev-dot"></span>
+            <span>Desarrolladores</span>
+          </div>
+          <h2>Equipo InaGo!</h2>
+          <p>Los creadores y artífices del mapa interactivo 3D del campus INACAP Sede Renca.</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="dev-btn-close"
+        (click)="closePanel()"
+        aria-label="Cerrar panel de desarrolladores">
+        &times;
+      </button>
+    </header>
+
+    <!-- Barra de Pestañas / Tabs por Integrante -->
+    <nav class="dev-tabs" role="tablist" aria-label="Integrantes del equipo">
+      <button
+        *ngFor="let dev of developers"
+        type="button"
+        role="tab"
+        class="dev-tab"
+        [class.active]="activeDevId() === dev.id"
+        [attr.aria-selected]="activeDevId() === dev.id"
+        (click)="selectDeveloper(dev.id)">
+        <div
+          class="dev-tab__avatar"
+          [style.background]="dev.avatarColor">
+          <img
+            *ngIf="dev.foto && !hasPhotoError(dev.id)"
+            [src]="dev.foto"
+            [alt]="dev.nombre"
+            class="dev-tab__img"
+            (error)="onPhotoError(dev.id)"
+          />
+          <span *ngIf="!dev.foto || hasPhotoError(dev.id)">{{ dev.iniciales }}</span>
+        </div>
+        <div class="dev-tab__meta">
+          <strong class="dev-tab__name">{{ dev.nombre }}</strong>
+          <span class="dev-tab__role">{{ dev.rol.split('·')[0].trim() }}</span>
+        </div>
+      </button>
+    </nav>
+
+    <!-- Cuerpo / Vista de Detalle del Integrante Activo -->
+    <main class="dev-body" *ngIf="activeDeveloper as dev" role="tabpanel">
+      
+      <!-- Tarjeta Principal del Perfil -->
+      <section class="dev-profile-card">
+        <div class="dev-profile-header">
+          
+          <!-- Foto o Placeholder Circular con Iniciales -->
+          <div
+            class="dev-avatar-large"
+            [style.background]="dev.avatarColor"
+            [class.clickable]="dev.foto && !hasPhotoError(dev.id)"
+            (click)="dev.foto && !hasPhotoError(dev.id) ? openLightbox(dev.foto) : null"
+            [title]="dev.foto ? 'Clic para ampliar foto' : dev.nombre">
+            <img
+              *ngIf="dev.foto && !hasPhotoError(dev.id)"
+              [src]="dev.foto"
+              [alt]="dev.nombre"
+              class="dev-avatar-img"
+              (error)="onPhotoError(dev.id)"
+            />
+            <span *ngIf="!dev.foto || hasPhotoError(dev.id)" class="dev-avatar-initials">{{ dev.iniciales }}</span>
+          </div>
+
+          <div class="dev-profile-info">
+            <h3 class="dev-name">{{ dev.nombre }}</h3>
+            <p class="dev-career">🎓 {{ dev.carrera }}</p>
+            <div class="dev-role-badge">
+              <span>💼 {{ dev.rol }}</span>
+            </div>
+
+            <!-- Enlaces opcionales (GitHub / LinkedIn) -->
+            <div *ngIf="dev.github || dev.linkedin" class="dev-social-links">
+              <a
+                *ngIf="dev.github"
+                [href]="dev.github"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="dev-social-btn"
+                title="GitHub">
+                <span>GitHub</span>
+              </a>
+              <a
+                *ngIf="dev.linkedin"
+                [href]="dev.linkedin"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="dev-social-btn dev-social-btn--linkedin"
+                title="LinkedIn">
+                <span>LinkedIn</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Descripción del aporte en el proyecto -->
+        <div class="dev-description-box">
+          <h4 class="dev-section-title">Aporte en el Proyecto</h4>
+          <p class="dev-description-text">{{ dev.descripcion }}</p>
+        </div>
+      </section>
+
+      <!-- Sección Extra: Edificios Modelados (Exclusivo de Tomas Palma) -->
+      <section *ngIf="dev.edificiosModelados?.length" class="dev-buildings-section">
+        <div class="dev-buildings-header">
+          <h4 class="dev-section-title">🏛️ Edificios Modelados en 3D</h4>
+          <span class="dev-buildings-count">{{ dev.edificiosModelados?.length }} Edificios</span>
+        </div>
+        <p class="dev-buildings-subtitle">
+          Reconstrucción volumétrica en 3D de los edificios del campus INACAP Sede Renca:
+        </p>
+
+        <div class="dev-buildings-grid">
+          <article
+            *ngFor="let ed of dev.edificiosModelados"
+            class="dev-building-card">
+            
+            <div class="dev-building-card__top">
+              <div class="dev-building-letter">
+                <span>{{ ed.id }}</span>
+              </div>
+              <div class="dev-building-title-group">
+                <h5 class="dev-building-name">{{ ed.name }}</h5>
+                <span class="dev-building-badge">Modelo 3D</span>
+              </div>
+            </div>
+
+            <!-- Espacio para Foto / Render 3D del Edificio -->
+            <div class="dev-building-media">
+              <img
+                *ngIf="ed.foto"
+                [src]="ed.foto"
+                [alt]="ed.name"
+                class="dev-building-img"
+              />
+              <div *ngIf="!ed.foto" class="dev-building-placeholder">
+                <span class="dev-building-placeholder-icon">🏢</span>
+                <span class="dev-building-placeholder-text">Render / Captura 3D</span>
+              </div>
+            </div>
+
+            <p class="dev-building-desc">{{ ed.description }}</p>
+          </article>
+        </div>
+      </section>
+
+    </main>
+
+  </aside>
+</div>
+
+<!-- Visor Lightbox para fotos ampliadas -->
+<div
+  *ngIf="lightboxImage()"
+  class="dev-lightbox"
+  (click)="closeLightbox()"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Visor de imagen">
+  <div class="dev-lightbox__content" (click)="$event.stopPropagation()">
+    <button
+      type="button"
+      class="dev-lightbox__close"
+      (click)="closeLightbox()"
+      aria-label="Cerrar visor de foto">
+      &times;
+    </button>
+    <img
+      [src]="lightboxImage()!"
+      alt="Foto ampliada"
+      class="dev-lightbox__img"
+    />
+  </div>
+</div>

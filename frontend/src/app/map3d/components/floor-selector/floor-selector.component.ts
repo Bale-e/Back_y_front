@@ -61,8 +61,25 @@ export class FloorSelectorComponent {
     this.closeDialog();
   }
 
+  selectFloorItem(floor: FloorDefinition): void {
+    if (floor.modelFile) {
+      this.floorSelected.emit(floor.modelFile);
+    } else {
+      this.selectFloorNumber(floor.number);
+    }
+    this.closeDialog();
+  }
+
   selectFloorNumber(floorNumber: number): void {
-    const key = floorNumber === 1 ? 'first' : (floorNumber === 2 ? 'second' : (floorNumber === 3 ? 'third' : `floor_${floorNumber}`));
+    const key = floorNumber === 1
+      ? 'first'
+      : floorNumber === 1.5
+        ? 'entrepiso'
+        : floorNumber === 2
+          ? 'second'
+          : floorNumber === 3
+            ? 'third'
+            : `floor_${floorNumber}`;
     this.floorSelected.emit(key);
     this.closeDialog();
   }

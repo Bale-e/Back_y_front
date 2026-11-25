@@ -1,12 +1,12 @@
 <div class="admin-overlay" role="dialog" aria-modal="true" aria-label="Panel de Administración">
   <div class="admin-modal">
     
-    <!-- ── 1. VISTA DE BLOQUEO POR CONTRASEÑA (Para los 4 dueños) ── -->
+    <!-- ── 1. VISTA DE BLOQUEO POR CONTRASEÑA ── -->
     <div *ngIf="!isAuthenticated" class="auth-gate">
       <div class="auth-gate__card">
         <div class="auth-gate__icon">🔒</div>
         <h2>Acceso de Administrador</h2>
-        <p class="auth-gate__sub">Este panel está restringido exclusivamente a los 4 administradores del mapa InaGo.</p>
+        <p class="auth-gate__sub">Panel de control de Firebase Firestore para InaGo. Ingresa la clave de administrador para gestionar edificios, salas, colecciones y rutas.</p>
 
         <form (ngSubmit)="verificarAcceso()" class="auth-gate__form">
           <label for="adminPass">Contraseña de acceso:</label>
@@ -27,7 +27,7 @@
 
           <div class="auth-gate__actions">
             <button type="submit" class="btn btn--primary">
-              Desbloquear Panel
+              Desbloquear Consola Firebase
             </button>
             <button type="button" class="btn btn--secondary" (click)="cerrar.emit()">
               Volver al Mapa
@@ -37,127 +37,326 @@
       </div>
     </div>
 
-    <!-- ── 2. VISTA PRINCIPAL DEL PANEL CRUD (Una vez autenticado) ── -->
+    <!-- ── 2. VISTA PRINCIPAL CONSOLA FIREBASE ── -->
     <div *ngIf="isAuthenticated" class="admin-content">
       
-      <!-- Encabezado del Panel -->
+      <!-- Encabezado y Navegación de Pestañas -->
       <header class="admin-header">
-        <div>
-          <h2>⚙️ Panel de Administración (InaGo)</h2>
-          <span class="badge badge--success">Sesión de Administrador Activa</span>
+        <div class="admin-header__brand">
+          <div class="brand-title">
+            <span class="firebase-flame">🔥</span>
+            <h2>InaGo Firebase Manager</h2>
+          </div>
+          <span class="badge badge--success">
+            🟢 Firestore Conectado ({{ statsData?.projectId || 'InaGo' }})
+          </span>
         </div>
+
+        <nav class="admin-tabs" aria-label="Secciones de administración">
+          <button
+            type="button"
+            class="tab-btn"
+            [class.active]="activeTab === 'edificios'"
+            (click)="setTab('edificios')">
+            🏢 Edificios ({{ edificios.length }})
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            [class.active]="activeTab === 'locaciones'"
+            (click)="setTab('locaciones')">
+            📍 Locaciones & Salas
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            [class.active]="activeTab === 'firestore'"
+            (click)="setTab('firestore')">
+            🗄️ Firestore Studio
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            [class.active]="activeTab === 'rutas'"
+            (click)="setTab('rutas')">
+            🧭 Rutas & Navegación
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            [class.active]="activeTab === 'diagnostico'"
+            (click)="setTab('diagnostico')">
+            ⚡ Diagnóstico
+          </button>
+        </nav>
+
         <div class="admin-header__actions">
-          <button type="button" class="btn btn--outline" (click)="cerrarSesionAdmin()">
-            🗺️ Volver al Mapa 3D
+          <button type="button" class="btn btn--outline btn--sm" (click)="cerrarSesionAdmin()">
+            🗺️ Volver al Mapa
           </button>
         </div>
       </header>
 
-      <!-- Alertas de éxito o error -->
-      <div *ngIf="successMessage" class="alert alert--success">
-        ✅ {{ successMessage }}
+      <!-- Mensajes globales -->
+      <div *ngIf="successMessage" class="alert alert--success alert--dismissible">
+        <span>✅ {{ successMessage }}</span>
+        <button type="button" class="alert-close" (click)="successMessage = ''">&times;</button>
       </div>
-      <div *ngIf="errorMessage" class="alert alert--danger">
-        ❌ {{ errorMessage }}
+      <div *ngIf="errorMessage" class="alert alert--danger alert--dismissible">
+        <span>❌ {{ errorMessage }}</span>
+        <button type="button" class="alert-close" (click)="errorMessage = ''">&times;</button>
       </div>
 
-      <div class="admin-grid">
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <!-- TAB 1: EDIFICIOS -->
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <div *ngIf="activeTab === 'edificios'" class="tab-pane">
+        <div class="admin-grid">
+          
+          <!-- Formulario: Crear / Editar Edificio -->
+          <section class="admin-card form-card">
+            <h3>{{ isEditingEdificio ? '✏️ Editar Edificio' : '➕ Registrar Nuevo Edificio' }}</h3>
+            <p class="section-desc">
+              {{ isEditingEdificio ? 'Modifica los datos del edificio en la colección "Edificios".' : 'Crea un nuevo documento en la colección "Edificios" de Firestore.' }}
+            </p>
+
+            <form (ngSubmit)="guardarEdificio()">
+              <div *ngIf="isEditingEdificio" class="form-group">
+                <label>ID Documento Firestore</label>
+                <input type="text" [value]="formDataEdificio.id" disabled class="input--readonly" />
+              </div>
+
+              <div class="form-group">
+                <label for="edificioNombre">Nombre del Edificio *</label>
+                <input
+                  id="edificioNombre"
+                  type="text"
+                  placeholder="Ej: Edificio E, Edificio G, Cafetería"
+                  [(ngModel)]="formDataEdificio.nombre"
+                  name="nombre"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="edificioPisos">Pisos (separados por coma)</label>
+                <input
+                  id="edificioPisos"
+                  type="text"
+                  placeholder="Ej: Piso 1, Piso 2, Piso 3"
+                  [(ngModel)]="formDataEdificio.pisosTexto"
+                  name="pisosTexto"
+                />
+                <small class="form-hint">Si se deja vacío, se asignará "Piso 1".</small>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn--primary" [disabled]="isLoading">
+                  {{ isEditingEdificio ? 'Guardar Cambios' : 'Registrar en Firestore' }}
+                </button>
+                <button
+                  *ngIf="isEditingEdificio"
+                  type="button"
+                  class="btn btn--secondary"
+                  (click)="cancelarEdicionEdificio()">
+                  Cancelar Edición
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Tabla de Edificios -->
+          <section class="admin-card table-card">
+            <div class="table-card__header">
+              <h3>🏢 Edificios Registrados ({{ edificios.length }})</h3>
+              <div class="card-header-actions">
+                <button type="button" class="btn btn--sm btn--outline" (click)="cargarEdificios()" [disabled]="isLoading">
+                  🔄 Actualizar
+                </button>
+              </div>
+            </div>
+
+            <div *ngIf="isLoading" class="loading-state">
+              Cargando edificios desde Firestore...
+            </div>
+
+            <div *ngIf="!isLoading && edificios.length === 0" class="empty-state">
+              No hay edificios registrados en Firestore.
+            </div>
+
+            <div *ngIf="!isLoading && edificios.length > 0" class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Pisos</th>
+                    <th style="text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let ed of edificios" [class.highlighted]="formDataEdificio.id === ed.id">
+                    <td>
+                      <strong>{{ ed.Nombre || ed.nombre || 'Sin nombre' }}</strong>
+                      <div class="doc-id">ID: {{ ed.id }}</div>
+                    </td>
+                    <td>
+                      <span class="badge badge--pill">{{ obtenerTextoPisos(ed) }}</span>
+                    </td>
+                    <td style="text-align: right;">
+                      <div class="action-buttons">
+                        <button
+                          type="button"
+                          class="btn btn--sm btn--info"
+                          title="Ver salas y locaciones de este edificio"
+                          (click)="verLocacionesDeEdificio(ed)">
+                          📍 Ver Salas
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn--sm btn--warning"
+                          title="Editar edificio"
+                          (click)="seleccionarParaEditarEdificio(ed)">
+                          ✏️ Editar
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn--sm btn--danger"
+                          title="Eliminar edificio"
+                          (click)="eliminarEdificio(ed)">
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <!-- TAB 2: LOCACIONES Y SALAS -->
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <div *ngIf="activeTab === 'locaciones'" class="tab-pane">
         
-        <!-- Formulario: Crear / Editar -->
-        <section class="admin-card form-card">
-          <h3>{{ isEditing ? '✏️ Editar Edificio' : '➕ Agregar Nuevo Edificio' }}</h3>
-          <p class="section-desc">
-            {{ isEditing ? 'Modifica los datos del edificio y guarda los cambios en Firestore.' : 'Registra un nuevo edificio en la base de datos de Firebase.' }}
-          </p>
+        <!-- Barra de Filtros y Acciones -->
+        <div class="filter-bar">
+          <div class="filter-controls">
+            <div class="filter-item">
+              <label>Edificio:</label>
+              <select [(ngModel)]="filtroEdificio" class="filter-select">
+                <option value="">Todos los Edificios</option>
+                <option *ngFor="let ed of edificios" [value]="ed.id">
+                  {{ ed.Nombre || ed.nombre || ed.id }}
+                </option>
+              </select>
+            </div>
 
-          <form (ngSubmit)="guardarEdificio()">
-            <div class="form-group">
-              <label for="edificioNombre">Nombre del Edificio *</label>
+            <div class="filter-item">
+              <label>Subcolección / Piso:</label>
+              <select [(ngModel)]="filtroSubcoleccion" class="filter-select">
+                <option value="">Todas las Subcolecciones</option>
+                <option *ngFor="let sub of subcoleccionesDisponibles" [value]="sub">
+                  {{ sub }}
+                </option>
+              </select>
+            </div>
+
+            <div class="filter-item filter-search">
+              <label>Buscar:</label>
               <input
-                id="edificioNombre"
                 type="text"
-                placeholder="Ej: Edificio N, Cafetería Central, etc."
-                [(ngModel)]="formData.nombre"
-                name="nombre"
-                required
+                placeholder="Filtrar por nombre, tipo o cuerpo..."
+                [(ngModel)]="filtroTexto"
+                class="filter-input"
               />
             </div>
+          </div>
 
-            <div class="form-group">
-              <label for="edificioPisos">Pisos (separados por coma)</label>
-              <input
-                id="edificioPisos"
-                type="text"
-                placeholder="Ej: Piso 1, Piso 2, Piso 3"
-                [(ngModel)]="formData.pisosTexto"
-                name="pisosTexto"
-              />
-              <small class="form-hint">Escribe los pisos separados por comas. Si se deja vacío, se asignará "Piso 1".</small>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" class="btn btn--primary">
-                {{ isEditing ? 'Guardar Cambios' : 'Registrar en Firestore' }}
-              </button>
-              <button
-                *ngIf="isEditing"
-                type="button"
-                class="btn btn--secondary"
-                (click)="cancelarEdicion()">
-                Cancelar Edición
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <!-- Tabla: Lista de Edificios en Firestore -->
-        <section class="admin-card table-card">
-          <div class="table-card__header">
-            <h3>🏢 Edificios Registrados ({{ edificios.length }})</h3>
-            <button type="button" class="btn btn--sm btn--outline" (click)="cargarEdificios()" [disabled]="isLoading">
-              {{ isLoading ? 'Cargando...' : '🔄 Actualizar' }}
+          <div class="filter-actions">
+            <button type="button" class="btn btn--primary" (click)="abrirModalCrearLocacion()">
+              ➕ Nueva Sala / Locación
             </button>
+            <button type="button" class="btn btn--outline btn--sm" (click)="cargarLocaciones()" [disabled]="isLoading">
+              🔄 Refrescar
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabla de Locaciones -->
+        <section class="admin-card">
+          <div class="table-card__header">
+            <h3>
+              📍 Locaciones Registradas (Mostrando {{ locacionesFiltradas.length }} de {{ locaciones.length }})
+            </h3>
           </div>
 
           <div *ngIf="isLoading" class="loading-state">
-            Cargando edificios desde Firestore...
+            Cargando salas y espacios desde Firestore...
           </div>
 
-          <div *ngIf="!isLoading && edificios.length === 0" class="empty-state">
-            No hay edificios registrados en Firestore.
+          <div *ngIf="!isLoading && locacionesFiltradas.length === 0" class="empty-state">
+            No se encontraron locaciones con los filtros seleccionados.
           </div>
 
-          <div *ngIf="!isLoading && edificios.length > 0" class="table-responsive">
+          <div *ngIf="!isLoading && locacionesFiltradas.length > 0" class="table-responsive table-responsive--tall">
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Pisos</th>
+                  <th>Nombre & Doc ID</th>
+                  <th>Edificio</th>
+                  <th>Subcolección / Piso</th>
+                  <th>Tipo</th>
+                  <th>Cuerpo</th>
+                  <th>Coordenadas 3D (X, Y, Z)</th>
                   <th style="text-align: right;">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let ed of edificios" [class.highlighted]="formData.id === ed.id">
+                <tr *ngFor="let loc of locacionesFiltradas">
                   <td>
-                    <strong>{{ ed.Nombre || ed.nombre || 'Sin nombre' }}</strong>
-                    <div class="doc-id">ID: {{ ed.id }}</div>
+                    <strong>{{ loc.nombre }}</strong>
+                    <div class="doc-id">ID: {{ loc.docId }}</div>
                   </td>
-                  <td>{{ obtenerTextoPisos(ed) }}</td>
+                  <td>
+                    <span class="badge badge--edificio">{{ loc.edificioNombre }}</span>
+                  </td>
+                  <td>
+                    <span class="badge badge--subcol">{{ loc.subcoleccion }}</span>
+                    <small *ngIf="loc.piso" class="sub-meta">({{ loc.piso }})</small>
+                  </td>
+                  <td>
+                    <span class="badge badge--tipo">{{ loc.tipo }}</span>
+                  </td>
+                  <td>
+                    <span *ngIf="loc.cuerpo != null" class="badge badge--cuerpo">Cuerpo {{ loc.cuerpo }}</span>
+                    <span *ngIf="loc.cuerpo == null" class="text-muted">-</span>
+                  </td>
+                  <td>
+                    <span *ngIf="loc.coordenadas" class="coords-tag">
+                      X: {{ loc.coordenadas.x != null ? loc.coordenadas.x : loc.coordenadas.X }},
+                      Y: {{ loc.coordenadas.y != null ? loc.coordenadas.y : loc.coordenadas.Y }},
+                      Z: {{ loc.coordenadas.z != null ? loc.coordenadas.z : loc.coordenadas.Z }}
+                    </span>
+                    <span *ngIf="!loc.coordenadas" class="text-muted">Sin coords 3D</span>
+                  </td>
                   <td style="text-align: right;">
                     <div class="action-buttons">
                       <button
                         type="button"
                         class="btn btn--sm btn--warning"
-                        title="Editar edificio"
-                        (click)="seleccionarParaEditar(ed)">
+                        title="Editar locación"
+                        (click)="abrirModalEditarLocacion(loc)">
                         ✏️ Editar
                       </button>
                       <button
                         type="button"
                         class="btn btn--sm btn--danger"
                         title="Eliminar de Firestore"
-                        (click)="eliminarEdificio(ed)">
-                        🗑️ Eliminar
+                        (click)="eliminarLocacion(loc)">
+                        🗑️
                       </button>
                     </div>
                   </td>
@@ -167,6 +366,605 @@
           </div>
         </section>
 
+      </div>
+
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <!-- TAB 3: CONSOLA / STUDIO DE FIRESTORE (3 PANELES) -->
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <div *ngIf="activeTab === 'firestore'" class="tab-pane firestore-studio">
+        
+        <!-- Barra de Navegación Breadcrumbs -->
+        <div class="studio-breadcrumbs">
+          <span class="breadcrumb-root">🔥 Firestore:</span>
+          <ng-container *ngFor="let b of breadcrumbs; let idx = index">
+            <span class="breadcrumb-separator">/</span>
+            <button
+              type="button"
+              class="breadcrumb-link"
+              [class.active]="idx === breadcrumbs.length - 1"
+              (click)="navegarBreadcrumb(idx)">
+              {{ b.label }}
+            </button>
+          </ng-container>
+        </div>
+
+        <!-- Vista de 3 Columnas estilo Firebase Console -->
+        <div class="studio-columns">
+          
+          <!-- Columna 1: Colecciones -->
+          <div class="studio-col studio-col--collections">
+            <div class="studio-col__header">
+              <h4>Colecciones</h4>
+              <button
+                type="button"
+                class="btn btn--sm btn--primary"
+                title="Iniciar nueva colección en la raíz"
+                (click)="mostrarModalCrearColeccion = true">
+                + Iniciar
+              </button>
+            </div>
+            <div class="studio-col__list">
+              <div
+                *ngFor="let col of firestoreCollections"
+                class="studio-item"
+                [class.active]="selectedCollection === col"
+                (click)="seleccionarColeccion(col)">
+                <span class="item-icon">📁</span>
+                <span class="item-title">{{ col }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Columna 2: Documentos -->
+          <div class="studio-col studio-col--documents">
+            <div class="studio-col__header">
+              <div>
+                <h4>Documentos</h4>
+                <small *ngIf="selectedCollection" class="text-muted">en {{ selectedCollection }}</small>
+              </div>
+              <button
+                *ngIf="selectedCollection"
+                type="button"
+                class="btn btn--sm btn--primary"
+                title="Agregar nuevo documento"
+                (click)="mostrarModalCrearDoc = true">
+                + Doc
+              </button>
+            </div>
+
+            <div *ngIf="selectedCollection" class="studio-search">
+              <input
+                type="text"
+                placeholder="Buscar documento por ID..."
+                [(ngModel)]="docSearchQuery"
+                class="input--sm"
+              />
+            </div>
+
+            <div class="studio-col__list">
+              <div *ngIf="!selectedCollection" class="col-empty">
+                Selecciona una colección a la izquierda.
+              </div>
+              <div *ngIf="selectedCollection && firestoreDocsFiltrados.length === 0" class="col-empty">
+                No hay documentos.
+              </div>
+              <div
+                *ngFor="let doc of firestoreDocsFiltrados"
+                class="studio-item"
+                [class.active]="selectedDocument?.id === doc.id"
+                (click)="seleccionarDocumento(doc)">
+                <span class="item-icon">📄</span>
+                <div class="item-details">
+                  <span class="item-title">{{ doc.id }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Columna 3: Datos del Documento y Subcolecciones -->
+          <div class="studio-col studio-col--fields">
+            <div class="studio-col__header">
+              <div>
+                <h4>Detalle del Documento</h4>
+                <div *ngIf="selectedDocument" class="doc-path-display">
+                  {{ selectedDocument.path }}
+                </div>
+              </div>
+
+              <div *ngIf="selectedDocument" class="doc-header-actions">
+                <button
+                  type="button"
+                  class="btn btn--sm btn--outline"
+                  (click)="jsonEditorMode = !jsonEditorMode">
+                  {{ jsonEditorMode ? '📋 Ver Campos' : '{ } Modo JSON' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn--sm btn--danger"
+                  title="Eliminar documento de Firestore"
+                  (click)="eliminarDocumentoSeleccionado()">
+                  🗑️
+                </button>
+              </div>
+            </div>
+
+            <div class="studio-col__body">
+              <div *ngIf="!selectedDocument" class="col-empty">
+                Selecciona un documento para inspeccionar y editar sus campos.
+              </div>
+
+              <!-- MODO 1: EDITOR JSON RAW -->
+              <div *ngIf="selectedDocument && jsonEditorMode" class="json-editor-pane">
+                <div class="json-editor-toolbar">
+                  <span>Edición directa del documento JSON:</span>
+                  <button type="button" class="btn btn--sm btn--secondary" (click)="formatearJsonRaw()">
+                    Formatear
+                  </button>
+                </div>
+                <textarea
+                  [(ngModel)]="rawJsonText"
+                  rows="16"
+                  class="json-textarea"
+                  spellcheck="false">
+                </textarea>
+                <div *ngIf="jsonError" class="alert alert--danger">
+                  {{ jsonError }}
+                </div>
+                <div class="json-actions">
+                  <button type="button" class="btn btn--primary" (click)="guardarJsonRaw()" [disabled]="isLoading">
+                    💾 Guardar Documento en Firestore
+                  </button>
+                </div>
+              </div>
+
+              <!-- MODO 2: LISTA DE CAMPOS Y SUBCOLECCIONES -->
+              <div *ngIf="selectedDocument && !jsonEditorMode" class="fields-pane">
+                
+                <!-- Subcolecciones del Documento -->
+                <div *ngIf="selectedDocument.subcollections && selectedDocument.subcollections.length > 0" class="subcollections-box">
+                  <span class="subcol-title">📁 Subcolecciones en este documento:</span>
+                  <div class="subcol-tags">
+                    <button
+                      *ngFor="let sc of selectedDocument.subcollections"
+                      type="button"
+                      class="subcol-pill"
+                      title="Explorar subcolección"
+                      (click)="descenderSubcoleccion(sc)">
+                      📂 {{ sc }} &rarr;
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Campos del Documento -->
+                <div class="fields-list">
+                  <div *ngFor="let campo of camposDelDocumento" class="field-row">
+                    <div class="field-row__info">
+                      <strong class="field-name">{{ campo.key }}</strong>
+                      <span class="badge badge--field-type">{{ campo.type }}</span>
+                    </div>
+                    <div class="field-row__value">
+                      <code>{{ formatearValorCampo(campo.value) }}</code>
+                    </div>
+                    <div class="field-row__actions">
+                      <button
+                        type="button"
+                        class="btn-icon btn-icon--danger"
+                        title="Eliminar campo"
+                        (click)="eliminarCampoDocumento(campo.key)">
+                        &times;
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Agregar nuevo campo -->
+                <div class="add-field-box">
+                  <h5>+ Agregar Campo al Documento</h5>
+                  <div class="add-field-form">
+                    <input
+                      type="text"
+                      placeholder="Nombre del campo"
+                      [(ngModel)]="nuevoCampo.clave"
+                      class="input--sm"
+                    />
+                    <select [(ngModel)]="nuevoCampo.tipo" class="select--sm">
+                      <option value="string">string</option>
+                      <option value="number">number</option>
+                      <option value="boolean">boolean</option>
+                      <option value="json">array / map (JSON)</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Valor"
+                      [(ngModel)]="nuevoCampo.valor"
+                      class="input--sm"
+                    />
+                    <button type="button" class="btn btn--sm btn--primary" (click)="agregarNuevoCampo()">
+                      Agregar
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <!-- TAB 4: RUTAS Y NAVEGACIÓN -->
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <div *ngIf="activeTab === 'rutas'" class="tab-pane">
+        <div class="admin-grid admin-grid--rutas">
+          
+          <!-- Lista de Rutas registradas -->
+          <section class="admin-card">
+            <div class="table-card__header">
+              <h3>🧭 Rutas y Caminos Registrados</h3>
+              <div class="card-header-actions">
+                <button type="button" class="btn btn--sm btn--primary" (click)="abrirModalCrearRuta()">
+                  ➕ Nueva Ruta
+                </button>
+                <button type="button" class="btn btn--sm btn--outline" (click)="cargarRutas()" [disabled]="isLoading">
+                  🔄 Actualizar
+                </button>
+              </div>
+            </div>
+
+            <div class="rutas-section">
+              <h4>NavigationPaths ({{ navigationPaths.length }})</h4>
+              <div class="rutas-list">
+                <div
+                  *ngFor="let np of navigationPaths"
+                  class="ruta-item"
+                  [class.active]="rutaSeleccionada?.id === np.id && rutaTipoSeleccionado === 'NavigationPaths'"
+                  (click)="seleccionarRuta(np, 'NavigationPaths')">
+                  <span class="ruta-icon">📍</span>
+                  <div class="ruta-info">
+                    <strong>{{ np.id }}</strong>
+                    <span *ngIf="np.data?.piso" class="badge badge--pill">{{ np.data.piso }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <h4>Rutas Antiguas / Alternativas ({{ rutasAntiguas.length }})</h4>
+              <div class="rutas-list">
+                <div
+                  *ngFor="let r of rutasAntiguas"
+                  class="ruta-item"
+                  [class.active]="rutaSeleccionada?.id === r.id && rutaTipoSeleccionado === 'Rutas'"
+                  (click)="seleccionarRuta(r, 'Rutas')">
+                  <span class="ruta-icon">🛤️</span>
+                  <div class="ruta-info">
+                    <strong>{{ r.id }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Editor de la Ruta seleccionada -->
+          <section class="admin-card">
+            <div class="table-card__header">
+              <h3>
+                {{ rutaSeleccionada ? '✏️ Detalle de Ruta: ' + rutaSeleccionada.id : 'Selecciona una ruta' }}
+              </h3>
+              <div *ngIf="rutaSeleccionada" class="card-header-actions">
+                <button type="button" class="btn btn--sm btn--danger" (click)="eliminarRutaActual()">
+                  🗑️ Eliminar
+                </button>
+              </div>
+            </div>
+
+            <div *ngIf="!rutaSeleccionada" class="col-empty">
+              Selecciona una ruta de la lista para inspeccionar y editar sus nodos y coordenadas.
+            </div>
+
+            <div *ngIf="rutaSeleccionada" class="ruta-editor">
+              <label>Estructura de la Ruta (JSON):</label>
+              <textarea
+                [(ngModel)]="rutaJsonText"
+                rows="18"
+                class="json-textarea"
+                spellcheck="false">
+              </textarea>
+              <div class="form-actions">
+                <button type="button" class="btn btn--primary" (click)="guardarRutaActual()" [disabled]="isLoading">
+                  💾 Guardar Cambios en {{ rutaTipoSeleccionado }}
+                </button>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <!-- TAB 5: DIAGNÓSTICO Y ESTADO DE FIREBASE -->
+      <!-- ═════════════════════════════════════════════════════════ -->
+      <div *ngIf="activeTab === 'diagnostico'" class="tab-pane">
+        
+        <!-- Tarjetas de Métricas -->
+        <div class="stats-cards-grid">
+          <div class="stat-card">
+            <div class="stat-icon">🟢</div>
+            <div class="stat-content">
+              <span class="stat-label">Conexión con Firestore</span>
+              <strong class="stat-value">Operativo</strong>
+              <small class="stat-sub">Google Cloud Firestore SDK</small>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">⚡</div>
+            <div class="stat-content">
+              <span class="stat-label">Latencia de Respuesta</span>
+              <strong class="stat-value">{{ latencyMs != null ? latencyMs + ' ms' : 'Consultando...' }}</strong>
+              <button
+                type="button"
+                class="btn btn--sm btn--outline"
+                style="margin-top: 0.35rem;"
+                (click)="testLatency()"
+                [disabled]="isTestingLatency">
+                {{ isTestingLatency ? 'Midiendo...' : '⏱️ Medir Latencia' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">🏢</div>
+            <div class="stat-content">
+              <span class="stat-label">Edificios Registrados</span>
+              <strong class="stat-value">{{ statsData?.stats?.edificios || edificios.length }}</strong>
+              <small class="stat-sub">Colección "Edificios"</small>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">🔑</div>
+            <div class="stat-content">
+              <span class="stat-label">Proyecto Firebase</span>
+              <strong class="stat-value">{{ statsData?.projectId || 'InaGo' }}</strong>
+              <small class="stat-sub">{{ statsData?.clientEmail || 'Cuenta de Servicio' }}</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Acciones de Mantenimiento y Caché -->
+        <section class="admin-card" style="margin-top: 1.5rem;">
+          <div class="table-card__header">
+            <h3>🧹 Mantenimiento de Caché de la API</h3>
+            <button type="button" class="btn btn--warning" (click)="limpiarCache()" [disabled]="isLoading">
+              ⚡ Invalidar Caché de Memoria
+            </button>
+          </div>
+          <p class="section-desc">
+            La API del campus guarda en memoria las lecturas recientes de Firestore para que el mapa cargue velozmente. Al invalidar la caché, todas las peticiones posteriores forzarán una lectura fresca directo desde Firebase Firestore.
+          </p>
+        </section>
+
+        <!-- Registro de Actividad y Auditoría Reciente -->
+        <section class="admin-card" style="margin-top: 1.5rem;">
+          <div class="table-card__header">
+            <h3>📋 Registro de Actividad de Administrador (Auditoría en Vivo)</h3>
+          </div>
+          <div class="activity-log-box">
+            <div *ngIf="activityLogs.length === 0" class="col-empty">
+              No hay actividades registradas en esta sesión.
+            </div>
+            <div *ngFor="let log of activityLogs" class="log-entry" [ngClass]="'log-entry--' + log.tipo">
+              <span class="log-time">{{ log.fecha }}</span>
+              <span class="log-action">{{ log.accion }}</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+    </div>
+
+    <!-- ── MODAL: CREAR / EDITAR LOCACIÓN ── -->
+    <div *ngIf="locacionModalOpen" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>{{ isEditingLocacion ? '✏️ Editar Sala / Locación' : '➕ Registrar Nueva Sala / Locación' }}</h3>
+          <button type="button" class="modal-close" (click)="cerrarModalLocacion()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="guardarLocacion()" class="modal-body">
+          
+          <div class="modal-row">
+            <div class="form-group">
+              <label>Edificio *</label>
+              <select [(ngModel)]="locacionFormData.edificioId" name="edificioId" required [disabled]="isEditingLocacion">
+                <option *ngFor="let ed of edificios" [value]="ed.id">
+                  {{ ed.Nombre || ed.nombre || ed.id }}
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Subcolección de Firestore *</label>
+              <select [(ngModel)]="locacionFormData.subcoleccion" name="subcoleccion" required [disabled]="isEditingLocacion">
+                <option *ngFor="let sub of subcoleccionesDisponibles" [value]="sub">
+                  {{ sub }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-row">
+            <div class="form-group flex-2">
+              <label>Nombre del Espacio *</label>
+              <input
+                type="text"
+                placeholder="Ej: Sala E102, Baño Mujeres, Laboratorio 3"
+                [(ngModel)]="locacionFormData.nombre"
+                name="nombre"
+                required
+              />
+            </div>
+
+            <div class="form-group flex-1">
+              <label>Tipo</label>
+              <select [(ngModel)]="locacionFormData.tipo" name="tipo">
+                <option *ngFor="let t of tiposComunes" [value]="t">{{ t }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-row">
+            <div class="form-group">
+              <label>Piso</label>
+              <input
+                type="text"
+                placeholder="Ej: Piso 1, Piso 2, Piso -1"
+                [(ngModel)]="locacionFormData.piso"
+                name="piso"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>Cuerpo (Número del pabellón)</label>
+              <input
+                type="number"
+                placeholder="Ej: 1, 2, 3"
+                [(ngModel)]="locacionFormData.cuerpo"
+                name="cuerpo"
+              />
+              <small class="form-hint">Para salas ubicadas en un cuerpo específico (Cuerpo 1, 2, etc.)</small>
+            </div>
+          </div>
+
+          <div class="coords-box">
+            <label class="coords-title">📍 Coordenadas 3D (Posición en el Mapa 3D)</label>
+            <div class="coords-inputs">
+              <div class="coord-item">
+                <span>X:</span>
+                <input type="number" step="0.01" [(ngModel)]="locacionFormData.coordX" name="coordX" />
+              </div>
+              <div class="coord-item">
+                <span>Y:</span>
+                <input type="number" step="0.01" [(ngModel)]="locacionFormData.coordY" name="coordY" />
+              </div>
+              <div class="coord-item">
+                <span>Z:</span>
+                <input type="number" step="0.01" [(ngModel)]="locacionFormData.coordZ" name="coordZ" />
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="submit" class="btn btn--primary" [disabled]="isLoading">
+              {{ isEditingLocacion ? 'Guardar Cambios en Firestore' : 'Crear en Firestore' }}
+            </button>
+            <button type="button" class="btn btn--secondary" (click)="cerrarModalLocacion()">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── MODAL: INICIAR COLECCIÓN RAÍZ ── -->
+    <div *ngIf="mostrarModalCrearColeccion" class="modal-backdrop">
+      <div class="modal-card modal-card--sm">
+        <div class="modal-header">
+          <h3>📁 Iniciar Nueva Colección en Firestore</h3>
+          <button type="button" class="modal-close" (click)="mostrarModalCrearColeccion = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>ID / Nombre de la Colección *</label>
+            <input
+              type="text"
+              placeholder="Ej: ZonasDeInteres, Eventos, Avisos"
+              [(ngModel)]="nuevaColeccionNombre"
+            />
+          </div>
+          <div class="form-group">
+            <label>ID del Primer Documento (Opcional)</label>
+            <input
+              type="text"
+              placeholder="Dejar vacío para auto-generar ID"
+              [(ngModel)]="primerDocId"
+            />
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn--primary" (click)="crearNuevaColeccion()">
+              Iniciar Colección
+            </button>
+            <button type="button" class="btn btn--secondary" (click)="mostrarModalCrearColeccion = false">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL: CREAR DOCUMENTO EN COLECCIÓN ── -->
+    <div *ngIf="mostrarModalCrearDoc" class="modal-backdrop">
+      <div class="modal-card modal-card--sm">
+        <div class="modal-header">
+          <h3>📄 Agregar Documento a {{ selectedCollection }}</h3>
+          <button type="button" class="modal-close" (click)="mostrarModalCrearDoc = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>ID Personalizado del Documento (Opcional)</label>
+            <input
+              type="text"
+              placeholder="Dejar vacío para auto-generar ID Firestore"
+              [(ngModel)]="nuevoDocCustomId"
+            />
+            <small class="form-hint">Si se deja vacío, Firestore asignará un ID alfanumérico automático.</small>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn--primary" (click)="crearNuevoDocumento()">
+              Crear Documento
+            </button>
+            <button type="button" class="btn btn--secondary" (click)="mostrarModalCrearDoc = false">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL: CREAR NUEVA RUTA ── -->
+    <div *ngIf="mostrarModalNuevaRuta" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>🧭 Crear Registro en {{ nuevaRuta.tipo }}</h3>
+          <button type="button" class="modal-close" (click)="mostrarModalNuevaRuta = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Colección:</label>
+            <select [(ngModel)]="nuevaRuta.tipo">
+              <option value="NavigationPaths">NavigationPaths</option>
+              <option value="Rutas">Rutas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ID del Documento (ej: "Piso 1", "Piso 2", "Ruta_Entrada"):</label>
+            <input type="text" [(ngModel)]="nuevaRuta.docId" placeholder="Ej: Piso 1" />
+          </div>
+          <div class="form-group">
+            <label>Contenido JSON:</label>
+            <textarea [(ngModel)]="nuevaRuta.json" rows="8" class="json-textarea"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn--primary" (click)="crearNuevaRuta()">
+              Crear Ruta
+            </button>
+            <button type="button" class="btn btn--secondary" (click)="mostrarModalNuevaRuta = false">
+              Cancelar
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

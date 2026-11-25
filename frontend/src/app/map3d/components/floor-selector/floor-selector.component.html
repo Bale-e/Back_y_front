@@ -8,7 +8,7 @@
     <ng-container *ngIf="currentBuilding !== 'S'; else selectBuildingTpl">
       <p class="dialog-title">¿A qué piso quieres ir?</p>
       <div class="floor-action__dialog-buttons">
-        <button *ngFor="let floor of availableFloors" type="button" (click)="selectFloorNumber(floor.number)">
+        <button *ngFor="let floor of availableFloors" type="button" (click)="selectFloorItem(floor)">
           {{ floor.label }}
         </button>
         <button type="button" (click)="selectBuilding('S')">🏛️ Mapa principal</button>

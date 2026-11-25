@@ -123,16 +123,32 @@ export class EspaciosApiService {
   // script de la página podría leerla).
   private adminToken = '';
 
-  /** Comprueba la clave con el backend. Devuelve true si es correcta. */
+  /** Comprueba la clave con el backend o valida la clave maestra por defecto si el backend no está disponible. */
   async iniciarSesionAdmin(clave: string): Promise<boolean> {
-    const res = await fetch(`${API_BASE_URL}/admin/verificar`, {
-      method: 'POST',
-      headers: adminHeaders(clave)
-    });
-    if (res.status === 429) throw new Error('Demasiados intentos. Espera unos minutos.');
-    if (!res.ok) return false;
-    this.adminToken = clave;
-    return true;
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/verificar`, {
+        method: 'POST',
+        headers: adminHeaders(clave)
+      });
+      if (res.status === 429) throw new Error('Demasiados intentos. Espera unos minutos.');
+      if (res.ok) {
+        this.adminToken = clave;
+        return true;
+      }
+      if (res.status === 401) {
+        return false;
+      }
+    } catch (err: any) {
+      if (err?.message?.includes('Demasiados intentos')) throw err;
+      // Si el servidor backend no está iniciado (error de conexión / Failed to fetch),
+      // permitimos el ingreso si coincide con la clave maestra configurada.
+      if (clave === 'Inago_Mapa_26') {
+        this.adminToken = clave;
+        return true;
+      }
+      throw new Error(`No se pudo conectar con el servidor backend (${API_BASE_URL}). Si estás en desarrollo local, inicia el servidor backend con "npm start".`);
+    }
+    return false;
   }
 
   cerrarSesionAdmin(): void {
@@ -185,6 +201,144 @@ export class EspaciosApiService {
     if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al eliminar edificio');
     this.clearCache();
     return true;
+  }
+
+  // ── ESTADO Y DIAGNÓSTICO DE FIREBASE ────────────────────────
+  async getFirestoreStats(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/stats`, {
+      headers: adminHeaders(this.adminToken)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al consultar estado de Firebase');
+    return res.json();
+  }
+
+  async limpiarCacheBackend(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/cache/clear`, {
+      method: 'POST',
+      headers: adminHeaders(this.adminToken)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al limpiar caché');
+    this.clearCache();
+    return res.json();
+  }
+
+  // ── EXPLORADOR / CONSOLA FIRESTORE (STUDIO) ──────────────────
+  async getFirestoreCollections(parentPath?: string): Promise<string[]> {
+    const url = parentPath
+      ? `${API_BASE_URL}/admin/firestore/collections?parentPath=${encodeURIComponent(parentPath)}`
+      : `${API_BASE_URL}/admin/firestore/collections`;
+    const res = await fetch(url, { headers: adminHeaders(this.adminToken) });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al listar colecciones de Firestore');
+    return res.json();
+  }
+
+  async getFirestoreDocuments(collectionPath: string, limit: number = 100): Promise<{ collectionPath: string; count: number; documents: Array<{ id: string; path: string; data: any }> }> {
+    const url = `${API_BASE_URL}/admin/firestore/documents?collectionPath=${encodeURIComponent(collectionPath)}&limit=${limit}`;
+    const res = await fetch(url, { headers: adminHeaders(this.adminToken) });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al listar documentos');
+    return res.json();
+  }
+
+  async getFirestoreDocument(documentPath: string): Promise<{ id: string; path: string; data: any; subcollections: string[] }> {
+    const url = `${API_BASE_URL}/admin/firestore/document?documentPath=${encodeURIComponent(documentPath)}`;
+    const res = await fetch(url, { headers: adminHeaders(this.adminToken) });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al obtener documento');
+    return res.json();
+  }
+
+  async saveFirestoreDocument(params: { collectionPath?: string; documentPath?: string; docId?: string; data: any; merge?: boolean }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/firestore/document`, {
+      method: 'POST',
+      headers: adminHeaders(this.adminToken),
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al guardar documento en Firestore');
+    this.clearCache();
+    return res.json();
+  }
+
+  async deleteFirestoreDocument(documentPath: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/firestore/document`, {
+      method: 'DELETE',
+      headers: adminHeaders(this.adminToken),
+      body: JSON.stringify({ documentPath })
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al eliminar documento');
+    this.clearCache();
+    return res.json();
+  }
+
+  // ── GESTIÓN DE LOCACIONES Y SALAS ────────────────────────────
+  async getLocacionesDetalladas(): Promise<{ total: number; locaciones: any[] }> {
+    const res = await fetch(`${API_BASE_URL}/admin/locaciones/todas`, {
+      headers: adminHeaders(this.adminToken)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al obtener locaciones detalladas');
+    return res.json();
+  }
+
+  async crearLocacion(params: { edificioId: string; subcoleccion?: string; data: any; docId?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/locaciones`, {
+      method: 'POST',
+      headers: adminHeaders(this.adminToken),
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al crear locación');
+    this.clearCache();
+    return res.json();
+  }
+
+  async actualizarLocacion(params: { edificioId: string; subcoleccion: string; docId: string; data: any }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/locaciones`, {
+      method: 'PUT',
+      headers: adminHeaders(this.adminToken),
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al actualizar locación');
+    this.clearCache();
+    return res.json();
+  }
+
+  async eliminarLocacion(params: { edificioId: string; subcoleccion: string; docId: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/locaciones`, {
+      method: 'DELETE',
+      headers: adminHeaders(this.adminToken),
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al eliminar locación');
+    this.clearCache();
+    return res.json();
+  }
+
+  // ── GESTIÓN DE RUTAS Y NAVEGACIÓN ────────────────────────────
+  async getRutasData(): Promise<{ navigationPaths: any[]; rutas: any[] }> {
+    const res = await fetch(`${API_BASE_URL}/admin/rutas/todas`, {
+      headers: adminHeaders(this.adminToken)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al obtener rutas');
+    return res.json();
+  }
+
+  async saveRuta(params: { collection: string; docId?: string; data: any }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/rutas/document`, {
+      method: 'POST',
+      headers: adminHeaders(this.adminToken),
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al guardar ruta');
+    this.clearCache();
+    return res.json();
+  }
+
+  async deleteRuta(params: { collection: string; docId: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/admin/rutas/document`, {
+      method: 'DELETE',
+      headers: adminHeaders(this.adminToken),
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) throw await this.errorDeRespuesta(res, 'Error al eliminar ruta');
+    this.clearCache();
+    return res.json();
   }
 
   clearCache(): void {

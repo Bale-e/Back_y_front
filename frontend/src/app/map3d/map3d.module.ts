@@ -7,6 +7,7 @@ import { FloorSelectorComponent } from './components/floor-selector/floor-select
 import { LocationDetailPanelComponent } from './components/location-detail-panel/location-detail-panel.component';
 import { MapControlsComponent } from './components/map-controls/map-controls.component';
 import { MapSearchComponent } from './components/map-search/map-search.component';
+import { DeveloperPanelComponent } from '../developer-panel/developer-panel.component';
 
 @NgModule({
   declarations: [
@@ -18,7 +19,8 @@ import { MapSearchComponent } from './components/map-search/map-search.component
   ],
   imports: [
     CommonModule,
-    FormsModule
+    FormsModule,
+    DeveloperPanelComponent
   ],
   exports: [
     Map3dContainerComponent
