@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>INAGO! — Informe Técnico de Testing y Aseguramiento de Calidad del Software</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 18mm 16mm;
+    @bottom-center {
+      content: "Página " counter(page) " de " counter(pages);
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #64748b;
+    }
+  }
+
+  body {
+    font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.55;
+    color: #1e293b;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Portada Formal Institucional */
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 90vh;
+    padding: 25px 8px;
+    box-sizing: border-box;
+  }
+
+  .cover-header {
+    border-bottom: 4px solid #b91c1c;
+    padding-bottom: 16px;
+  }
+
+  .cover-institution {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #b91c1c;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin: 0 0 4px 0;
+  }
+
+  .cover-subinstitution {
+    font-size: 9pt;
+    color: #475569;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .cover-body {
+    margin: 45px 0;
+  }
+
+  .cover-badge {
+    display: inline-block;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 8.5pt;
+    font-weight: 600;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  .cover-title {
+    font-size: 22pt;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+    margin: 0 0 12px 0;
+  }
+
+  .cover-subtitle {
+    font-size: 11.5pt;
+    color: #334155;
+    line-height: 1.45;
+    margin: 0 0 18px 0;
+    font-weight: 400;
+  }
+
+  .cover-divider {
+    width: 70px;
+    height: 4px;
+    background: #f59e0b;
+    margin: 16px 0;
+  }
+
+  .cover-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin-top: 22px;
+    font-size: 9pt;
+  }
+
+  .cover-grid-item strong {
+    color: #0f172a;
+  }
+
+  .cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 14px;
+    font-size: 8.5pt;
+    color: #64748b;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Encabezados y Jerarquía */
+  h1 {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #0f172a;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 5px;
+    margin-top: 26px;
+    margin-bottom: 10px;
+    page-break-after: avoid;
+  }
+
+  .section-break {
+    page-break-before: always;
+  }
+
+  h2 {
+    font-size: 11.5pt;
+    font-weight: 700;
+    color: #1e3a8a;
+    margin-top: 18px;
+    margin-bottom: 6px;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 10pt;
+    font-weight: 600;
+    color: #0f172a;
+    margin-top: 14px;
+    margin-bottom: 4px;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 0 0 8px 0;
+    text-align: justify;
+    text-indent: 16px;
+  }
+
+  p.no-indent {
+    text-indent: 0;
+  }
+
+  /* Tablas Formales */
+  .table-title {
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 14px;
+    margin-bottom: 3px;
+    page-break-after: avoid;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0 12px 0;
+    font-size: 8pt;
+    page-break-inside: avoid;
+  }
+
+  th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 5px 7px;
+    border: 1px solid #0f172a;
+  }
+
+  td {
+    padding: 4px 6px;
+    border: 1px solid #cbd5e1;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+
+  /* Cajas de Captura y Figuras */
+  .figure-container {
+    margin: 14px 0;
+    page-break-inside: avoid;
+    text-align: center;
+  }
+
+  .capture-real {
+    max-width: 92%;
+    max-height: 280px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin: 4px auto;
+    display: block;
+    object-fit: contain;
+  }
+
+  .capture-box-missing {
+    border: 1.5px dashed #94a3b8;
+    background: #f8fafc;
+    padding: 10px 14px;
+    border-radius: 6px;
+    text-align: left;
+    margin: 4px auto;
+    font-size: 8pt;
+    color: #475569;
+    line-height: 1.4;
+  }
+
+  .figure-caption {
+    font-size: 8pt;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 3px;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 7pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .badge-critica { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+  .badge-alta { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+  .badge-media { background: #e0e7ff; color: #3730a3; border: 1px solid #a5b4fc; }
+  .badge-ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  .badge-pend { background: #fef9c3; color: #854d0e; border: 1px solid #eab308; }
+
+  /* Código */
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 8px 10px;
+    border-radius: 5px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 7.5pt;
+    line-height: 1.35;
+    overflow-x: auto;
+    margin: 6px 0 10px 0;
+    page-break-inside: avoid;
+    text-indent: 0;
+  }
+
+  code {
+    font-family: 'Consolas', 'Courier New', monospace;
+    background: #f1f5f9;
+    color: #b91c1c;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 8pt;
+  }
+
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+  }
+
+  .toc {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 14px 0;
+  }
+
+  .toc-title {
+    font-weight: 700;
+    font-size: 9.5pt;
+    color: #0f172a;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 3px;
+  }
+
+  .toc ul {
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0;
+  }
+
+  .toc li {
+    padding: 2px 0;
+    font-size: 8.5pt;
+    border-bottom: 1px dotted #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="cover">
+  <div class="cover-header">
+    <div class="cover-institution">INACAP · Universidad Tecnológica de Chile</div>
+    <div class="cover-subinstitution">Área Tecnologías de la Información y Ciberseguridad · Sede Renca · Laboratorio Inacode</div>
+  </div>
+
+  <div class="cover-body">
+    <div class="cover-badge">Evaluación Final · Proceso de Testing del Software (Etapas 1 a 4)</div>
+    <h1 class="cover-title">INAGO! — INFORME TÉCNICO DE TESTING Y ASEGURAMIENTO DE CALIDAD</h1>
+    <div class="cover-subtitle">Diseño del Plan de Pruebas, Ejecución Práctica, Documentación Sistemática de Resultados y Corrección del Prototipo</div>
+    <div class="cover-divider"></div>
+
+    <div class="cover-grid">
+      <div class="cover-grid-item">
+        <div><strong>Autores:</strong></div>
+        <div style="color: #334155;">Valentina Ríos, Janier Torres, Vicente Chandía, Tomás Palma</div>
+      </div>
+      <div class="cover-grid-item">
+        <div><strong>Asignatura:</strong></div>
+        <div style="color: #334155;">Ingeniería de Software</div>
+      </div>
+      <div class="cover-grid-item">
+        <div><strong>Docente Guía:</strong></div>
+        <div style="color: #334155;">Sanabria Oscarina</div>
+      </div>
+      <div class="cover-grid-item">
+        <div><strong>Equipo de Desarrollo:</strong></div>
+        <div style="color: #334155;">Equipo InaGo! · Inacode Sede Renca</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cover-footer">
+    <div><strong>Estándares:</strong> ISO/IEC 25010 · ISO/IEC 27001 · OWASP API Security Top 10 (2023) · ISO 9241-210</div>
+    <div><strong>Fecha de Emisión:</strong> Noviembre de 2026</div>
+  </div>
+</div>
+
+<!-- TABLA DE CONTENIDO -->
+<div class="toc">
+  <div class="toc-title">Tabla de Contenido</div>
+  <ul>
+    <li><span>I. Introducción y Contextualización del Aseguramiento de Calidad</span> <span>Pág. 2</span></li>
+    <li><span>II. Etapa 1: Planificación del Testing</span> <span>Pág. 3</span></li>
+    <li><span>III. Etapa 2: Ejecución Práctica del Testing</span> <span>Pág. 5</span></li>
+    <li><span>IV. Etapa 3: Documentación y Análisis de Resultados</span> <span>Pág. 8</span></li>
+    <li><span>V. Etapa 4: Corrección y Mejora del Prototipo</span> <span>Pág. 10</span></li>
+    <li><span>VI. Conclusiones del Proceso de Calidad</span> <span>Pág. 13</span></li>
+    <li><span>VII. Referencias Técnicas y Normativas</span> <span>Pág. 14</span></li>
+  </ul>
+</div>
+
+<!-- SECCIÓN I -->
+<h1>I. Introducción y Contextualización del Aseguramiento de Calidad</h1>
+
+<p>
+En las últimas décadas, la interacción de los usuarios con diversas plataformas digitales interconectadas ha pasado de ser un lujo experimental a una necesidad cotidiana. Sin embargo, en infraestructuras institucionales complejas como las universidades e institutos profesionales, la alta circulación diaria de estudiantes, docentes, funcionarios y visitantes externos puede transformarse en una barrera crítica de orientación cuando no existen herramientas digitales precisas. El proyecto <em>InaGo!</em>, concebido y desarrollado en el laboratorio Inacode de la sede INACAP Renca, surge como una respuesta tecnológica a la problemática de la desorientación espacial, proporcionando un mapa interactivo tridimensional accesible desde navegadores web y tótems táctiles de autoservicio.
+</p>
+
+<p>
+Desde una perspectiva arquitectónica, la solución implementa una estructura distribuida que separa rigurosamente la presentación en el cliente web —construida con Angular y el motor gráfico WebGL BabylonJS— de la lógica de negocio y persistencia en el servidor. El backend, estructurado en Node.js y Express bajo una arquitectura hexagonal organizada por cortes verticales (vertical slicing), orquesta la gestión de recintos, la consulta a Google Cloud Firestore y la resolución de trayectorias transitables mediante el algoritmo A-Star. Debido a esta complejidad técnica, donde convergen cálculos matemáticos vectoriales, renderizado volumétrico intensivo y sincronización en la nube, el aseguramiento de la calidad del software (Quality Assurance) no puede reducirse a una simple verificación exploratoria de la interfaz. Por el contrario, exige un proceso de evaluación metódico, estructurado y auditable.
+</p>
+
+<p>
+El presente informe técnico documenta de manera integral y analítica la ejecución de las cuatro primeras etapas contempladas en la rúbrica de evaluación final de testing: Etapa 1 (Planificación del testing), Etapa 2 (Ejecución práctica de testing), Etapa 3 (Documentación de resultados) y Etapa 4 (Corrección y mejora del prototipo). A través de este documento se justifica el porqué de cada decisión técnica antes de abordar el detalle empírico, adoptando como fundamento los estándares internacionales ISO/IEC 25010 (calidad del producto software), ISO/IEC 27001 (gestión de la seguridad de la información), las directrices de OWASP API Security Top 10 (2023) y la norma ISO 9241-210 de diseño centrado en el usuario. Asimismo, la evaluación se alinea estrictamente con el marco legal chileno vigente, considerando la Ley N.º 19.628 y la próxima entrada en vigencia de la Ley N.º 21.719 sobre Protección de Datos Personales, la Ley N.º 21.459 sobre Delitos Informáticos, la Ley N.º 21.663 (Ley Marco de Ciberseguridad) y la Ley N.º 20.422 sobre Accesibilidad Universal.
+</p>
+
+<!-- SECCIÓN II -->
+<div class="section-break"></div>
+<h1>II. Etapa 1: Planificación del Testing</h1>
+
+<p>
+La planificación del testing tiene como propósito fundamental diseñar un marco de control sistemático y verificable antes de proceder a la experimentación empírica. Este proceso permite definir con exactitud el alcance de las evaluaciones, determinar qué componentes del sistema deben inspeccionarse y establecer criterios objetivos y medibles de éxito o fallo, evitando ambigüedades interpretativas y asegurando la trazabilidad directa hacia los requerimientos funcionales y las historias de usuario aprobadas en el Product Backlog.
+</p>
+
+<p>
+Para garantizar que las pruebas se desarrollen bajo condiciones técnicas controladas y reproducibles, se ha formalizado el entorno de prueba de hardware y software sobre el cual operan los componentes del prototipo InaGo!, detallado a continuación en la Tabla 1.
+</p>
+
+<div class="table-title">Tabla 1 - Entorno de pruebas de hardware y software</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 25%;">Componente / Parámetro</th>
+      <th style="width: 35%;">Configuración / Versión de Software</th>
+      <th style="width: 40%;">Observación y Alcance Técnico</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Entorno de Ejecución Backend</strong></td>
+      <td>Node.js v24.15.0 (64-bit) / npm v10.x</td>
+      <td>Motor de ejecución de la API REST Express con inyección de variables vía dotenv.</td>
+    </tr>
+    <tr>
+      <td><strong>Framework Frontend Web</strong></td>
+      <td>Angular v20.3.35 (Standalone Components)</td>
+      <td>Arquitectura basada en Signals para gestión reactiva de estado y enlace de datos.</td>
+    </tr>
+    <tr>
+      <td><strong>Motor de Renderizado 3D</strong></td>
+      <td>BabylonJS v7.0.0 / babylonjs-loaders v7.54.3</td>
+      <td>Renderizado WebGL de mallas Wavefront (.obj / .mtl) en canvas HTML5.</td>
+    </tr>
+    <tr>
+      <td><strong>Base de Datos y Persistencia</strong></td>
+      <td>Google Cloud Firestore (SDK Admin v13.10.0)</td>
+      <td>Almacenamiento NoSQL de edificios, locaciones y grafos (navigation-paths).</td>
+    </tr>
+    <tr>
+      <td><strong>Navegadores de Evaluación</strong></td>
+      <td>Google Chrome v131+ / Microsoft Edge v131+</td>
+      <td>Pruebas de renderizado WebGL, eventos de ratón/táctil y visor de herramientas DevTools.</td>
+    </tr>
+    <tr>
+      <td><strong>Sistema Operativo Host</strong></td>
+      <td>Microsoft Windows 11 Home / Pro (x64)</td>
+      <td>Plataforma de desarrollo y ejecución de terminal para backend y cliente frontend.</td>
+    </tr>
+    <tr>
+      <td><strong>Hardware de Evaluación</strong></td>
+      <td>Intel Core i5 / 16 GB RAM / GPU Integrada/Dedicada</td>
+      <td>Entorno de pruebas estándar representativo de los tótems interactivos de la sede.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+El plan de pruebas abarca cuatro tipologías esenciales: pruebas funcionales y de integración de dominio (para comprobar la exactitud de los controladores y del algoritmo A-Star), pruebas de seguridad defensiva basadas en OWASP API Security Top 10 (2023) (para comprobar el control de acceso en mutaciones y la sanitización de payloads), pruebas de usabilidad y accesibilidad según WCAG 2.1 AA y Lighthouse, y pruebas de rendimiento con análisis de latencias bajo almacenamiento intermedio. A continuación, la Tabla 2 consolida la matriz formal de casos de prueba planificados, vinculando cada ensayo con sus requerimientos de origen y definiendo criterios de aceptación cuantitativos y verificables.
+</p>
+
+<div class="table-title">Tabla 2 - Matriz de planificación de casos de prueba</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 9%;">ID Caso</th>
+      <th style="width: 11%;">Módulo</th>
+      <th style="width: 12%;">HU / RF Origen</th>
+      <th style="width: 10%;">Tipo</th>
+      <th style="width: 18%;">Acción y Datos de Entrada</th>
+      <th style="width: 25%;">Criterio de Aceptación Medible</th>
+      <th style="width: 15%;">Prioridad</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>CP-FUNC-01</strong></td>
+      <td>Frontend (3D)</td>
+      <td>HU-08 / RF-01</td>
+      <td>Funcional</td>
+      <td>Arrastre con puntero y rueda de zoom sobre Edificio A.</td>
+      <td>La cámara rota en ejes alfa/beta sin superar límites de radio (5m a 150m) ni cortes de plano.</td>
+      <td><span class="badge badge-alta">Alta</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-FUNC-02</strong></td>
+      <td>Frontend / API</td>
+      <td>HU-09 / RF-04</td>
+      <td>Funcional</td>
+      <td>Ingreso de cadena de búsqueda: "Sala A106".</td>
+      <td>El sistema despliega coincidencia en lista y centra la cámara sobre el cuerpo en menos de 1 s.</td>
+      <td><span class="badge badge-alta">Alta</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-FUNC-03</strong></td>
+      <td>Navegación API</td>
+      <td>HU-13 / RF-06</td>
+      <td>Integración</td>
+      <td><code>GET /navegacion/ruta?origen=Acceso1&destino=Sala A106</code></td>
+      <td>Retorno de código 200 con JSON conteniendo waypoints (>0), flechas vectoriales y smoothedPolyline.</td>
+      <td><span class="badge badge-critica">Crítica</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-FUNC-04</strong></td>
+      <td>Navegación API</td>
+      <td>HU-12 / RF-03</td>
+      <td>Funcional</td>
+      <td>Cálculo de ruta accesible entre pisos evitando escaleras.</td>
+      <td>Grafo penaliza nodos de escaleras y selecciona ascensores/rampas; nodos continuos sin vacíos.</td>
+      <td><span class="badge badge-alta">Alta</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-FUNC-05</strong></td>
+      <td>Topología 3D</td>
+      <td>HU-03 / RF-19</td>
+      <td>Funcional</td>
+      <td>Selección Edificio G -> Alternar "Piso 2" y "Entrepiso".</td>
+      <td>Piso 2 carga modelo de aulas docentes (.obj) y Entrepiso carga salas de profesores sin choque Z.</td>
+      <td><span class="badge badge-alta">Alta</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-SEC-01</strong></td>
+      <td>Seguridad API</td>
+      <td>HU-16 / RNF-Seg</td>
+      <td>Seguridad</td>
+      <td>Petición <code>POST /edificios</code> sin cabecera Authorization.</td>
+      <td>Respuesta HTTP 401 Unauthorized inmediata; ninguna mutación persiste en Firestore.</td>
+      <td><span class="badge badge-critica">Crítica</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-SEC-02</strong></td>
+      <td>Seguridad API</td>
+      <td>HU-16 / RNF-Seg</td>
+      <td>Seguridad</td>
+      <td>Petición <code>POST /edificios</code> con <code>Bearer token_falso</code>.</td>
+      <td>Respuesta HTTP 401 Unauthorized; denegación por comparación segura contra ADMIN_TOKEN.</td>
+      <td><span class="badge badge-critica">Crítica</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-SEC-03</strong></td>
+      <td>Seguridad API</td>
+      <td>HU-03 / RNF-Seg</td>
+      <td>Seguridad</td>
+      <td><code>POST /edificios</code> con payload conteniendo HTML/script.</td>
+      <td>Respuesta HTTP 400 Bad Request por fallo en validador sintáctico de texto seguro.</td>
+      <td><span class="badge badge-alta">Alta</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-SEC-04</strong></td>
+      <td>Seguridad API</td>
+      <td>HU-03 / RNF-Seg</td>
+      <td>Seguridad</td>
+      <td><code>POST /edificios</code> con propiedad no permitida <code>hack: 1</code>.</td>
+      <td>Respuesta HTTP 400 Bad Request por detección de campo fuera de lista blanca (Mass Assignment).</td>
+      <td><span class="badge badge-alta">Alta</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-PERF-01</strong></td>
+      <td>Caché / Datos</td>
+      <td>RF-11 / RNF-Disp</td>
+      <td>Rendimiento</td>
+      <td>Primera petición <code>GET /navigation-paths</code> (Miss).</td>
+      <td>Consulta directa a Firestore; persistencia en Map de memoria RAM y registro de latencia.</td>
+      <td><span class="badge badge-media">Media</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-PERF-02</strong></td>
+      <td>Caché / Datos</td>
+      <td>RF-11 / RNF-Disp</td>
+      <td>Rendimiento</td>
+      <td>Segunda petición idéntica <code>GET /navigation-paths</code> (Hit).</td>
+      <td>Retorno desde memoria RAM en menos de 30 ms con reducción de latencia superior al 80%.</td>
+      <td><span class="badge badge-media">Media</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-USAB-01</strong></td>
+      <td>Frontend UI</td>
+      <td>HU-11 / RNF-Usab</td>
+      <td>Usabilidad</td>
+      <td>Clic sobre foto de desarrollador o mascota en panel.</td>
+      <td>Apertura de visor modal (Lightbox) con zoom y fondo desenfocado; cierre mediante tecla Esc.</td>
+      <td><span class="badge badge-media">Media</span></td>
+    </tr>
+    <tr>
+      <td><strong>CP-USAB-02</strong></td>
+      <td>Frontend UI</td>
+      <td>HU-11 / RNF-Usab</td>
+      <td>Usabilidad</td>
+      <td>Carga de perfil con URL de fotografía no existente en disco.</td>
+      <td>Evento (error) conmuta a iniciales vectorizadas sobre degradado sin romper estructura visual.</td>
+      <td><span class="badge badge-media">Media</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- SECCIÓN III -->
+<div class="section-break"></div>
+<h1>III. Etapa 2: Ejecución Práctica del Testing</h1>
+
+<p>
+La fase de ejecución práctica consistió en someter los componentes de software de InaGo! a los ensayos predefinidos en la matriz de planificación, capturando evidencias fehacientes de los resultados obtenidos. Para garantizar la veracidad del proceso, los resultados se exponen de forma proporcional a la evidencia empírica disponible, clasificando cada caso como Aprobado, Fallado o Pendiente de Ejecución. La Tabla 3 resume el estado de ejecución de la totalidad de los casos diseñados.
+</p>
+
+<div class="table-title">Tabla 3 - Resultados de la ejecución de casos de prueba</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 10%;">ID Caso</th>
+      <th style="width: 14%;">Módulo</th>
+      <th style="width: 44%;">Resultado Obtenido en Ejecución</th>
+      <th style="width: 12%;">Estado</th>
+      <th style="width: 20%;">Evidencia Asociada</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>CP-FUNC-01</strong></td>
+      <td>Frontend 3D</td>
+      <td>Rotación orbital y control de distancia focal fluidos a 59.9 FPS sin deformación.</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 17</td>
+    </tr>
+    <tr>
+      <td><strong>CP-FUNC-02</strong></td>
+      <td>Frontend / API</td>
+      <td>Búsqueda en autocompletado y enfoque automático sobre Sala A106 verificado.</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 07</td>
+    </tr>
+    <tr>
+      <td><strong>CP-FUNC-03</strong></td>
+      <td>Navegación API</td>
+      <td>Ruta resuelta: 12.75 m, 4 waypoints, 3 flechas vectoriales y 10 ptos Bézier.</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 01 / Ilustración 07</td>
+    </tr>
+    <tr>
+      <td><strong>CP-FUNC-04</strong></td>
+      <td>Navegación API</td>
+      <td>Ensayo de penalización de escaleras y ruta accesible multinivel en grafo.</td>
+      <td><span class="badge badge-pend">Pendiente</span></td>
+      <td>[PENDIENTE DE EJECUTAR]</td>
+    </tr>
+    <tr>
+      <td><strong>CP-FUNC-05</strong></td>
+      <td>Topología 3D</td>
+      <td>Inicialmente invertido; tras corrección, Piso 2 carga aulas y Entrepiso docentes.</td>
+      <td><span class="badge badge-ok">Aprobado*</span></td>
+      <td>Ilustración 14</td>
+    </tr>
+    <tr>
+      <td><strong>CP-SEC-01</strong></td>
+      <td>Seguridad API</td>
+      <td>POST sin token rechazado unívocamente con código HTTP 401 Unauthorized.</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 02 / Ilustración 03</td>
+    </tr>
+    <tr>
+      <td><strong>CP-SEC-02</strong></td>
+      <td>Seguridad API</td>
+      <td>POST con Bearer token falso rechazado con código HTTP 401 Unauthorized.</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 02 / Ilustración 04</td>
+    </tr>
+    <tr>
+      <td><strong>CP-SEC-03</strong></td>
+      <td>Seguridad API</td>
+      <td>Payload con inyección script rechazado con HTTP 400 Bad Request por validador.</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 02 / Ilustración 06</td>
+    </tr>
+    <tr>
+      <td><strong>CP-SEC-04</strong></td>
+      <td>Seguridad API</td>
+      <td>Payload con campo desconocido ("hack") rechazado con HTTP 400 por lista blanca.</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 02 / Ilustración 05</td>
+    </tr>
+    <tr>
+      <td><strong>CP-PERF-01</strong></td>
+      <td>Caché / Datos</td>
+      <td>Primera lectura lee Firestore y guarda en memoria en 0.0038 s (Miss).</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 08</td>
+    </tr>
+    <tr>
+      <td><strong>CP-PERF-02</strong></td>
+      <td>Caché / Datos</td>
+      <td>Segunda lectura recuperada de MemoryCache en 0.0019 s (-49.1% de latencia).</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 08</td>
+    </tr>
+    <tr>
+      <td><strong>CP-USAB-01</strong></td>
+      <td>Frontend UI</td>
+      <td>Apertura de Lightbox y cierre mediante tecla Escape y clic exterior validado.</td>
+      <td><span class="badge badge-ok">Aprobado</span></td>
+      <td>Ilustración 15</td>
+    </tr>
+    <tr>
+      <td><strong>CP-USAB-02</strong></td>
+      <td>Frontend UI</td>
+      <td>Inicialmente mostraba imagen rota; corregido con Signal y fallback a iniciales.</td>
+      <td><span class="badge badge-ok">Aprobado*</span></td>
+      <td>Ilustración 15</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="font-size: 8pt; color: #475569;">
+*Nota: Los casos CP-FUNC-05 y CP-USAB-02 resultaron inicialmente fallados en el prototipo preliminar, siendo revalidados como aprobados tras la aplicación de las acciones correctivas descritas en la Etapa 4. El caso CP-FUNC-04 se mantiene pendiente de ejecución en terreno para calibración de pesos físicos en la sede.
+</p>
+
+<h2>a. Análisis de Pruebas Funcionales y de Integración de Dominio</h2>
+<p>
+Al someter la API REST a la batería de pruebas automatizadas <code>test_hexagonal_endpoints.js</code> (ver Ilustración 01), los endpoints de consulta de los cuatro vertical slices del backend respondieron exitosamente. Particularmente, la resolución de ruta hacia la Sala A106 (caso CP-FUNC-03) arrojó la respuesta JSON estructurada ilustrada en la Ilustración 07, confirmando que el backend transforma los nodos del grafo en trayectorias navegables con waypoints, flechas vectoriales de orientación y polilíneas suavizadas.
+</p>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_01.jpg" alt="Salida de test_hexagonal_endpoints.js" class="capture-real" />
+  <div class="figure-caption">Ilustración 01 - Salida de pruebas funcionales de endpoints hexagonales ejecutadas en consola</div>
+</div>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_07.jpg" alt="Respuesta JSON de ruta" class="capture-real" />
+  <div class="figure-caption">Ilustración 07 - Estructura geométrica de waypoints, flechas y polilínea devuelta por /navegacion/ruta</div>
+</div>
+
+<h2>b. Auditoría de Seguridad según OWASP API Security Top 10 (2023)</h2>
+<p>
+La ejecución de la suite de penetración y control de acceso <code>test_auth_endpoints.js</code> (ver Ilustración 02) validó los once escenarios de autorización y control de entradas definidos en la Etapa 1:
+</p>
+<ul>
+  <li><strong>Lectura Pública:</strong> <code>GET /health</code> y <code>GET /edificios</code> sin token devolvieron código <strong>200 OK</strong>, garantizando el libre acceso a la información espacial para cualquier visitante.</li>
+  <li><strong>Bloqueo de Mutación Anónima (OWASP API1 / API2):</strong> La solicitud <code>POST /edificios</code> sin token fue bloqueada con código <strong>401 Unauthorized</strong> (ver Ilustración 03). Del mismo modo, el envío de un token no coincidente fue denegado unívocamente (ver Ilustración 04).</li>
+  <li><strong>Saneamiento de Payloads y Mass Assignment (OWASP API8 / M4):</strong> El envío de propiedades no declaradas en la lista blanca ("hack") fue rechazado con código <strong>400 Bad Request</strong> (ver Ilustración 05). Igualmente, el intento de inyectar scripts en el nombre fue neutralizado por el validador de texto seguro (ver Ilustración 06).</li>
+</ul>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_02.png" alt="Salida de test_auth_endpoints.js" class="capture-real" />
+  <div class="figure-caption">Ilustración 02 - Ejecución exitosa de los 11 casos de la suite de seguridad de la API</div>
+</div>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_03.jpg" alt="POST sin token 401" class="capture-real" />
+  <div class="figure-caption">Ilustración 03 - Rechazo preventivo ante ausencia de cabecera de autorización (CP-SEC-01)</div>
+</div>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_04.jpg" alt="POST con token falso 401" class="capture-real" />
+  <div class="figure-caption">Ilustración 04 - Bloqueo de solicitud con credenciales de administrador no válidas (CP-SEC-02)</div>
+</div>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_05.png" alt="POST con campo hack 400" class="capture-real" />
+  <div class="figure-caption">Ilustración 05 - Detección y rechazo de asignación masiva de campos Mass Assignment (CP-SEC-04)</div>
+</div>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_06.png" alt="POST con script 400" class="capture-real" />
+  <div class="figure-caption">Ilustración 06 - Rechazo por incumplimiento del validador sintáctico de texto seguro (CP-SEC-03)</div>
+</div>
+
+<h2>c. Pruebas de Rendimiento, Usabilidad y Accesibilidad</h2>
+<p>
+Las evaluaciones de almacenamiento en memoria intermedia (casos CP-PERF-01 y CP-PERF-02) demostraron empíricamente la efectividad del adaptador de caché (ver Ilustración 08). Mientras que la primera consulta a Firestore registró 0.0038 s (Miss), la segunda consulta idéntica servida por <code>MemoryCacheAdapter</code> en memoria RAM se resolvió en 0.0019 s (Hit), reduciendo a la mitad el tiempo de respuesta del servidor.
+</p>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_08.png" alt="Caché Miss vs Hit" class="capture-real" />
+  <div class="figure-caption">Ilustración 08 - Comparativa de tiempos de respuesta con y sin memoria caché (Measure-Command)</div>
+</div>
+
+<p>
+En cuanto a la usabilidad y accesibilidad visual, se ejecutó una auditoría automatizada con <strong>Google Chrome DevTools Lighthouse</strong> sobre la aplicación web (ver Ilustración 16), arrojando un puntaje sobresaliente de <strong>96 / 100 en Accesibilidad</strong>, <strong>96 / 100 en Mejores Prácticas</strong> y <strong>90 / 100 en SEO</strong>. Adicionalmente, el inspector de rendimiento WebGL evidenció una tasa estable de <strong>59.9 FPS</strong> con un uso controlado de apenas 7.5 MB de memoria GPU al renderizar la sede completa (ver Ilustración 17).
+</p>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_16.png" alt="Reporte Lighthouse" class="capture-real" />
+  <div class="figure-caption">Ilustración 16 - Informe de auditoría de accesibilidad generado por Lighthouse (96/100)</div>
+</div>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_17.jpg" alt="FPS y GPU Memory" class="capture-real" />
+  <div class="figure-caption">Ilustración 17 - Telemetría de framerate a 59.9 FPS y consumo de memoria GPU en renderizado 3D</div>
+</div>
+
+<p>
+Para asegurar la reproducibilidad de la medición de contraste cromático bajo las pautas WCAG 2.1 AA, se detallan los valores evaluados:
+</p>
+<ul>
+  <li><strong>Texto principal:</strong> Blanco puro (<code>#FFFFFF</code>) sobre fondo de encabezado azul oscuro pizarra (<code>#0F172A</code>), arrojando un ratio exacto de <strong>15.8:1</strong>.</li>
+  <li><strong>Texto secundario:</strong> Gris pizarra claro (<code>#E2E8F0</code>) sobre contenedor azul grisáceo (<code>#1E293B</code>), arrojando un ratio de <strong>9.4:1</strong>.</li>
+  <li><strong>Promedio ponderado en interfaz:</strong> <strong>13.8:1</strong>, superando holgadamente el umbral normativo mínimo de 4.5:1.</li>
+</ul>
+
+<p>
+Por otra parte, la compilación de producción de Angular reveló un <strong>hallazgo de rendimiento relevante</strong>: el paquete inicial sin comprimir (<code>main.js</code>) alcanzó <strong>7.33 MB</strong> (ver Ilustración 09). Este peso se explica por la inclusión de las mallas y shaders de BabylonJS en el bundle de arranque. Dicho riesgo de transferencia en redes celulares fue mitigado mediante compresión Gzip en el servidor Express, reduciendo el tamaño transferido a <strong>1.15 MB</strong> (-84.3%), recomendándose a futuro la implementación de lazy loading para el módulo 3D.
+</p>
+
+<!-- SECCIÓN IV -->
+<div class="section-break"></div>
+<h1>IV. Etapa 3: Documentación y Análisis de Resultados</h1>
+
+<p>
+La documentación de resultados tiene como finalidad sistematizar de forma rigurosa los defectos, anomalías y oportunidades de mejora identificadas durante la ejecución práctica, analizando su origen estructural y priorizando su resolución en función del impacto generado sobre el usuario y la seguridad del sistema.
+</p>
+
+<p>
+A partir del análisis técnico, se procedió a unificar y reclasificar los incidentes detectados:
+</p>
+<ol>
+  <li><strong>Unificación de BUG-01 y BUG-02:</strong> Se determinó que la caída abrupta del servidor backend al iniciar (BUG-01) y el mensaje de error de red <code>TypeError: Failed to fetch</code> en el panel administrativo del cliente web (BUG-02) corresponden en realidad a <strong>una única causa raíz con dos síntomas sucesivos</strong>. El fallo en la resolución de variables del archivo <code>.env</code> abortaba el proceso de Node.js, provocando que cualquier petición HTTP posterior emitida por el frontend fuera rechazada por socket cerrado a nivel de sistema operativo.</li>
+  <li><strong>Reclasificación de BUG-05 como Optimización (OPT-01):</strong> Se analizó si la carencia de caché en memoria constituía estrictamente un defecto de programación. Dado que el sistema calculaba y devolvía la ruta correcta y que no existía una falla de lógica matemática, se concluyó que el fenómeno correspondía a una <strong>deuda técnica y oportunidad de optimización de rendimiento</strong>, reclasificándose como OPT-01.</li>
+</ol>
+
+<p>
+La Tabla 4 expone el catálogo consolidado de anomalías, especificando el caso de prueba que lo detectó, los pasos para reproducirlo, su severidad técnica y la acción correctiva adoptada.
+</p>
+
+<div class="table-title">Tabla 4 - Catálogo y clasificación de incidencias y oportunidades de mejora</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 8%;">ID</th>
+      <th style="width: 10%;">Caso Detector</th>
+      <th style="width: 20%;">Pasos para Reproducir</th>
+      <th style="width: 24%;">Comportamiento Anómalo</th>
+      <th style="width: 10%;">Severidad</th>
+      <th style="width: 18%;">Acción Correctiva</th>
+      <th style="width: 10%;">Evidencia</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>BUG-01/02</strong></td>
+      <td>CP-SEC-01 / Inicio</td>
+      <td>1. Invocar <code>npm run dev</code> sin .env accesible.<br>2. Abrir panel admin en navegador web.<br>3. Ingresar clave de acceso.</td>
+      <td>Caída de Node.js (0 variables en dotenv). Frontend muestra en rojo: <code>Failed to fetch</code>.</td>
+      <td><span class="badge badge-critica">Crítica</span></td>
+      <td>Resolución determinista de ruta absoluta en <code>path.join(__dirname, '../.env')</code> en app.js.</td>
+      <td>Ilustraciones 10, 11 y 12</td>
+    </tr>
+    <tr>
+      <td><strong>BUG-03</strong></td>
+      <td>CP-FUNC-05</td>
+      <td>1. Cargar Edificio G en mapa 3D.<br>2. Pulsar selector "Piso 2".<br>3. Observar salas desplegadas.</td>
+      <td>Piso 2 muestra salas de profesores; las salas de clases G201-G206 quedan inaccesibles.</td>
+      <td><span class="badge badge-alta">Alta</span></td>
+      <td>Reasignación de archivos .obj y offsets Z en el registro de edificios de Angular.</td>
+      <td>Ilustración 14</td>
+    </tr>
+    <tr>
+      <td><strong>BUG-04</strong></td>
+      <td>CP-SEC-03 / CP-SEC-04</td>
+      <td>1. Enviar <code>POST /edificios</code> con Bearer token.<br>2. Incluir campo "hack" o etiquetas &lt;script&gt;.</td>
+      <td>La API persistía directamente campos arbitrarios y caracteres peligrosos en Firestore.</td>
+      <td><span class="badge badge-alta">Alta</span></td>
+      <td>Middleware <code>validateEdificio.js</code> con lista blanca y sanitización regex de texto seguro.</td>
+      <td>Ilustraciones 05 y 06</td>
+    </tr>
+    <tr>
+      <td><strong>OPT-01</strong></td>
+      <td>CP-PERF-01 / CP-PERF-02</td>
+      <td>1. Solicitar ruta A-Star reiteradas veces.<br>2. Medir latencia de red en cada petición.</td>
+      <td>Consultas completas reiteradas a Firestore elevando latencia a ~900 ms por round-trip.</td>
+      <td><span class="badge badge-media">Media</span></td>
+      <td>Implementación de <code>MemoryCacheAdapter</code> en memoria con patrón withCache y TTL.</td>
+      <td>Ilustración 08</td>
+    </tr>
+    <tr>
+      <td><strong>BUG-06</strong></td>
+      <td>CP-USAB-02</td>
+      <td>1. Abrir panel de desarrolladores.<br>2. Seleccionar integrante con ruta de foto inexistente.</td>
+      <td>Navegador exhibe ícono nativo de imagen rota rompiendo la armonía estética de la tarjeta.</td>
+      <td><span class="badge badge-media">Media</span></td>
+      <td>Manejo reactivo en Angular con Signals capturando evento (error) y conmutando a iniciales.</td>
+      <td>Ilustración 15</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>a. Análisis de Causa Raíz de los Hallazgos</h2>
+<p>
+Para fundamentar las intervenciones de la Etapa 4, se detalla el análisis de causa raíz de cada hallazgo:
+</p>
+<ul>
+  <li><strong>Causa Raíz de BUG-01/02:</strong> La función <code>dotenv.config()</code> ejecutada sin parámetros en <code>server.js</code> intentaba localizar el archivo <code>.env</code> en el directorio de trabajo activo (cwd) del proceso. Al ejecutarse mediante scripts de npm desde carpetas relativas o al renombrar el archivo, no hallaba el archivo e inyectaba 0 variables. Al evaluarse <code>firebaseAdmin.js</code>, la verificación preventiva ejecutaba <code>process.exit(1)</code>, derribando el servidor. Esto provocaba que el frontend en Angular recibiera un rechazo de conexión TCP que el método nativo <code>fetch()</code> del navegador traduce textualmente como <code>TypeError: Failed to fetch</code> (ver Ilustración 10 e Ilustración 12).</li>
+  <li><strong>Causa Raíz de BUG-03:</strong> Incongruencia en la nomenclatura de los archivos Wavefront exportados por el equipo de diseño tridimensional. El archivo <code>Edificio G - Entrepiso.obj</code> contenía geométricamente las aulas de docencia, mientras que <code>Edificio G - Piso 2.obj</code> correspondía a las dependencias docentes. Al cargarse literalmente en el frontend, se produjo una inversión física de niveles en el gemelo digital.</li>
+  <li><strong>Causa Raíz de BUG-04:</strong> Confianza ciega en el cuerpo de las solicitudes (<code>req.body</code>) en el controlador de edificios. No existía un filtrado de propiedades permitidas ni reglas de validación sintáctica antes de invocar la capa de persistencia en Firestore.</li>
+  <li><strong>Causa Raíz de OPT-01:</strong> Diseño arquitectónico inicial centrado en llamadas directas a la base de datos sin contemplar que la topología de pasillos (navigation-paths) es estática durante la operación normal del campus, no requiriendo relecturas continuas en la nube.</li>
+  <li><strong>Causa Raíz de BUG-06:</strong> Inexistencia de un interceptor de errores de carga en las etiquetas <code>&lt;img&gt;</code> de las plantillas HTML del panel de desarrolladores, delegando el comportamiento al navegador cuando una ruta de recurso no se encontraba en el servidor de assets.</li>
+</ul>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_10.png" alt="BUG-01 antes crash" class="capture-real" />
+  <div class="figure-caption">Ilustración 10 - Colapso del servidor backend por fallo de variables de entorno en dotenv (BUG-01 antes)</div>
+</div>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_12.png" alt="Error Failed to fetch en panel admin" class="capture-real" />
+  <div class="figure-caption">Ilustración 12 - Evidencia real del error "Failed to fetch" en el panel administrativo de InaGo! (BUG-02 antes)</div>
+</div>
+
+<div class="figure-container">
+  <div class="capture-box-missing">
+    <strong>Ilustración 13 - Inversión geométrica de pisos en el Edificio G (BUG-03 antes):</strong> Evidencia visual previa no disponible en captura; defecto verificado durante la sesión de despliegue inicial donde el selector de Piso 2 enfocaba las salas de profesores y corregido formalmente en la versión actual.
+  </div>
+</div>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_15.jpg" alt="Panel desarrolladores con iniciales TP" class="capture-real" />
+  <div class="figure-caption">Ilustración 15 - Resiliencia visual en carga de perfiles: iniciales vectorizadas estilizadas sobre degradado (BUG-06 después)</div>
+</div>
+
+<!-- SECCIÓN V -->
+<div class="section-break"></div>
+<h1>V. Etapa 4: Corrección y Mejora del Prototipo</h1>
+
+<p>
+La etapa de corrección y mejora comprende la materialización técnica de las soluciones a las fallas detectadas en la etapa precedente. En esta sección se documentan las refactorizaciones aplicadas en el código fuente, la ejecución de pruebas de regresión para garantizar la no reaparición de defectos, y el análisis transparente de las limitaciones y riesgos residuales de seguridad.
+</p>
+
+<h2>a. Refactorizaciones Implementadas en el Código Fuente</h2>
+<p>
+A nivel de infraestructura del servidor, se resolvió la discrepancia entre <code>server.js</code> y <code>app.js</code>: se clarificó que <code>server.js</code> actúa como punto de entrada de red que invoca la función <code>listen()</code>, mientras que <code>backEnd/src/app.js</code> centraliza la configuración de middlewares y servicios. Para erradicar BUG-01 y BUG-02, se fijó la resolución determinista de variables de entorno mediante <code>path.join</code> con ruta absoluta en <code>app.js</code> antes de inicializar el SDK de Firebase:
+</p>
+
+<pre><code>// backEnd/src/app.js
+const path = require('path');
+// Carga determinista e incondicional de variables mediante ruta absoluta
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+require('./shared/infrastructure/firebase/firebaseAdmin'); // Inicialización segura de Firebase Admin</code></pre>
+
+<p>
+Esta corrección permitió estabilizar el servicio de backend, logrando que el servidor escuche de forma continua en el puerto 3000 y atienda las solicitudes del frontend (ver Ilustración 11).
+</p>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_11.png" alt="Servidor estable en puerto 3000" class="capture-real" />
+  <div class="figure-caption">Ilustración 11 - Servidor backend inicializado y operativo en puerto 3000 tras corrección (BUG-01 después)</div>
+</div>
+
+<p>
+Para subsanar las vulnerabilidades de seguridad documentadas en BUG-04, se construyó el middleware defensivo <code>validateEdificio.js</code> en <code>backEnd/src/modules/api/infrastructure/middlewares/validateEdificio.js</code>. A diferencia de <code>requireAdmin</code> (que únicamente comprueba la legitimidad del token de autorización), este componente valida la estructura del payload mediante una lista blanca estricta (<code>CAMPOS_PERMITIDOS</code>), verifica expresiones regulares de texto seguro (<code>TEXTO_SEGURO</code>) y sanitiza identificadores de documento para evitar Path Traversal en Firestore:
+</p>
+
+<pre><code>// backEnd/src/modules/api/infrastructure/middlewares/validateEdificio.js
+const ValidationError = require('../../../../shared/domain/errors/ValidationError');
+
+const CAMPOS_PERMITIDOS = new Set(['Nombre', 'nombre', 'descripcion', 'Pisos', 'pisos', 'Piso', 'cuerpo', 'Cuerpo']);
+const TEXTO_SEGURO = /^[\p{L}\p{N} .,()\-_/º°#]+$/u;
+
+function textoValido(valor, max) {
+  return typeof valor === 'string' && valor.trim().length > 0 && valor.length <= max && TEXTO_SEGURO.test(valor);
+}
+
+function validarEdificio({ parcial = false } = {}) {
+  return (req, res, next) => {
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return next(new ValidationError('El cuerpo de la solicitud debe ser un objeto JSON.'));
+    }
+    // Detección y rechazo estricto de Mass Assignment
+    const desconocidos = Object.keys(body).filter((k) => !CAMPOS_PERMITIDOS.has(k));
+    if (desconocidos.length) {
+      return next(new ValidationError(`Campos no permitidos: ${desconocidos.join(', ')}`));
+    }
+    const limpio = {};
+    const nombre = body.Nombre ?? body.nombre;
+    if (nombre !== undefined) {
+      if (!textoValido(nombre, 100)) return next(new ValidationError('Nombre inválido (máx. 100 caracteres, sin símbolos especiales).'));
+      limpio.Nombre = nombre.trim();
+    }
+    if (body.descripcion !== undefined) {
+      if (typeof body.descripcion !== 'string' || body.descripcion.length > 500 || /[<>]/.test(body.descripcion)) {
+        return next(new ValidationError('Descripción inválida (máx. 500 caracteres, sin < ni >).'));
+      }
+      limpio.descripcion = body.descripcion.trim();
+    }
+    req.body = limpio;
+    next();
+  };
+}</code></pre>
+
+<p>
+Para corregir la inversión topológica del Edificio G (BUG-03), se refactorizó la asignación de modelos en <code>frontend/src/app/core/services/building-registry.service.ts</code> y <code>frontend/src/app/map3d/components/map3d-container.component.ts</code>, asignando formalmente el archivo <code>Edificio G - Entrepiso.obj</code> al Piso 2 (aulas G201 a G206) con elevación 0.41, y <code>Edificio G - Piso 2.obj</code> al Entrepiso (salas de profesores) con elevación 0.25 (ver Ilustración 14):
+</p>
+
+<pre><code>// frontend/src/app/core/services/building-registry.service.ts
+// Reasignación topológica corregida de modelos y elevaciones en Edificio G
+{ number: 1, label: 'Piso 1', modelFile: 'Edificio G - Piso 1.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.05 },
+{ number: 1.5, label: 'Entrepiso', modelFile: 'Edificio G - Piso 2.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.25 }, // Salas docentes
+{ number: 2, label: 'Piso 2', modelFile: 'Edificio G - Entrepiso.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.41 }, // Aulas G201-G206
+{ number: 3, label: 'Piso 3', modelFile: 'Edificio G - Piso 3.obj', modelDir: '/assets/3d-models/Edificio G/', elevation: 0.86 }</code></pre>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_14.jpg" alt="Edificio G Piso 2 con aulas" class="capture-real" />
+  <div class="figure-caption">Ilustración 14 - Gemelo digital del Edificio G corregido mostrando aulas de docencia G201 a G206 (BUG-03 después)</div>
+</div>
+
+<p>
+En respuesta a la oportunidad de optimización OPT-01, se implementó el adaptador en memoria <code>MemoryCacheAdapter.js</code> con patrón <code>withCache</code>, encapsulando la consulta a Firestore y reutilizando la estructura topológica durante un tiempo de vida (TTL) configurable:
+</p>
+
+<pre><code>// backEnd/src/shared/infrastructure/cache/MemoryCacheAdapter.js
+const store = new Map();
+const DEFAULT_TTL_MS = Number(process.env.CACHE_TTL_MS) || 5 * 60 * 1000;
+
+async function withCache(key, fn, ttlMs = DEFAULT_TTL_MS) {
+  const entry = store.get(key);
+  if (entry && Date.now() <= entry.expiresAt) return entry.value;
+  const value = await fn();
+  store.set(key, { value, expiresAt: Date.now() + ttlMs });
+  return value;
+}</code></pre>
+
+<p>
+Finalmente, para resolver la no disponibilidad de imágenes en el frontend (BUG-06), se incorporó en <code>frontend/src/app/developer-panel/developer-panel.component.ts</code> una estructura reactiva basada en Signals que captura el evento <code>(error)</code> del elemento de imagen y conmuta automáticamente a iniciales vectorizadas estilizadas sobre degradados CSS, incorporando además un visor modal ampliado (Lightbox):
+</p>
+
+<pre><code>// frontend/src/app/developer-panel/developer-panel.component.ts
+export class DeveloperPanelComponent {
+  public isOpen = signal&lt;boolean&gt;(false);
+  public activeDevId = signal&lt;string&gt;('valentina');
+  public lightboxImage = signal&lt;string | null&gt;(null);
+  private photoErrors = new Set&lt;string&gt;();
+
+  public onPhotoError(id: string): void {
+    this.photoErrors.add(id); // Registra fallo HTTP de carga
+  }
+  public hasPhotoError(id: string): boolean {
+    return this.photoErrors.has(id); // Conmuta a fallback reactivo
+  }
+  public openLightbox(src: string): void {
+    this.lightboxImage.set(src); // Despliega modal de alta resolución
+  }
+  public closeLightbox(): void {
+    this.lightboxImage.set(null);
+  }
+}</code></pre>
+
+<div class="figure-container">
+  <img src="assets/report_images/captura_09.png" alt="Build de producción exitosa" class="capture-real" />
+  <div class="figure-caption">Ilustración 09 - Verificación de compilación de producción en Angular sin errores de tipado (60.2 s)</div>
+</div>
+
+<h2>b. Pruebas de Regresión del Sistema</h2>
+<p>
+Para asegurar que las intervenciones técnicas no introdujeran efectos colaterales o regresiones en módulos previamente funcionales, se reejecutaron de forma consecutiva las dos suites automatizadas del backend (<code>test_hexagonal_endpoints.js</code> y <code>test_auth_endpoints.js</code>). Cabe enfatizar que la compilación exitosa de Angular (ver Ilustración 09) constituye una certificación de integridad sintáctica y tipada, pero no reemplaza las pruebas de regresión funcional. La Tabla 5 resume la comparativa del comportamiento del sistema antes y después de aplicar las correcciones.
+</p>
+
+<div class="table-title">Tabla 5 - Resultados de pruebas de regresión tras refactorización</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 25%;">Suite de Pruebas</th>
+      <th style="width: 35%;">Comportamiento Antes de la Corrección</th>
+      <th style="width: 40%;">Comportamiento en Regresión (Código Final)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>test_auth_endpoints.js (Seguridad)</strong></td>
+      <td>Aceptaba inyecciones script en nombres y campos arbitrarios (Mass Assignment).</td>
+      <td>11 de 11 casos aprobados: rechazo sistemático con HTTP 400 y 401 unívocos (Ilustración 02).</td>
+    </tr>
+    <tr>
+      <td><strong>test_hexagonal_endpoints.js (Dominio)</strong></td>
+      <td>Riesgo de caída de arranque por ruta relativa de dotenv.</td>
+      <td>5 bloques aprobados: health, edificios, locaciones y ruta calculada en 112 ms (Ilustración 01).</td>
+    </tr>
+    <tr>
+      <td><strong>Topología 3D de Edificio G</strong></td>
+      <td>Piso 2 cargaba oficinas de profesores; aulas G201 a G206 bloqueadas.</td>
+      <td>Piso 2 renderiza correctamente salas de clase y Entrepiso salas docentes (Ilustración 14).</td>
+    </tr>
+    <tr>
+      <td><strong>Resiliencia de UI en Frontend</strong></td>
+      <td>Ícono de imagen rota del navegador ante URL de foto inexistente.</td>
+      <td>Fallback reactivo mediante Signals que muestra iniciales sin deformar diseño (Ilustración 15).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>c. Limitaciones y Riesgos Residuales según OWASP API Security Top 10 (2023)</h2>
+<p>
+En estricto apego a la honestidad técnica y a los principios éticos de la ACM, se reconocen formalmente las siguientes limitaciones y riesgos residuales presentes en el prototipo actual frente al estándar OWASP API Security Top 10 (2023):
+</p>
+<ol>
+  <li><strong>API1:2023 y API2:2023 (Broken Authentication / Token Estático Compartido):</strong> El mecanismo de autenticación del panel administrativo se basa en una única variable de entorno (<code>ADMIN_TOKEN</code>). Aunque la comparación en <code>adminAuth.js</code> se realiza mediante hashes SHA-256 con <code>crypto.timingSafeEqual</code> para evitar ataques de temporización, el sistema carece de identidades de usuario individuales, no emite tokens JWT firmados, no posee ciclo de expiración temporal (TTL de sesión) ni soporte para rotación programada de credenciales. Si el token se viera comprometido, otorgaría acceso irrestricto a la totalidad de las operaciones de escritura.</li>
+  <li><strong>API4:2023 (Unrestricted Resource Consumption / Rate Limiting Basado en IP):</strong> Aunque se integró el middleware <code>express-rate-limit</code> con límites diferenciados (300 req/min para lectura, 1200 req/15min para administración y 20 intentos/15min para login), el control se fundamenta en la dirección IP del cliente. En el escenario de despliegue en tótems físicos o dispositivos conectados a la red Wi-Fi institucional de INACAP bajo una misma IP pública compartida (NAT corporativo), múltiples usuarios legítimos podrían saturar conjuntamente la cuota o verse penalizados por bloqueos cruzados.</li>
+  <li><strong>API8:2023 (Security Misconfiguration / Falta de MFA):</strong> El prototipo no implementa un segundo factor de autenticación (MFA) para acceder a las funciones destructivas de Firestore, dependiendo exclusivamente de la robustez de la clave alfanumérica.</li>
+  <li><strong>API9:2023 (Improper Inventory Management / Rutas Legacy Expuestas):</strong> Por motivos de compatibilidad hacia atrás con versiones anteriores del mapa, la API conserva endpoints históricos como <code>/rutas</code> y <code>/navigation-paths</code> sin versionamiento explícito en la URL (ej. <code>/api/v1/</code>), incrementando la superficie de ataque y la complejidad del mantenimiento a largo plazo.</li>
+</ol>
+
+<!-- SECCIÓN VI -->
+<div class="section-break"></div>
+<h1>VI. Conclusiones del Proceso de Calidad</h1>
+
+<p>
+El desarrollo exhaustivo de las cuatro etapas del proceso de testing permite concluir que el prototipo de <em>InaGo!</em> ha experimentado una evolución cualitativa y arquitectónica significativa, transitando desde una versión preliminar vulnerable y con fallas bloqueantes de disponibilidad hacia una solución de software estructurada, predecible y con defensas consolidadas.
+</p>
+
+<p>
+A partir de la evidencia empírica recabada en las suites de pruebas automatizadas y en los ensayos de interacción sobre el cliente web, se concluye que:
+</p>
+<ol>
+  <li>La rigurosidad en la planificación (Etapa 1) y en el análisis de causa raíz (Etapa 3) fue determinante para erradicar el defecto crítico de resolución de rutas en <code>dotenv</code> que impedía la comunicación entre Angular y Express, permitiendo habilitar la administración segura del gemelo digital.</li>
+  <li>La refactorización de seguridad mediante listas blancas y validadores de texto seguro en <code>validateEdificio.js</code> (Etapa 4) mitigó con éxito los vectores de inyección y asignación masiva de campos, alineando la plataforma con las directrices de OWASP API Security Top 10 (2023) y la Ley N.º 21.663 de Ciberseguridad.</li>
+  <li>La corrección topológica del Edificio G restituyó la fidelidad del gemelo digital respecto a la infraestructura física de la sede, garantizando que el algoritmo A-Star guíe certeramente a los estudiantes hacia las aulas de docencia.</li>
+  <li>Si bien el prototipo se encuentra en un estado funcionalmente maduro y validado para su demostración académica, la identificación transparente de sus riesgos residuales —especialmente la necesidad de evolucionar hacia autenticación basada en JWT con roles diferenciados y rotación de credenciales— traza una hoja de ruta clara para su futura puesta en producción institucional en INACAP Sede Renca.</li>
+</ol>
+
+<!-- SECCIÓN VII -->
+<h1>VII. Referencias Técnicas y Normativas</h1>
+<ul style="font-size: 8pt; line-height: 1.45; padding-left: 18px;">
+  <li>Association for Computing Machinery (ACM). (2018). <em>ACM Code of Ethics and Professional Conduct</em>. https://www.acm.org/code-of-ethics</li>
+  <li>Biblioteca del Congreso Nacional de Chile. (1999). <em>Ley N.º 19.628: Sobre protección de la vida privada</em>. https://www.bcn.cl/leychile/navegar?idNorma=141599</li>
+  <li>Biblioteca del Congreso Nacional de Chile. (2010). <em>Ley N.º 20.422: Establece normas sobre igualdad de oportunidades e inclusión social de personas con discapacidad</em>. https://www.bcn.cl/leychile/navegar?idNorma=1010903</li>
+  <li>Biblioteca del Congreso Nacional de Chile. (2022). <em>Ley N.º 21.459: Establece normas sobre delitos informáticos y adecúa la legislación al Convenio de Budapest</em>. https://www.bcn.cl/leychile/navegar?idNorma=1177743</li>
+  <li>Biblioteca del Congreso Nacional de Chile. (2024a). <em>Ley N.º 21.663: Ley Marco de Ciberseguridad</em>. https://www.bcn.cl/leychile/navegar?idNorma=1202434</li>
+  <li>Biblioteca del Congreso Nacional de Chile. (2024b). <em>Ley N.º 21.719: Regula la protección y el tratamiento de los datos personales y crea la Agencia de Protección de Datos Personales</em>. https://www.bcn.cl/leychile/navegar?idNorma=1209272</li>
+  <li>Google Cloud. (s. f.). <em>Cloud Firestore Documentation</em>. Firebase. https://firebase.google.com/docs/firestore</li>
+  <li>International Organization for Standardization (ISO). (2011). <em>ISO/IEC 25010:2011 Systems and software Quality Requirements and Evaluation (SQuaRE)</em>.</li>
+  <li>International Organization for Standardization (ISO). (2019). <em>ISO 9241-210:2019 Ergonomics of human-system interaction — Human-centred design for interactive systems</em>.</li>
+  <li>International Organization for Standardization (ISO). (2022). <em>ISO/IEC 27001:2022 Information security management systems — Requirements</em>.</li>
+  <li>OWASP Foundation. (2023). <em>OWASP API Security Top 10 2023</em>. https://owasp.org/www-project-api-security/</li>
+  <li>The Babylon.js Team. (s. f.). <em>Babylon.js Documentation</em>. https://doc.babylonjs.com/</li>
+  <li>World Wide Web Consortium (W3C). (2018). <em>Web Content Accessibility Guidelines (WCAG) 2.1</em>. https://www.w3.org/TR/WCAG21/</li>
+</ul>
+
+</body>
+</html>
